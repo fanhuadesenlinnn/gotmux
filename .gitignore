@@ -1,0 +1,5 @@
+/gotmux
+dist/
+*.log
+*.test
+.DS_Store
