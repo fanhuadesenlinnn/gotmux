@@ -15,13 +15,16 @@ manual verification note.
 | Attach/detach | Implemented |
 | Common window and pane commands | Implemented |
 | Common `C-b` prefix bindings | Implemented |
+| Basic format expansion for `list-*` and `display-message` | Implemented for the fields covered by `scripts/compat_probe.sh` |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI format subset |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
 
 | Area | Gap |
 | --- | --- |
-| Full command parser | tmux command language, quoting, formats, command queues, and target resolution are incomplete. |
+| Full command parser | tmux command language, quoting, command queues, and target resolution are incomplete. |
+| Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
 | Layout rendering | Multiple panes exist, but tiled split rendering is not equivalent to tmux yet. |
 | Screen model | Full grid, scrollback, alternate screen, redraw diffing, and terminal escape interpretation are incomplete. |
 | Copy mode | Not implemented. |
@@ -31,7 +34,7 @@ manual verification note.
 | Key tables and custom bindings | Only built-in prefix bindings are implemented. |
 | `.tmux.conf` / `source-file` | Not implemented. |
 | Status format language | Only a simple status line is implemented. |
-| Hooks and formats | Not implemented. |
+| Hooks | Not implemented. |
 | Control mode | Not implemented. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |

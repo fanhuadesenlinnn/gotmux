@@ -130,7 +130,7 @@ func (s *Server) NewSession(name, cwd string, windowName string, command []strin
 	s.NextSessionID++
 	s.Sessions[name] = session
 
-	window := s.newWindowLocked(session, windowName)
+	window := s.newWindowLocked(session, defaultWindowName(windowName, command))
 	pane := s.newPaneLocked(window, cwd, command)
 	return session, window, pane, nil
 }
@@ -146,7 +146,7 @@ func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Wi
 	if cwd == "" {
 		cwd = session.CWD
 	}
-	window := s.newWindowLocked(session, name)
+	window := s.newWindowLocked(session, defaultWindowName(name, command))
 	pane := s.newPaneLocked(window, cwd, command)
 	session.Active = len(session.Windows) - 1
 	session.Activity = time.Now()
@@ -504,6 +504,20 @@ func (s *Server) newWindowLocked(session *Session, name string) *Window {
 	s.NextWindowID++
 	session.Windows = append(session.Windows, window)
 	return window
+}
+
+func defaultWindowName(name string, command []string) string {
+	if name != "" {
+		return name
+	}
+	if len(command) == 0 {
+		return ""
+	}
+	base := filepath.Base(command[0])
+	if base == "." || base == "/" || base == "" {
+		return ""
+	}
+	return strings.TrimPrefix(base, "-")
 }
 
 func (s *Server) newPaneLocked(window *Window, cwd string, command []string) *Pane {

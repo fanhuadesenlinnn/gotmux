@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,11 +34,11 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		}
 		return ok("")
 	case "list-sessions":
-		return ok(listSessions(rt.state))
+		return ok(listSessionsFormat(rt.state, optionValue(args, "-F", "")))
 	case "list-windows":
-		return ok(listWindows(rt.state, currentSession))
+		return ok(listWindowsFormat(rt.state, targetSession(args, currentSession), optionValue(args, "-F", "")))
 	case "list-panes":
-		return ok(listPanes(rt.state, currentSession))
+		return ok(listPanesFormat(rt.state, targetSession(args, currentSession), optionValue(args, "-F", "")))
 	case "new-window":
 		return rt.cmdNewWindow(args, currentSession, width, height)
 	case "split-window":
@@ -121,7 +122,7 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		rt.sendKeys(currentSession, keys)
 		return ok("")
 	case "display-message":
-		return ok(strings.Join(nonOptionArgs(args), " "))
+		return rt.cmdDisplayMessage(args, currentSession)
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
@@ -182,6 +183,20 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 		return fail(err.Error())
 	}
 	return ok(fmt.Sprintf("pane %d", pane.Index))
+}
+
+func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
+	template := optionValue(args, "-F", "")
+	if template == "" {
+		values := nonOptionArgs(args)
+		if len(values) > 0 {
+			template = strings.Join(values, " ")
+		}
+	}
+	if template == "" {
+		template = "#{session_name}: #{window_index}:#{window_name}, current pane #{pane_index}"
+	}
+	return ok(formatString(template, activeFormatContext(rt.state, currentSession)))
 }
 
 func (rt *Runtime) sendKeys(session string, keys []string) {
@@ -267,6 +282,10 @@ func optionValue(args []string, name string, fallback string) string {
 	return fallback
 }
 
+func targetSession(args []string, currentSession string) string {
+	return cleanSessionTarget(optionValue(args, "-t", currentSession))
+}
+
 func hasAny(args []string, names ...string) bool {
 	for _, arg := range args {
 		for _, name := range names {
@@ -330,19 +349,32 @@ func trailingCommand(args []string, optionsWithValues map[string]bool) []string 
 }
 
 func listSessions(state *model.Server) string {
-	sessions, _ := state.Snapshot()
+	format := ""
+	return listSessionsFormat(state, format)
+}
+
+func listSessionsFormat(state *model.Server, format string) string {
+	sessions := snapshotSessions(state)
 	if len(sessions) == 0 {
 		return ""
 	}
 	lines := make([]string, 0, len(sessions))
 	for _, session := range sessions {
-		lines = append(lines, fmt.Sprintf("%s: %d windows (created %s) [%dx%d]",
-			session.Name, len(session.Windows), session.CreatedAt.Format("Mon Jan _2 15:04:05 2006"), activeWidth(session), activeHeight(session)))
+		if format != "" {
+			lines = append(lines, formatString(format, formatContext{session: session, window: session.ActiveWindow(), pane: activePane(session)}))
+		} else {
+			lines = append(lines, fmt.Sprintf("%s: %d windows (created %s) [%dx%d]",
+				session.Name, len(session.Windows), session.CreatedAt.Format("Mon Jan _2 15:04:05 2006"), activeWidth(session), activeHeight(session)))
+		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 func listWindows(state *model.Server, sessionName string) string {
+	return listWindowsFormat(state, sessionName, "")
+}
+
+func listWindowsFormat(state *model.Server, sessionName string, format string) string {
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
 	}
@@ -352,11 +384,15 @@ func listWindows(state *model.Server, sessionName string) string {
 		}
 		lines := make([]string, 0, len(session.Windows))
 		for _, window := range session.Windows {
-			mark := ""
-			if window.Index == session.Active {
-				mark = "*"
+			if format != "" {
+				lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: window.ActivePane()}))
+			} else {
+				mark := ""
+				if window.Index == session.Active {
+					mark = "*"
+				}
+				lines = append(lines, fmt.Sprintf("%d: %s%s (%d panes)", window.Index, window.Name, mark, len(window.Panes)))
 			}
-			lines = append(lines, fmt.Sprintf("%d: %s%s (%d panes)", window.Index, window.Name, mark, len(window.Panes)))
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -364,6 +400,10 @@ func listWindows(state *model.Server, sessionName string) string {
 }
 
 func listPanes(state *model.Server, sessionName string) string {
+	return listPanesFormat(state, sessionName, "")
+}
+
+func listPanesFormat(state *model.Server, sessionName string, format string) string {
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
 	}
@@ -377,16 +417,20 @@ func listPanes(state *model.Server, sessionName string) string {
 		}
 		lines := make([]string, 0, len(window.Panes))
 		for _, pane := range window.Panes {
-			mark := ""
-			if pane.Index == window.Active {
-				mark = "*"
+			if format != "" {
+				lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: pane}))
+			} else {
+				mark := ""
+				if pane.Index == window.Active {
+					mark = "*"
+				}
+				state := "running"
+				if pane.Exited {
+					state = "exited"
+				}
+				lines = append(lines, fmt.Sprintf("%d:%s [%dx%d] %s %s",
+					pane.Index, mark, pane.Width, pane.Height, state, model.CommandString(pane.Command)))
 			}
-			state := "running"
-			if pane.Exited {
-				state = "exited"
-			}
-			lines = append(lines, fmt.Sprintf("%d:%s [%dx%d] %s %s",
-				pane.Index, mark, pane.Width, pane.Height, state, model.CommandString(pane.Command)))
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -411,7 +455,28 @@ func firstSessionName(state *model.Server) string {
 
 func snapshotSessions(state *model.Server) []*model.Session {
 	sessions, _ := state.Snapshot()
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].Name < sessions[j].Name
+	})
 	return sessions
+}
+
+func activeFormatContext(state *model.Server, sessionName string) formatContext {
+	if sessionName == "" {
+		sessionName = firstSessionName(state)
+	}
+	for _, session := range snapshotSessions(state) {
+		if session.Name != sessionName {
+			continue
+		}
+		window := session.ActiveWindow()
+		var pane *model.Pane
+		if window != nil {
+			pane = window.ActivePane()
+		}
+		return formatContext{session: session, window: window, pane: pane}
+	}
+	return formatContext{}
 }
 
 func cleanSessionTarget(target string) string {

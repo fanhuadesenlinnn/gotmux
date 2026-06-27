@@ -25,6 +25,8 @@ This first implementation supports:
 - `kill-pane`, `kill-window`, `kill-session`, `kill-server`
 - interactive prefix key `C-b` for common window and pane operations
 - detached sessions with shell processes running in PTYs
+- basic tmux format expansion for `list-sessions`, `list-windows`,
+  `list-panes`, and `display-message`
 - macOS and Linux builds with `CGO_ENABLED=0`
 
 Full tmux parity is not complete yet. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
@@ -61,3 +63,16 @@ Inside an attached client, the default prefix is `C-b`:
 
 Pushing a tag like `v0.1.0` builds Linux and macOS artifacts through GitHub
 Actions and publishes them to a GitHub Release.
+
+## Compatibility Probe
+
+Use the local tmux binary as the behavior oracle for the currently automated
+compatibility subset:
+
+```sh
+scripts/compat_probe.sh
+```
+
+The probe starts isolated tmux and gotmux servers, creates matching sessions,
+windows, and panes, then compares format-driven `list-*` and `display-message`
+output.
