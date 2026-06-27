@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/client"
+	cmdparse "github.com/fanhuadesenlinnn/gotmux/internal/command"
 	"github.com/fanhuadesenlinnn/gotmux/internal/config"
 	"github.com/fanhuadesenlinnn/gotmux/internal/daemon"
 	"github.com/fanhuadesenlinnn/gotmux/internal/server"
@@ -39,7 +40,7 @@ func run(args []string) int {
 		return 0
 	}
 	if global.server {
-		if err := server.Run(context.Background(), socketPath); err != nil {
+		if err := server.Run(context.Background(), socketPath, global.configFiles); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
@@ -49,15 +50,23 @@ func run(args []string) int {
 	if len(command) == 0 {
 		command = []string{"new-session"}
 	}
-	name := normalize(command[0])
+	commands, err := cmdparse.ParseArgv(command)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if len(commands) == 0 {
+		commands = [][]string{{"new-session"}}
+	}
+	name := normalize(commands[0][0])
 	switch name {
 	case "new-session":
-		if err := daemon.Ensure(socketPath); err != nil {
+		if err := daemon.Ensure(socketPath, global.configFiles); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 		width, height := terminal.Size(int(os.Stdout.Fd()))
-		result, err := daemon.SendCommand(socketPath, command, "", width, height)
+		result, err := daemon.SendCommands(socketPath, commands, "", width, height)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
@@ -66,7 +75,7 @@ func run(args []string) int {
 			fmt.Fprintln(os.Stderr, result.Text)
 			return code(result.Code)
 		}
-		if detached(command) {
+		if detached(commands[0]) || len(commands) > 1 {
 			if result.Text != "" {
 				fmt.Println(result.Text)
 			}
@@ -94,7 +103,7 @@ func run(args []string) int {
 			return 1
 		}
 		width, height := terminal.Size(int(os.Stdout.Fd()))
-		result, err := daemon.SendCommand(socketPath, command, cleanTarget(optionValue(command[1:], "-t", "")), width, height)
+		result, err := daemon.SendCommands(socketPath, commands, cleanTarget(optionValue(commands[0][1:], "-t", "")), width, height)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
@@ -110,11 +119,12 @@ func run(args []string) int {
 }
 
 type globals struct {
-	socket  string
-	label   string
-	server  bool
-	version bool
-	help    bool
+	socket      string
+	label       string
+	configFiles []string
+	server      bool
+	version     bool
+	help        bool
 }
 
 func parseGlobal(args []string) (globals, []string, error) {
@@ -136,6 +146,12 @@ func parseGlobal(args []string) (globals, []string, error) {
 				return g, nil, fmt.Errorf("-L requires a socket label")
 			}
 			g.label = args[i]
+		case "-f":
+			i++
+			if i >= len(args) {
+				return g, nil, fmt.Errorf("-f requires a file")
+			}
+			g.configFiles = append(g.configFiles, args[i])
 		case "-V":
 			g.version = true
 		case "-h", "--help":

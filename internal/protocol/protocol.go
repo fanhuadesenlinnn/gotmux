@@ -22,16 +22,17 @@ const (
 )
 
 type Message struct {
-	Type    string   `json:"type"`
-	ID      int64    `json:"id,omitempty"`
-	Command []string `json:"command,omitempty"`
-	Session string   `json:"session,omitempty"`
-	Width   int      `json:"width,omitempty"`
-	Height  int      `json:"height,omitempty"`
-	Data    []byte   `json:"data,omitempty"`
-	Text    string   `json:"text,omitempty"`
-	OK      bool     `json:"ok,omitempty"`
-	Code    int      `json:"code,omitempty"`
+	Type     string     `json:"type"`
+	ID       int64      `json:"id,omitempty"`
+	Command  []string   `json:"command,omitempty"`
+	Commands [][]string `json:"commands,omitempty"`
+	Session  string     `json:"session,omitempty"`
+	Width    int        `json:"width,omitempty"`
+	Height   int        `json:"height,omitempty"`
+	Data     []byte     `json:"data,omitempty"`
+	Text     string     `json:"text,omitempty"`
+	OK       bool       `json:"ok,omitempty"`
+	Code     int        `json:"code,omitempty"`
 }
 
 type Conn struct {

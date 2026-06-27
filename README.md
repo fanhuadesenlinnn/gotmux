@@ -27,6 +27,10 @@ This first implementation supports:
 - detached sessions with shell processes running in PTYs
 - basic tmux format expansion for `list-sessions`, `list-windows`,
   `list-panes`, and `display-message`
+- basic command sequences separated by `;`
+- `source-file`, explicit `-f` startup config loading, and a first subset of
+  `set-option`, `show-options`, `set-window-option`, `bind-key`,
+  `unbind-key`, and `list-keys`
 - macOS and Linux builds with `CGO_ENABLED=0`
 
 Full tmux parity is not complete yet. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
@@ -46,6 +50,8 @@ gotmux attach -t work
 gotmux ls
 gotmux new-window -t work -n logs
 gotmux split-window -t work
+gotmux -f ./tmux.conf new-session -d -s configured
+gotmux new-session -d -s demo \; new-window -t demo -n logs
 ```
 
 Inside an attached client, the default prefix is `C-b`:
@@ -74,5 +80,5 @@ scripts/compat_probe.sh
 ```
 
 The probe starts isolated tmux and gotmux servers, creates matching sessions,
-windows, and panes, then compares format-driven `list-*` and `display-message`
-output.
+windows, and panes, then compares format-driven `list-*`, `display-message`,
+basic options, key bindings, `source-file`, and command sequence behavior.

@@ -30,7 +30,7 @@ type attachedClient struct {
 	done chan struct{}
 }
 
-func Run(ctx context.Context, socketPath string) error {
+func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	if err := os.MkdirAll(parentDir(socketPath), 0o700); err != nil {
 		return err
 	}
@@ -45,6 +45,12 @@ func Run(ctx context.Context, socketPath string) error {
 	rt := &Runtime{
 		state:   model.NewServer(socketPath),
 		clients: make(map[int64]*attachedClient),
+	}
+	for _, file := range configFiles {
+		result := rt.cmdSourceFile([]string{file}, "", 80, 24)
+		if !result.OK {
+			return fmt.Errorf("%s: %s", file, result.Text)
+		}
 	}
 
 	go func() {
@@ -121,7 +127,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 			_ = conn.Write(protocol.Message{Type: protocol.TypeExit, Text: "detached"})
 			return
 		case protocol.TypeCommand:
-			result := rt.execute(next.Command, rt.state.ActiveSessionName(client.ID), next.Width, next.Height)
+			result := rt.executeMessage(next, rt.state.ActiveSessionName(client.ID))
 			_ = conn.Write(result)
 			rt.redrawClient(client.ID)
 		}
@@ -129,7 +135,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 }
 
 func (rt *Runtime) handleCommand(conn *protocol.Conn, msg protocol.Message) {
-	result := rt.execute(msg.Command, msg.Session, msg.Width, msg.Height)
+	result := rt.executeMessage(msg, msg.Session)
 	_ = conn.Write(result)
 }
 

@@ -8,9 +8,52 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fanhuadesenlinnn/gotmux/internal/command"
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 )
+
+func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
+	commands := msg.Commands
+	var err error
+	if len(commands) == 0 {
+		commands, err = command.ParseArgv(msg.Command)
+		if err != nil {
+			return fail(err.Error())
+		}
+	}
+	return rt.executeCommands(commands, currentSession, msg.Width, msg.Height)
+}
+
+func (rt *Runtime) executeCommands(commands [][]string, currentSession string, width, height int) protocol.Message {
+	var texts []string
+	last := ok("")
+	activeSession := currentSession
+	for _, argv := range commands {
+		if len(argv) == 0 {
+			continue
+		}
+		last = rt.execute(argv, activeSession, width, height)
+		if last.Session != "" {
+			activeSession = last.Session
+		} else if activeSession == "" {
+			activeSession = firstSessionName(rt.state)
+		}
+		if last.Text != "" {
+			texts = append(texts, last.Text)
+		}
+		if !last.OK {
+			break
+		}
+	}
+	if len(texts) > 0 {
+		last.Text = strings.Join(texts, "\n")
+	}
+	if last.Session == "" {
+		last.Session = activeSession
+	}
+	return last
+}
 
 func (rt *Runtime) execute(argv []string, currentSession string, width, height int) protocol.Message {
 	if len(argv) == 0 {
@@ -43,6 +86,20 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdNewWindow(args, currentSession, width, height)
 	case "split-window":
 		return rt.cmdSplitWindow(args, currentSession, width, height)
+	case "source-file":
+		return rt.cmdSourceFile(args, currentSession, width, height)
+	case "set-option":
+		return rt.cmdSetOption(args, currentSession, "session")
+	case "set-window-option":
+		return rt.cmdSetOption(args, currentSession, "window")
+	case "show-options":
+		return rt.cmdShowOptions(args, currentSession)
+	case "bind-key":
+		return rt.cmdBindKey(args)
+	case "unbind-key":
+		return rt.cmdUnbindKey(args)
+	case "list-keys":
+		return rt.cmdListKeys(args)
 	case "select-window":
 		target := optionValue(args, "-t", "")
 		index, parsed := parseWindowTarget(target)
@@ -199,6 +256,177 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 	return ok(formatString(template, activeFormatContext(rt.state, currentSession)))
 }
 
+func (rt *Runtime) cmdSourceFile(args []string, currentSession string, width, height int) protocol.Message {
+	paths := optionOperands(args)
+	if len(paths) == 0 {
+		return fail("missing path")
+	}
+	var texts []string
+	last := ok("")
+	for _, path := range paths {
+		data, err := os.ReadFile(expandPath(path))
+		if err != nil {
+			if hasAny(args, "-q") {
+				continue
+			}
+			return fail(err.Error())
+		}
+		commands, err := command.ParseScript(string(data))
+		if err != nil {
+			return fail(err.Error())
+		}
+		last = rt.executeCommands(commands, currentSession, width, height)
+		if last.Text != "" {
+			texts = append(texts, last.Text)
+		}
+		if !last.OK {
+			return last
+		}
+	}
+	last.Text = strings.Join(texts, "\n")
+	return last
+}
+
+func (rt *Runtime) cmdSetOption(args []string, currentSession string, defaultScope string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing option")
+	}
+	name := values[0]
+	value := ""
+	if len(values) > 1 {
+		value = strings.Join(values[1:], " ")
+	}
+	scope := defaultScope
+	if hasAny(args, "-g") {
+		if defaultScope == "window" {
+			scope = "global-window"
+		} else {
+			scope = "global"
+		}
+	}
+	if hasAny(args, "-w") {
+		scope = "window"
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	if err := rt.state.SetOption(scope, currentSession, name, value); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol.Message {
+	scope := "session"
+	if hasAny(args, "-g") {
+		scope = "global"
+	}
+	if hasAny(args, "-w") {
+		if hasAny(args, "-g") {
+			scope = "global-window"
+		} else {
+			scope = "window"
+		}
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	options, err := rt.state.Options(scope, currentSession)
+	if err != nil {
+		return fail(err.Error())
+	}
+	names := optionOperands(args)
+	valueOnly := hasAny(args, "-v")
+	if len(names) > 0 {
+		value, exists := options[names[0]]
+		if !exists {
+			if hasAny(args, "-q") {
+				return ok("")
+			}
+			return fail(fmt.Sprintf("invalid option: %s", names[0]))
+		}
+		if valueOnly {
+			return ok(value)
+		}
+		return ok(fmt.Sprintf("%s %s", names[0], value))
+	}
+	keys := make([]string, 0, len(options))
+	for key := range options {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if valueOnly {
+			lines = append(lines, options[key])
+		} else {
+			lines = append(lines, fmt.Sprintf("%s %s", key, options[key]))
+		}
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) cmdBindKey(args []string) protocol.Message {
+	table := optionValue(args, "-T", "prefix")
+	if hasAny(args, "-n") {
+		table = "root"
+	}
+	note := optionValue(args, "-N", "")
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing key")
+	}
+	key := values[0]
+	boundCommand := []string{"send-prefix"}
+	if len(values) > 1 {
+		boundCommand = values[1:]
+	}
+	rt.state.BindKey(table, key, boundCommand, note, hasAny(args, "-r"))
+	return ok("")
+}
+
+func (rt *Runtime) cmdUnbindKey(args []string) protocol.Message {
+	table := optionValue(args, "-T", "prefix")
+	if hasAny(args, "-n") {
+		table = "root"
+	}
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing key")
+	}
+	rt.state.UnbindKey(table, values[0])
+	return ok("")
+}
+
+func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
+	table := optionValue(args, "-T", "")
+	format := optionValue(args, "-F", "")
+	filterKeys := optionOperands(args)
+	bindings := rt.state.ListKeyBindings(table)
+	sort.Slice(bindings, func(i, j int) bool {
+		if bindings[i].Table == bindings[j].Table {
+			return bindings[i].Key < bindings[j].Key
+		}
+		return bindings[i].Table < bindings[j].Table
+	})
+	var lines []string
+	for _, binding := range bindings {
+		if len(filterKeys) > 0 && binding.Key != filterKeys[0] {
+			continue
+		}
+		if format != "" {
+			lines = append(lines, formatKeyBinding(format, binding))
+		} else {
+			lines = append(lines, fmt.Sprintf("bind-key -T %s %s %s", binding.Table, binding.Key, strings.Join(binding.Command, " ")))
+		}
+		if hasAny(args, "-1") && len(lines) > 0 {
+			break
+		}
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
 func (rt *Runtime) sendKeys(session string, keys []string) {
 	pane := rt.state.ActivePane(session)
 	if pane == nil || pane.PTY == nil {
@@ -253,8 +481,24 @@ func normalizeCommandName(name string) string {
 		return "kill-pane"
 	case "killw":
 		return "kill-window"
+	case "source":
+		return "source-file"
+	case "set":
+		return "set-option"
+	case "setw":
+		return "set-window-option"
+	case "show":
+		return "show-options"
+	case "bind":
+		return "bind-key"
+	case "unbind":
+		return "unbind-key"
+	case "lsk":
+		return "list-keys"
 	case "kill-server", "kill-session", "rename-session", "rename-window",
-		"send-keys", "display-message", "detach-client", "version":
+		"send-keys", "display-message", "detach-client", "version",
+		"source-file", "set-option", "set-window-option", "show-options",
+		"bind-key", "unbind-key", "list-keys":
 		return name
 	default:
 		return name
@@ -315,6 +559,30 @@ func nonOptionArgs(args []string) []string {
 		if strings.HasPrefix(arg, "-") {
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				skip = true
+			}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
+func optionOperands(args []string) []string {
+	valueFlags := map[string]bool{
+		"-c": true, "-d": true, "-F": true, "-f": true, "-L": true,
+		"-N": true, "-S": true, "-T": true, "-t": true, "-x": true,
+		"-y": true,
+	}
+	var out []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			if valueFlags[arg] && i+1 < len(args) {
+				i++
 			}
 			continue
 		}
@@ -485,6 +753,34 @@ func cleanSessionTarget(target string) string {
 	return target
 }
 
+func expandPath(path string) string {
+	if path == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home
+		}
+	}
+	if strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home + path[1:]
+		}
+	}
+	return path
+}
+
+func formatKeyBinding(template string, binding model.KeyBinding) string {
+	out := template
+	replacements := map[string]string{
+		"#{key_table}": binding.Table,
+		"#{key}":       binding.Key,
+		"#{command}":   strings.Join(binding.Command, " "),
+		"#{note}":      binding.Note,
+	}
+	for old, newValue := range replacements {
+		out = strings.ReplaceAll(out, old, newValue)
+	}
+	return out
+}
+
 func activeWidth(session *model.Session) int {
 	if pane := activePane(session); pane != nil && pane.Width > 0 {
 		return pane.Width
@@ -522,4 +818,15 @@ func parsePaneDelta(target string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func parseWindowTarget(s string) (int, bool) {
+	if len(s) > 0 && s[0] == ':' {
+		s = s[1:]
+	}
+	if len(s) > 0 && s[0] == '=' {
+		s = s[1:]
+	}
+	n, err := strconv.Atoi(s)
+	return n, err == nil
 }

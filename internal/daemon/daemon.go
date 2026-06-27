@@ -14,7 +14,7 @@ func Dial(socketPath string) (net.Conn, error) {
 	return net.DialTimeout("unix", socketPath, 500*time.Millisecond)
 }
 
-func Ensure(socketPath string) error {
+func Ensure(socketPath string, configFiles []string) error {
 	if conn, err := Dial(socketPath); err == nil {
 		_ = conn.Close()
 		return nil
@@ -24,7 +24,11 @@ func Ensure(socketPath string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(exe, "--server", "-S", socketPath)
+	args := []string{"--server", "-S", socketPath}
+	for _, file := range configFiles {
+		args = append(args, "-f", file)
+	}
+	cmd := exec.Command(exe, args...)
 	devNull, _ := os.OpenFile(os.DevNull, os.O_RDWR, 0)
 	if devNull != nil {
 		defer devNull.Close()
@@ -52,6 +56,10 @@ func Ensure(socketPath string) error {
 }
 
 func SendCommand(socketPath string, command []string, session string, width, height int) (protocol.Message, error) {
+	return SendCommands(socketPath, [][]string{command}, session, width, height)
+}
+
+func SendCommands(socketPath string, commands [][]string, session string, width, height int) (protocol.Message, error) {
 	conn, err := Dial(socketPath)
 	if err != nil {
 		return protocol.Message{}, err
@@ -60,11 +68,11 @@ func SendCommand(socketPath string, command []string, session string, width, hei
 
 	pc := protocol.NewConn(conn)
 	if err := pc.Write(protocol.Message{
-		Type:    protocol.TypeCommand,
-		Command: command,
-		Session: session,
-		Width:   width,
-		Height:  height,
+		Type:     protocol.TypeCommand,
+		Commands: commands,
+		Session:  session,
+		Width:    width,
+		Height:   height,
 	}); err != nil {
 		return protocol.Message{}, err
 	}

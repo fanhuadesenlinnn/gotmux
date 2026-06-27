@@ -16,23 +16,28 @@ manual verification note.
 | Common window and pane commands | Implemented |
 | Common `C-b` prefix bindings | Implemented |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields covered by `scripts/compat_probe.sh` |
-| tmux/gotmux automated behavior probe | Implemented for the first CLI format subset |
+| Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
+| `source-file` | Implemented for simple command files and line continuations |
+| Explicit `-f` startup config | Implemented for server startup, not yet default `.tmux.conf` discovery |
+| Basic options | Implemented for string-backed `set-option`, `set-window-option`, and `show-options` |
+| Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, and prefix dispatch |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, source-file, and command-sequence subsets |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
 
 | Area | Gap |
 | --- | --- |
-| Full command parser | tmux command language, quoting, command queues, and target resolution are incomplete. |
+| Full command parser | Advanced tmux quoting, parse-time formats, command queues, `%if`, includes, and full target resolution are incomplete. |
 | Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
 | Layout rendering | Multiple panes exist, but tiled split rendering is not equivalent to tmux yet. |
 | Screen model | Full grid, scrollback, alternate screen, redraw diffing, and terminal escape interpretation are incomplete. |
 | Copy mode | Not implemented. |
 | Mouse support | Not implemented. |
 | Buffers and paste buffers | Not implemented. |
-| Options | Global/session/window/user options are not implemented. |
-| Key tables and custom bindings | Only built-in prefix bindings are implemented. |
-| `.tmux.conf` / `source-file` | Not implemented. |
+| Full option semantics | Only a small string-backed subset exists. Most documented options and option side effects are not implemented. |
+| Key tables and custom bindings | Prefix/root table storage exists, but full key tables, repeat behavior, notes, mode tables, and multi-command bindings are incomplete. |
+| Default `.tmux.conf` discovery | Not implemented. |
 | Status format language | Only a simple status line is implemented. |
 | Hooks | Not implemented. |
 | Control mode | Not implemented. |

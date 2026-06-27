@@ -13,15 +13,18 @@ import (
 const HistoryBytes = 2 << 20
 
 type Server struct {
-	mu            sync.RWMutex
-	Sessions      map[string]*Session
-	Clients       map[int64]*Client
-	NextSessionID int
-	NextWindowID  int
-	NextPaneID    int
-	NextClientID  int64
-	SocketPath    string
-	StartedAt     time.Time
+	mu                  sync.RWMutex
+	Sessions            map[string]*Session
+	Clients             map[int64]*Client
+	GlobalOptions       map[string]string
+	GlobalWindowOptions map[string]string
+	KeyBindings         map[string]map[string]KeyBinding
+	NextSessionID       int
+	NextWindowID        int
+	NextPaneID          int
+	NextClientID        int64
+	SocketPath          string
+	StartedAt           time.Time
 }
 
 type Session struct {
@@ -33,6 +36,7 @@ type Session struct {
 	Windows   []*Window
 	Active    int
 	Attached  int
+	Options   map[string]string
 }
 
 type Window struct {
@@ -43,6 +47,7 @@ type Window struct {
 	Activity  time.Time
 	Panes     []*Pane
 	Active    int
+	Options   map[string]string
 }
 
 type Pane struct {
@@ -70,13 +75,67 @@ type Client struct {
 	ReadOnly    bool
 }
 
+type KeyBinding struct {
+	Table   string
+	Key     string
+	Command []string
+	Note    string
+	Repeat  bool
+}
+
 func NewServer(socketPath string) *Server {
 	return &Server{
-		Sessions:   make(map[string]*Session),
-		Clients:    make(map[int64]*Client),
-		SocketPath: socketPath,
-		StartedAt:  time.Now(),
+		Sessions:            make(map[string]*Session),
+		Clients:             make(map[int64]*Client),
+		GlobalOptions:       defaultOptions(),
+		GlobalWindowOptions: defaultWindowOptions(),
+		KeyBindings:         defaultKeyBindings(),
+		SocketPath:          socketPath,
+		StartedAt:           time.Now(),
 	}
+}
+
+func defaultOptions() map[string]string {
+	return map[string]string{
+		"base-index":      "0",
+		"default-command": "",
+		"default-shell":   DefaultShell(),
+		"escape-time":     "500",
+		"prefix":          "C-b",
+		"status":          "on",
+	}
+}
+
+func defaultWindowOptions() map[string]string {
+	return map[string]string{
+		"history-limit":   "2000",
+		"mode-keys":       "emacs",
+		"pane-base-index": "0",
+	}
+}
+
+func defaultKeyBindings() map[string]map[string]KeyBinding {
+	bindings := make(map[string]map[string]KeyBinding)
+	add := func(table, key string, command ...string) {
+		if bindings[table] == nil {
+			bindings[table] = make(map[string]KeyBinding)
+		}
+		bindings[table][key] = KeyBinding{Table: table, Key: key, Command: command}
+	}
+	add("prefix", "C-b", "send-prefix")
+	add("prefix", `"`, "split-window")
+	add("prefix", "%", "split-window", "-h")
+	add("prefix", "c", "new-window")
+	add("prefix", "d", "detach-client")
+	add("prefix", "n", "next-window")
+	add("prefix", "p", "previous-window")
+	add("prefix", "o", "select-pane", "-t", ":.+")
+	add("prefix", "x", "kill-pane")
+	for i := 0; i <= 9; i++ {
+		key := fmt.Sprintf("%d", i)
+		add("prefix", key, "select-window", "-t", ":"+key)
+	}
+	return bindings
 }
 
 func DefaultShell() string {
@@ -474,6 +533,152 @@ func (s *Server) SetClientPrefix(clientID int64, prefix bool) {
 	if client != nil {
 		client.Prefix = prefix
 	}
+}
+
+func (s *Server) SetOption(scope, sessionName, name, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch scope {
+	case "global":
+		s.GlobalOptions[name] = value
+	case "global-window":
+		s.GlobalWindowOptions[name] = value
+	case "session":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return fmt.Errorf("can't find session: %s", sessionName)
+		}
+		if session.Options == nil {
+			session.Options = make(map[string]string)
+		}
+		session.Options[name] = value
+	case "window":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return fmt.Errorf("can't find session: %s", sessionName)
+		}
+		window := session.ActiveWindow()
+		if window == nil {
+			return fmt.Errorf("session has no active window")
+		}
+		if window.Options == nil {
+			window.Options = make(map[string]string)
+		}
+		window.Options[name] = value
+	default:
+		return fmt.Errorf("unknown option scope: %s", scope)
+	}
+	return nil
+}
+
+func (s *Server) Options(scope, sessionName string) (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make(map[string]string)
+	copyOptions := func(src map[string]string) {
+		for k, v := range src {
+			out[k] = v
+		}
+	}
+	switch scope {
+	case "global":
+		copyOptions(s.GlobalOptions)
+	case "global-window":
+		copyOptions(s.GlobalWindowOptions)
+	case "session":
+		copyOptions(s.GlobalOptions)
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		copyOptions(session.Options)
+	case "window":
+		copyOptions(s.GlobalWindowOptions)
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		window := session.ActiveWindow()
+		if window == nil {
+			return nil, fmt.Errorf("session has no active window")
+		}
+		copyOptions(window.Options)
+	default:
+		return nil, fmt.Errorf("unknown option scope: %s", scope)
+	}
+	return out, nil
+}
+
+func (s *Server) GlobalOption(name string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.GlobalOptions[name]
+}
+
+func (s *Server) BindKey(table, key string, command []string, note string, repeat bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if table == "" {
+		table = "prefix"
+	}
+	if s.KeyBindings[table] == nil {
+		s.KeyBindings[table] = make(map[string]KeyBinding)
+	}
+	s.KeyBindings[table][key] = KeyBinding{
+		Table:   table,
+		Key:     key,
+		Command: append([]string(nil), command...),
+		Note:    note,
+		Repeat:  repeat,
+	}
+}
+
+func (s *Server) UnbindKey(table, key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if table == "" {
+		table = "prefix"
+	}
+	if s.KeyBindings[table] != nil {
+		delete(s.KeyBindings[table], key)
+	}
+}
+
+func (s *Server) KeyBinding(table, key string) (KeyBinding, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if table == "" {
+		table = "prefix"
+	}
+	binding, ok := s.KeyBindings[table][key]
+	return binding, ok
+}
+
+func (s *Server) ListKeyBindings(table string) []KeyBinding {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var out []KeyBinding
+	appendTable := func(tableName string, tableBindings map[string]KeyBinding) {
+		for _, binding := range tableBindings {
+			binding.Table = tableName
+			out = append(out, binding)
+		}
+	}
+	if table != "" {
+		appendTable(table, s.KeyBindings[table])
+	} else {
+		for tableName, tableBindings := range s.KeyBindings {
+			appendTable(tableName, tableBindings)
+		}
+	}
+	return out
 }
 
 func (s *Session) ActiveWindow() *Window {

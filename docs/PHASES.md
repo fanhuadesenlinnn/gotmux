@@ -11,7 +11,7 @@ specific as each area gets implemented.
 - Match simple format output for `list-sessions`, `list-windows`,
   `list-panes`, and `display-message`.
 
-Status: in progress. The current automated probe passes for this subset.
+Status: complete for the current probe subset.
 
 ## Phase 2: Command Language and Configuration
 
@@ -20,6 +20,11 @@ Status: in progress. The current automated probe passes for this subset.
 - Implement `.tmux.conf` discovery and `source-file`.
 - Implement `set-option`, `show-options`, `set-environment`,
   `show-environment`, `bind-key`, `unbind-key`, and `list-keys`.
+
+Status: in progress. Basic command sequences, explicit `-f`, `source-file`,
+string-backed options, and basic prefix key bindings are implemented and covered
+by `scripts/compat_probe.sh`. Full tmux syntax, default `.tmux.conf` discovery,
+environment commands, and complete option/key semantics remain.
 
 ## Phase 3: Terminal Screen Model
 

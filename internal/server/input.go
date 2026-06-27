@@ -3,12 +3,9 @@ package server
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 )
-
-const prefixKey = byte(0x02)
 
 func (rt *Runtime) handleInput(clientID int64, data []byte) {
 	for len(data) > 0 {
@@ -21,7 +18,7 @@ func (rt *Runtime) handleInput(clientID int64, data []byte) {
 			data = data[consumed:]
 			continue
 		}
-		idx := bytes.IndexByte(data, prefixKey)
+		idx := bytes.IndexByte(data, rt.prefixByte())
 		if idx == -1 {
 			rt.writeActivePane(clientID, data)
 			return
@@ -39,53 +36,20 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 		return 0
 	}
 	session := rt.state.ActiveSessionName(clientID)
-	switch data[0] {
-	case prefixKey:
-		rt.writeActivePane(clientID, []byte{prefixKey})
-	case 'c':
-		result := rt.execute([]string{"new-window"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case '"':
-		result := rt.execute([]string{"split-window", "-v"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case '%':
-		result := rt.execute([]string{"split-window", "-h"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case 'n':
-		result := rt.execute([]string{"next-window"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case 'p':
-		result := rt.execute([]string{"previous-window"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case 'o', ';':
-		result := rt.execute([]string{"select-pane", "-t", ":.+"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case 'x':
-		result := rt.execute([]string{"kill-pane"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
-	case 'd':
-		rt.detachClient(clientID, "detached")
-	case '?':
+	key, consumed := inputKeyName(data)
+	if key == "?" {
 		rt.showKeys(clientID)
-	default:
-		if data[0] >= '0' && data[0] <= '9' {
-			result := rt.execute([]string{"select-window", "-t", ":" + string(data[0])}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-			rt.writeCommandResult(clientID, result)
-			return 1
-		}
-		if len(data) >= 3 && data[0] == '\x1b' && data[1] == '[' {
-			switch data[2] {
-			case 'A', 'D':
-				result := rt.execute([]string{"select-pane", "-t", ":.-"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-				rt.writeCommandResult(clientID, result)
-			case 'B', 'C':
-				result := rt.execute([]string{"select-pane", "-t", ":.+"}, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-				rt.writeCommandResult(clientID, result)
-			}
-			return 3
-		}
+		return consumed
 	}
-	return 1
+	if key == rt.state.GlobalOption("prefix") {
+		rt.writeActivePane(clientID, []byte{rt.prefixByte()})
+		return consumed
+	}
+	if binding, ok := rt.state.KeyBinding("prefix", key); ok {
+		result := rt.execute(binding.Command, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
+		rt.writeCommandResult(clientID, result)
+	}
+	return consumed
 }
 
 func (rt *Runtime) writeActivePane(clientID int64, data []byte) {
@@ -97,6 +61,10 @@ func (rt *Runtime) writeActivePane(clientID int64, data []byte) {
 }
 
 func (rt *Runtime) writeCommandResult(clientID int64, result protocol.Message) {
+	if result.Type == protocol.TypeExit {
+		rt.detachClient(clientID, result.Text)
+		return
+	}
 	if !result.OK && result.Text != "" {
 		rt.writeClientOutput(clientID, []byte(fmt.Sprintf("\r\n%s\r\n", result.Text)))
 	}
@@ -115,7 +83,7 @@ func (rt *Runtime) detachClient(clientID int64, text string) {
 }
 
 func (rt *Runtime) showKeys(clientID int64) {
-	keys := "\r\nC-b c new-window | C-b \" split-window | C-b % split-window -h | C-b n/p next/previous-window | C-b 0..9 select-window | C-b o select-pane | C-b x kill-pane | C-b d detach\r\n"
+	keys := "\r\n" + rt.cmdListKeys([]string{"-T", "prefix"}).Text + "\r\n"
 	rt.writeClientOutput(clientID, []byte(keys))
 	rt.redrawStatus(clientID)
 }
@@ -130,13 +98,32 @@ func (rt *Runtime) writeClientOutput(clientID int64, data []byte) {
 	_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: data})
 }
 
-func parseWindowTarget(s string) (int, bool) {
-	if len(s) > 0 && s[0] == ':' {
-		s = s[1:]
+func (rt *Runtime) prefixByte() byte {
+	prefix := rt.state.GlobalOption("prefix")
+	if len(prefix) == 3 && prefix[0] == 'C' && prefix[1] == '-' {
+		return prefix[2] & 0x1f
 	}
-	if len(s) > 0 && s[0] == '=' {
-		s = s[1:]
+	if len(prefix) == 1 {
+		return prefix[0]
 	}
-	n, err := strconv.Atoi(s)
-	return n, err == nil
+	return 0x02
+}
+
+func inputKeyName(data []byte) (string, int) {
+	if len(data) >= 3 && data[0] == '\x1b' && data[1] == '[' {
+		switch data[2] {
+		case 'A':
+			return "Up", 3
+		case 'B':
+			return "Down", 3
+		case 'C':
+			return "Right", 3
+		case 'D':
+			return "Left", 3
+		}
+	}
+	if data[0] >= 1 && data[0] <= 26 {
+		return fmt.Sprintf("C-%c", data[0]+'a'-1), 1
+	}
+	return string(data[0]), 1
 }
