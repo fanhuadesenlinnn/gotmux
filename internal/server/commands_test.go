@@ -123,6 +123,25 @@ func TestNewWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestRenameWindowHonorsTargetWindow(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "ren", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "ren", "-n", "second", "/bin/sh"}, "ren", 80, 24); !msg.OK {
+		t.Fatalf("new-window failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"rename-window", "-t", "ren:0", "primary"}, "ren", 80, 24)
+	if !msg.OK {
+		t.Fatalf("rename-window failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-windows", "-t", "ren", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "ren", 80, 24)
+	if got.Text != "0:primary:0\n1:second:1" {
+		t.Fatalf("windows after rename = %q", got.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "ren"}, "ren", 80, 24)
+}
+
 func TestEnvironmentCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "env", "/bin/sh"}, "", 80, 24)

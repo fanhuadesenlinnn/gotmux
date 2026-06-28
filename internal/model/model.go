@@ -443,6 +443,23 @@ func (s *Server) RenameWindow(sessionName, newName string) error {
 	return nil
 }
 
+func (s *Server) RenameWindowByIndex(sessionName string, windowIndex int, newName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			window.Name = newName
+			return nil
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
 func (s *Server) SelectWindow(sessionName string, index int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

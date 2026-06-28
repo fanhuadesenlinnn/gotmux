@@ -204,7 +204,17 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		if name == "" {
 			return fail("missing window name")
 		}
-		if err := rt.state.RenameWindow(currentSession, name); err != nil {
+		sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+		if !found {
+			return fail("can't find window")
+		}
+		var err error
+		if hasWindow {
+			err = rt.state.RenameWindowByIndex(sessionName, windowIndex, name)
+		} else {
+			err = rt.state.RenameWindow(sessionName, name)
+		}
+		if err != nil {
 			return fail(err.Error())
 		}
 		return ok("")

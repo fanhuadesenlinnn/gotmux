@@ -213,6 +213,13 @@ compare "kill-pane target panes" list-panes -t killp -F "#{pane_index}:#{pane_ac
 compare "kill-window target command" kill-window -t killw:1
 compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t renamew -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t renamew -n second /bin/sh >/dev/null
+compare "rename-window target command" rename-window -t renamew:0 primary
+compare "rename-window target windows" list-windows -t renamew -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" set -g status off
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
