@@ -108,11 +108,11 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
 		target := optionValue(args, "-t", "")
-		index, parsed := parseWindowTarget(target)
+		sessionName, index, parsed := selectWindowTarget(target, currentSession)
 		if !parsed {
 			return fail("bad window target")
 		}
-		if err := rt.state.SelectWindow(currentSession, index); err != nil {
+		if err := rt.state.SelectWindow(sessionName, index); err != nil {
 			return fail(err.Error())
 		}
 		return ok("")
@@ -1506,6 +1506,19 @@ func parsePaneDelta(target string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func selectWindowTarget(target string, currentSession string) (string, int, bool) {
+	cleaned := cleanSessionTarget(target)
+	if strings.Contains(cleaned, ":") {
+		sessionName, windowIndex, _, hasWindow, _ := parsePaneTarget(cleaned)
+		if sessionName == "" {
+			sessionName = currentSession
+		}
+		return sessionName, windowIndex, hasWindow
+	}
+	index, ok := parseWindowTarget(cleaned)
+	return currentSession, index, ok
 }
 
 func parseWindowTarget(s string) (int, bool) {

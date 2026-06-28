@@ -227,6 +227,13 @@ compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#
 compare "rename-window target command" rename-window -t renamew:0 primary
 compare "rename-window target windows" list-windows -t renamew -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s selectw -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t selectw -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s selectw -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t selectw -n second /bin/sh >/dev/null
+compare "select-window target command" select-window -t selectw:0
+compare "select-window target windows" list-windows -t selectw -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" set -g status off
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
