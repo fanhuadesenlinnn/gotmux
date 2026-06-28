@@ -110,19 +110,30 @@ type CaptureRow struct {
 }
 
 func (s *Screen) CaptureRows(preserveTrailing bool) []CaptureRow {
+	if preserveTrailing {
+		return s.CaptureRowsWithOptions(false, false)
+	}
+	return s.CaptureRowsWithOptions(true, true)
+}
+
+func (s *Screen) CaptureRowsWithOptions(includeEmptyCells bool, trimTrailing bool) []CaptureRow {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	rows := make([]CaptureRow, s.height)
 	for y := 0; y < s.height; y++ {
-		line := cellsString(s.cells[y], s.width)
-		if preserveTrailing {
-			last := lastUsedCell(s.cells[y])
-			if last < 0 {
-				line = ""
-			} else {
-				line = cellsString(s.cells[y][:last+1], last+1)
+		line := ""
+		last := lastUsedCell(s.cells[y])
+		if includeEmptyCells {
+			if last >= 0 {
+				end := expandedLineSize(s.width, last+1)
+				line = cellsString(s.cells[y][:end], end)
 			}
 		} else {
+			if last >= 0 {
+				line = cellsString(s.cells[y][:last+1], last+1)
+			}
+		}
+		if trimTrailing {
 			line = strings.TrimRight(line, " ")
 		}
 		rows[y] = CaptureRow{Text: line, Wrapped: y < len(s.wraps) && s.wraps[y]}
@@ -645,6 +656,21 @@ func resizeWraps(old []bool, height int) []bool {
 	wraps := make([]bool, height)
 	copy(wraps, old)
 	return wraps
+}
+
+func expandedLineSize(width int, used int) int {
+	if used <= 0 || width <= 0 {
+		return 0
+	}
+	size := used
+	if quarter := width / 4; size < quarter {
+		size = quarter
+	} else if half := width / 2; size < half {
+		size = half
+	} else if width > size {
+		size = width
+	}
+	return clampInt(size, 0, width)
 }
 
 func cellsString(cells []cell, width int) string {

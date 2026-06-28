@@ -117,6 +117,30 @@ func TestScreenCaptureLinesClearsUsedCells(t *testing.T) {
 	})
 }
 
+func TestScreenCaptureRowsWithEmptyCellOptions(t *testing.T) {
+	screen := NewScreen(8, 2)
+	screen.Write([]byte("one  \r\ntwo"))
+
+	assertCaptureRows(t, screen.CaptureRowsWithOptions(true, false), []CaptureRow{
+		{Text: "one     "},
+		{Text: "two "},
+	})
+	assertCaptureRows(t, screen.CaptureRowsWithOptions(false, false), []CaptureRow{
+		{Text: "one  "},
+		{Text: "two"},
+	})
+	assertCaptureRows(t, screen.CaptureRowsWithOptions(true, true), []CaptureRow{
+		{Text: "one"},
+		{Text: "two"},
+	})
+
+	wide := NewScreen(20, 1)
+	wide.Write([]byte("one  "))
+	assertCaptureRows(t, wide.CaptureRowsWithOptions(true, false), []CaptureRow{
+		{Text: "one       "},
+	})
+}
+
 func TestScreenCaptureRowsMarksAutoWrappedLines(t *testing.T) {
 	screen := NewScreen(5, 3)
 	screen.Write([]byte("abcdefgh\r\nxy"))

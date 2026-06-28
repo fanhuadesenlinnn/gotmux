@@ -353,7 +353,9 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 		return fail("can't find pane")
 	}
 	joinLines := hasAny(args, "-J")
-	rows := rt.capturePaneRows(pane, hasAny(args, "-N") || joinLines)
+	includeEmptyCells := !joinLines && !hasAny(args, "-T")
+	trimTrailing := !joinLines && !hasAny(args, "-N")
+	rows := rt.capturePaneRows(pane, includeEmptyCells, trimTrailing)
 	rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
 	text := formatCaptureRows(rows, hasAny(args, "-L"), hasAny(args, "-F"), joinLines)
 	if !hasAny(args, "-p") {
@@ -1245,7 +1247,7 @@ func parsePaneTarget(target string) (session string, window int, pane int, hasWi
 }
 
 func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []string {
-	rows := rt.capturePaneRows(pane, !trimTrailing)
+	rows := rt.capturePaneRows(pane, true, trimTrailing)
 	lines := make([]string, len(rows))
 	for i, row := range rows {
 		lines[i] = row.Text
@@ -1259,13 +1261,13 @@ type capturePaneRow struct {
 	Number  int
 }
 
-func (rt *Runtime) capturePaneRows(pane *model.Pane, preserveTrailing bool) []capturePaneRow {
+func (rt *Runtime) capturePaneRows(pane *model.Pane, includeEmptyCells bool, trimTrailing bool) []capturePaneRow {
 	var rows []capturePaneRow
 	rt.screensMu.RLock()
 	screen := rt.screens[pane.ID]
 	rt.screensMu.RUnlock()
 	if screen != nil {
-		screenRows := screen.CaptureRows(preserveTrailing)
+		screenRows := screen.CaptureRowsWithOptions(includeEmptyCells, trimTrailing)
 		rows = make([]capturePaneRow, len(screenRows))
 		for i, row := range screenRows {
 			rows[i] = capturePaneRow{Text: row.Text, Wrapped: row.Wrapped, Number: i}
@@ -1277,7 +1279,11 @@ func (rt *Runtime) capturePaneRows(pane *model.Pane, preserveTrailing bool) []ca
 		}
 		rows = make([]capturePaneRow, len(lines))
 		for i, line := range lines {
-			if !preserveTrailing {
+			if includeEmptyCells && pane.Width > 0 && len(line) < pane.Width {
+				width := captureExpandedLineSize(pane.Width, len(line))
+				line += strings.Repeat(" ", width-len(line))
+			}
+			if trimTrailing {
 				line = strings.TrimRight(line, " ")
 			}
 			rows[i] = capturePaneRow{Text: line, Number: i}
@@ -1355,6 +1361,24 @@ func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, 
 		}
 	}
 	return b.String()
+}
+
+func captureExpandedLineSize(width int, used int) int {
+	if used <= 0 || width <= 0 {
+		return 0
+	}
+	size := used
+	if quarter := width / 4; size < quarter {
+		size = quarter
+	} else if half := width / 2; size < half {
+		size = half
+	} else if width > size {
+		size = width
+	}
+	if size > width {
+		return width
+	}
+	return size
 }
 
 func parseCaptureLineIndex(value string, lineCount int, fallback int) int {

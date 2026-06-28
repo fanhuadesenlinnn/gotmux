@@ -102,10 +102,12 @@ compare "display-message formats" display-message -p -t compat -F "#{session_nam
 
 "${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh >/dev/null
-"${tmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone\\ntwo\\nthree\\n'" Enter
-"${gotmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone\\ntwo\\nthree\\n'" Enter >/dev/null
+"${tmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone  \\ntwo\\nthree\\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone  \\ntwo\\nthree\\n'" Enter >/dev/null
 sleep 0.4
 compare "capture-pane visible text" capture-pane -p -t cap -S 0 -E 2
+compare "capture-pane full empty cells" capture-pane -p -N -t cap -S 0 -E 0
+compare "capture-pane used trailing cells" capture-pane -p -N -T -t cap -S 0 -E 0
 "${tmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2
 "${gotmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2 >/dev/null
 compare "capture-pane buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
