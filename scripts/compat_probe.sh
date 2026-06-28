@@ -123,6 +123,13 @@ compare "capture-pane line flags" capture-pane -p -F -t capj -S 0 -E 2
 compare "capture-pane line numbers" capture-pane -p -L -t capj -S 0 -E 2
 compare "capture-pane joined flags and numbers" capture-pane -p -L -F -J -t capj -S 0 -E 2
 
+"${tmux_cmd[@]}" new-session -d -s capc -x 20 -y 4 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s capc -x 20 -y 4 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t capc "printf '\\033[H\\033[2Ja\\\\\\\\b\\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t capc "printf '\\033[H\\033[2Ja\\\\\\\\b\\n'" Enter >/dev/null
+sleep 0.4
+compare "capture-pane escaped backslash" capture-pane -p -C -t capc -S 0 -E 0
+
 "${tmux_cmd[@]}" set-buffer -b named "hello world"
 "${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null
 compare "show named buffer" show-buffer -b named

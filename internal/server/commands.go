@@ -357,7 +357,7 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 	trimTrailing := !joinLines && !hasAny(args, "-N")
 	rows := rt.capturePaneRows(pane, includeEmptyCells, trimTrailing)
 	rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
-	text := formatCaptureRows(rows, hasAny(args, "-L"), hasAny(args, "-F"), joinLines)
+	text := formatCaptureRows(rows, hasAny(args, "-L"), hasAny(args, "-F"), joinLines, hasAny(args, "-C"))
 	if !hasAny(args, "-p") {
 		if len(rows) == 0 || !joinLines || !rows[len(rows)-1].Wrapped {
 			text += "\n"
@@ -1340,7 +1340,7 @@ func sliceCaptureRows(rows []capturePaneRow, startValue string, endValue string)
 	return rows[start : end+1]
 }
 
-func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, joinLines bool) string {
+func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, joinLines bool, escapeSequences bool) string {
 	var b strings.Builder
 	for i, row := range rows {
 		if numberLines {
@@ -1355,12 +1355,20 @@ func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, 
 			}
 			b.WriteByte(' ')
 		}
-		b.WriteString(row.Text)
+		text := row.Text
+		if escapeSequences {
+			text = escapeCaptureText(text)
+		}
+		b.WriteString(text)
 		if i < len(rows)-1 && (!joinLines || !row.Wrapped) {
 			b.WriteByte('\n')
 		}
 	}
 	return b.String()
+}
+
+func escapeCaptureText(text string) string {
+	return strings.ReplaceAll(text, `\`, `\\`)
 }
 
 func captureExpandedLineSize(width int, used int) int {
