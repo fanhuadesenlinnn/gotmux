@@ -35,6 +35,7 @@ This first implementation supports:
 - a first subset of `set-environment` / `show-environment`
 - pane geometry tracking for basic horizontal/vertical splits, `resize-pane`,
   and `select-layout even-horizontal`
+- basic multi-pane redraw with borders from pane history snapshots
 - macOS and Linux builds with `CGO_ENABLED=0`
 
 Full tmux parity is not complete yet. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).

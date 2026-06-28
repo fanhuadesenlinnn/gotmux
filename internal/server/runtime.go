@@ -95,7 +95,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		_ = conn.Write(protocol.Message{Type: protocol.TypeError, Text: err.Error(), Code: 1})
 		return
 	}
-	rt.state.SetActiveWindowSize(session.Name, msg.Width, msg.Height)
+	rt.state.SetActiveWindowSize(session.Name, msg.Width, max(1, msg.Height-1))
 	ac := &attachedClient{id: client.ID, conn: conn, done: make(chan struct{})}
 	rt.mu.Lock()
 	rt.clients[client.ID] = ac
@@ -123,9 +123,9 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		case protocol.TypeResize:
 			rt.state.SetClientSize(client.ID, next.Width, next.Height)
 			sessionName := rt.state.ActiveSessionName(client.ID)
-			rt.state.SetActiveWindowSize(sessionName, next.Width, next.Height)
+			rt.state.SetActiveWindowSize(sessionName, next.Width, max(1, next.Height-1))
 			rt.resizeSessionPanes(sessionName)
-			rt.redrawStatus(client.ID)
+			rt.redrawClient(client.ID)
 		case protocol.TypeDetach:
 			_ = conn.Write(protocol.Message{Type: protocol.TypeExit, Text: "detached"})
 			return
@@ -221,13 +221,26 @@ func (rt *Runtime) readPane(pane *model.Pane) {
 
 func (rt *Runtime) broadcastPaneOutput(pane *model.Pane, data []byte) {
 	rt.mu.RLock()
-	defer rt.mu.RUnlock()
+	clients := make(map[int64]*attachedClient, len(rt.clients))
 	for id, client := range rt.clients {
-		active := rt.state.ActivePane(rt.state.ActiveSessionName(id))
-		if active == nil || active.ID != pane.ID {
+		clients[id] = client
+	}
+	rt.mu.RUnlock()
+	for id, client := range clients {
+		sessionName := rt.state.ActiveSessionName(id)
+		active := rt.state.ActivePane(sessionName)
+		if active == nil {
 			continue
 		}
-		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: data})
+		panes := rt.state.ActiveWindowPanes(sessionName)
+		if !containsRuntimePane(panes, pane.ID) {
+			continue
+		}
+		if len(panes) <= 1 && active.ID == pane.ID {
+			_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: data})
+			continue
+		}
+		rt.renderClientContent(id, client, panes)
 	}
 }
 
@@ -238,15 +251,35 @@ func (rt *Runtime) redrawClient(clientID int64) {
 	if client == nil {
 		return
 	}
-	pane := rt.state.ActivePane(rt.state.ActiveSessionName(clientID))
-	_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: terminal.ClearScreen()})
-	if pane != nil {
-		if err := rt.startPane(pane, rt.clientWidth(clientID), rt.clientHeight(clientID)); err != nil {
+	sessionName := rt.state.ActiveSessionName(clientID)
+	panes := rt.state.ActiveWindowPanes(sessionName)
+	if len(panes) == 0 {
+		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: terminal.ClearScreen()})
+	} else if len(panes) == 1 {
+		pane := panes[0]
+		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: terminal.ClearScreen()})
+		if err := rt.startPane(pane, rt.clientWidth(clientID), rt.clientContentHeight(clientID)); err != nil {
 			_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: []byte(err.Error() + "\r\n")})
 		}
 		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: pane.History.Bytes()})
+	} else {
+		rt.renderClientContent(clientID, client, panes)
 	}
 	rt.redrawStatus(clientID)
+}
+
+func (rt *Runtime) renderClientContent(clientID int64, client *attachedClient, panes []*model.Pane) {
+	width, height := rt.state.ClientSize(clientID)
+	contentHeight := max(1, height-1)
+	sessionName := rt.state.ActiveSessionName(clientID)
+	rt.state.SetActiveWindowSize(sessionName, width, contentHeight)
+	panes = rt.state.ActiveWindowPanes(sessionName)
+	for _, pane := range panes {
+		if err := rt.startPane(pane, width, contentHeight); err != nil {
+			_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: []byte(err.Error() + "\r\n")})
+		}
+	}
+	_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: renderPanes(width, contentHeight, panes)})
 }
 
 func (rt *Runtime) redrawStatus(clientID int64) {
@@ -294,8 +327,12 @@ func (rt *Runtime) statusText(clientID int64) string {
 				paneText += " exited"
 			}
 		}
-		return fmt.Sprintf("[%s] %d:%s*%s | %d windows | prefix C-b",
-			session.Name, window.Index, window.Name, paneText, len(session.Windows))
+		prefix := rt.state.GlobalOption("prefix")
+		if prefix == "" {
+			prefix = "C-b"
+		}
+		return fmt.Sprintf("[%s] %d:%s*%s | %d windows | prefix %s",
+			session.Name, window.Index, window.Name, paneText, len(session.Windows), prefix)
 	}
 	return "[gotmux]"
 }
@@ -332,6 +369,19 @@ func (rt *Runtime) clientWidth(id int64) int {
 func (rt *Runtime) clientHeight(id int64) int {
 	_, h := rt.state.ClientSize(id)
 	return h
+}
+
+func (rt *Runtime) clientContentHeight(id int64) int {
+	return max(1, rt.clientHeight(id)-1)
+}
+
+func containsRuntimePane(panes []*model.Pane, paneID int) bool {
+	for _, pane := range panes {
+		if pane != nil && pane.ID == paneID {
+			return true
+		}
+	}
+	return false
 }
 
 func parentDir(path string) string {

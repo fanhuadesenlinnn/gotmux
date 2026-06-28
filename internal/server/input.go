@@ -61,7 +61,7 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 
 func (rt *Runtime) executeBinding(clientID int64, command []string) {
 	session := rt.state.ActiveSessionName(clientID)
-	result := rt.execute(command, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
+	result := rt.execute(command, session, rt.clientWidth(clientID), rt.clientContentHeight(clientID))
 	rt.writeCommandResult(clientID, result)
 }
 

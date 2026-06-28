@@ -40,9 +40,10 @@ environment edge cases, and complete option/key semantics remain.
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
 Status: in progress. Basic split geometry, nested split geometry,
-`resize-pane`, and `select-layout even-horizontal` are implemented and compared
-with tmux through `scripts/compat_probe.sh`. Rendering multiple panes with
-borders, complete layout algorithms, zoom, and pane movement commands remain.
+`resize-pane`, `select-layout even-horizontal`, and history-backed multi-pane
+redraw with simple borders are implemented. Geometry is compared with tmux
+through `scripts/compat_probe.sh`; complete layout algorithms, tmux-style
+border rendering, zoom, and pane movement commands remain.
 
 ## Phase 5: Modes, Buffers, and Input
 
