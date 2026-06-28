@@ -36,9 +36,10 @@ environment edge cases, and complete option/key semantics remain.
 
 Status: in progress. A basic pane screen grid now tracks printable output,
 cursor movement, clear line/screen, insertion/deletion, and scrolling escape
-sequences, and multi-pane redraw uses screen snapshots when available. Full
-alternate screen handling, scrollback integration, styles/colors, wide
-characters, redraw diffing, and terminal capability negotiation remain.
+sequences. It also supports basic alternate-screen switching for full-screen
+programs, and multi-pane redraw uses screen snapshots when available. Full
+scrollback integration, styles/colors, wide characters, redraw diffing, and
+terminal capability negotiation remain.
 
 ## Phase 4: Layouts and Panes
 

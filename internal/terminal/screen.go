@@ -23,6 +23,13 @@ type Screen struct {
 	height int
 	cells  [][]rune
 
+	altScreen   bool
+	mainCells   [][]rune
+	mainCursorX int
+	mainCursorY int
+	mainSavedX  int
+	mainSavedY  int
+
 	cursorX int
 	cursorY int
 	savedX  int
@@ -82,20 +89,16 @@ func (s *Screen) Lines() []string {
 }
 
 func (s *Screen) resizeLocked(width, height int) {
-	old := s.cells
-	cells := make([][]rune, height)
-	for y := range cells {
-		cells[y] = make([]rune, width)
-		for x := range cells[y] {
-			cells[y][x] = ' '
-		}
-	}
-	for y := 0; y < minInt(len(old), height); y++ {
-		copy(cells[y], old[y])
+	s.cells = resizeCells(s.cells, width, height)
+	if s.altScreen {
+		s.mainCells = resizeCells(s.mainCells, width, height)
+		s.mainCursorX = clampInt(s.mainCursorX, 0, width)
+		s.mainCursorY = clampInt(s.mainCursorY, 0, height-1)
+		s.mainSavedX = clampInt(s.mainSavedX, 0, width)
+		s.mainSavedY = clampInt(s.mainSavedY, 0, height-1)
 	}
 	s.width = width
 	s.height = height
-	s.cells = cells
 	s.cursorX = clampInt(s.cursorX, 0, width)
 	s.cursorY = clampInt(s.cursorY, 0, height-1)
 	s.savedX = clampInt(s.savedX, 0, width)
@@ -202,7 +205,12 @@ func (s *Screen) applyCSILocked(seq string) {
 	}
 	final := seq[len(seq)-1]
 	raw := seq[:len(seq)-1]
+	private := strings.HasPrefix(raw, "?")
 	params := parseCSIParams(raw)
+	if private && (final == 'h' || final == 'l') {
+		s.applyPrivateModeLocked(params, final == 'h')
+		return
+	}
 	switch final {
 	case 'H', 'f':
 		row := csiParam(params, 0, 1)
@@ -249,6 +257,71 @@ func (s *Screen) applyCSILocked(seq string) {
 	}
 }
 
+func (s *Screen) applyPrivateModeLocked(params []int, enable bool) {
+	for _, mode := range params {
+		switch mode {
+		case 47, 1047:
+			if enable {
+				s.enterAltScreenLocked(false)
+			} else {
+				s.leaveAltScreenLocked(false)
+			}
+		case 1048:
+			if enable {
+				s.savedX, s.savedY = s.cursorX, s.cursorY
+			} else {
+				s.cursorX = clampInt(s.savedX, 0, s.width)
+				s.cursorY = clampInt(s.savedY, 0, s.height-1)
+			}
+		case 1049:
+			if enable {
+				s.enterAltScreenLocked(true)
+			} else {
+				s.leaveAltScreenLocked(true)
+			}
+		}
+	}
+}
+
+func (s *Screen) enterAltScreenLocked(saveCursor bool) {
+	if saveCursor {
+		s.savedX, s.savedY = s.cursorX, s.cursorY
+	}
+	if s.altScreen {
+		s.clearScreenLocked(2)
+		s.cursorX, s.cursorY = 0, 0
+		return
+	}
+	s.mainCells = cloneCells(s.cells)
+	s.mainCursorX, s.mainCursorY = s.cursorX, s.cursorY
+	s.mainSavedX, s.mainSavedY = s.savedX, s.savedY
+	s.cells = newCells(s.width, s.height)
+	s.cursorX, s.cursorY = 0, 0
+	s.savedX, s.savedY = 0, 0
+	s.altScreen = true
+}
+
+func (s *Screen) leaveAltScreenLocked(restoreCursor bool) {
+	if !s.altScreen {
+		if restoreCursor {
+			s.cursorX = clampInt(s.savedX, 0, s.width)
+			s.cursorY = clampInt(s.savedY, 0, s.height-1)
+		}
+		return
+	}
+	if len(s.mainCells) > 0 {
+		s.cells = resizeCells(s.mainCells, s.width, s.height)
+	} else {
+		s.cells = newCells(s.width, s.height)
+	}
+	s.cursorX = clampInt(s.mainCursorX, 0, s.width)
+	s.cursorY = clampInt(s.mainCursorY, 0, s.height-1)
+	s.savedX = clampInt(s.mainSavedX, 0, s.width)
+	s.savedY = clampInt(s.mainSavedY, 0, s.height-1)
+	s.altScreen = false
+	s.mainCells = nil
+}
+
 func parseCSIParams(raw string) []int {
 	raw = strings.TrimLeft(raw, "?=>")
 	if raw == "" {
@@ -281,11 +354,11 @@ func csiParam(params []int, index, fallback int) int {
 }
 
 func (s *Screen) resetLocked() {
-	for y := range s.cells {
-		for x := range s.cells[y] {
-			s.cells[y][x] = ' '
-		}
-	}
+	s.cells = newCells(s.width, s.height)
+	s.altScreen = false
+	s.mainCells = nil
+	s.mainCursorX, s.mainCursorY = 0, 0
+	s.mainSavedX, s.mainSavedY = 0, 0
 	s.cursorX, s.cursorY = 0, 0
 	s.savedX, s.savedY = 0, 0
 	s.state = screenNormal
@@ -454,6 +527,34 @@ func (s *Screen) fillLineLocked(y, start, end int, r rune) {
 	for x := start; x < end; x++ {
 		s.cells[y][x] = r
 	}
+}
+
+func newCells(width, height int) [][]rune {
+	cells := make([][]rune, height)
+	for y := range cells {
+		cells[y] = make([]rune, width)
+		for x := range cells[y] {
+			cells[y][x] = ' '
+		}
+	}
+	return cells
+}
+
+func cloneCells(cells [][]rune) [][]rune {
+	clone := make([][]rune, len(cells))
+	for y := range cells {
+		clone[y] = make([]rune, len(cells[y]))
+		copy(clone[y], cells[y])
+	}
+	return clone
+}
+
+func resizeCells(old [][]rune, width, height int) [][]rune {
+	cells := newCells(width, height)
+	for y := 0; y < minInt(len(old), height); y++ {
+		copy(cells[y], old[y])
+	}
+	return cells
 }
 
 func clampInt(v, low, high int) int {

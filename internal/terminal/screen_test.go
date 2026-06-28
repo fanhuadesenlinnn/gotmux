@@ -50,6 +50,42 @@ func TestScreenInsertAndDeleteCharacters(t *testing.T) {
 	assertLines(t, screen.Lines(), want)
 }
 
+func TestScreenAlternateScreenRestoresMainBuffer(t *testing.T) {
+	screen := NewScreen(8, 3)
+	screen.Write([]byte("shell\r\nprompt"))
+	screen.Write([]byte("\x1b[?1049hALT"))
+
+	assertLines(t, screen.Lines(), []string{
+		"ALT     ",
+		"        ",
+		"        ",
+	})
+
+	screen.Write([]byte("\x1b[?1049l!"))
+
+	want := []string{
+		"shell   ",
+		"prompt! ",
+		"        ",
+	}
+	assertLines(t, screen.Lines(), want)
+}
+
+func TestScreenAlternateScreenRestoresMainAfterResize(t *testing.T) {
+	screen := NewScreen(6, 2)
+	screen.Write([]byte("main"))
+	screen.Write([]byte("\x1b[?1049halt"))
+	screen.Resize(8, 3)
+	screen.Write([]byte("\x1b[?1049l"))
+
+	want := []string{
+		"main    ",
+		"        ",
+		"        ",
+	}
+	assertLines(t, screen.Lines(), want)
+}
+
 func assertLines(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {
