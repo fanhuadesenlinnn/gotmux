@@ -1094,7 +1094,7 @@ func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []strin
 	screen := rt.screens[pane.ID]
 	rt.screensMu.RUnlock()
 	if screen != nil {
-		lines = screen.Lines()
+		lines = screen.CaptureLines(!trimTrailing)
 	} else {
 		lines = visibleTextLines(pane.History.Bytes(), pane.Height)
 		if pane.Height > 0 && len(lines) < pane.Height {

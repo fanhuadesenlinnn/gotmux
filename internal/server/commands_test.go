@@ -219,5 +219,13 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	if msg.Text != "two" {
 		t.Fatalf("capture-pane range = %q", msg.Text)
 	}
+
+	screen = terminal.NewScreen(8, 2)
+	screen.Write([]byte("one  \r\ntwo"))
+	rt.screens[pane.ID] = screen
+	msg = rt.execute([]string{"capture-pane", "-p", "-N", "-S", "0", "-E", "1", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "one  \ntwo" {
+		t.Fatalf("capture-pane -N = %q", msg.Text)
+	}
 	_ = rt.execute([]string{"kill-session", "-t", "cap"}, "cap", 80, 24)
 }

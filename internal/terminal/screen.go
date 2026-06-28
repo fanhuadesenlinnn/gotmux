@@ -21,10 +21,10 @@ type Screen struct {
 	mu     sync.RWMutex
 	width  int
 	height int
-	cells  [][]rune
+	cells  [][]cell
 
 	altScreen   bool
-	mainCells   [][]rune
+	mainCells   [][]cell
 	mainCursorX int
 	mainCursorY int
 	mainSavedX  int
@@ -38,6 +38,11 @@ type Screen struct {
 	state   int
 	csi     []byte
 	utf8Buf []byte
+}
+
+type cell struct {
+	r    rune
+	used bool
 }
 
 func NewScreen(width, height int) *Screen {
@@ -83,7 +88,28 @@ func (s *Screen) Lines() []string {
 	defer s.mu.RUnlock()
 	lines := make([]string, s.height)
 	for y := 0; y < s.height; y++ {
-		lines[y] = string(s.cells[y])
+		lines[y] = cellsString(s.cells[y], s.width)
+	}
+	return lines
+}
+
+func (s *Screen) CaptureLines(preserveTrailing bool) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	lines := make([]string, s.height)
+	for y := 0; y < s.height; y++ {
+		line := cellsString(s.cells[y], s.width)
+		if preserveTrailing {
+			last := lastUsedCell(s.cells[y])
+			if last < 0 {
+				line = ""
+			} else {
+				line = cellsString(s.cells[y][:last+1], last+1)
+			}
+		} else {
+			line = strings.TrimRight(line, " ")
+		}
+		lines[y] = line
 	}
 	return lines
 }
@@ -380,7 +406,7 @@ func (s *Screen) putRuneLocked(r rune) {
 	if r < 0x20 {
 		return
 	}
-	s.cells[s.cursorY][s.cursorX] = r
+	s.cells[s.cursorY][s.cursorX] = cell{r: r, used: true}
 	s.cursorX++
 }
 
@@ -401,11 +427,11 @@ func (s *Screen) clearScreenLocked(mode int) {
 			if y == s.cursorY {
 				end = clampInt(s.cursorX+1, 0, s.width)
 			}
-			s.fillLineLocked(y, start, end, ' ')
+			s.fillLineLocked(y, start, end, ' ', false)
 		}
 	case 2, 3:
 		for y := 0; y < s.height; y++ {
-			s.fillLineLocked(y, 0, s.width, ' ')
+			s.fillLineLocked(y, 0, s.width, ' ', false)
 		}
 	default:
 		for y := s.cursorY; y < s.height; y++ {
@@ -413,7 +439,7 @@ func (s *Screen) clearScreenLocked(mode int) {
 			if y == s.cursorY {
 				start = clampInt(s.cursorX, 0, s.width)
 			}
-			s.fillLineLocked(y, start, s.width, ' ')
+			s.fillLineLocked(y, start, s.width, ' ', false)
 		}
 	}
 }
@@ -421,18 +447,18 @@ func (s *Screen) clearScreenLocked(mode int) {
 func (s *Screen) clearLineLocked(mode int) {
 	switch mode {
 	case 1:
-		s.fillLineLocked(s.cursorY, 0, clampInt(s.cursorX+1, 0, s.width), ' ')
+		s.fillLineLocked(s.cursorY, 0, clampInt(s.cursorX+1, 0, s.width), ' ', false)
 	case 2:
-		s.fillLineLocked(s.cursorY, 0, s.width, ' ')
+		s.fillLineLocked(s.cursorY, 0, s.width, ' ', false)
 	default:
-		s.fillLineLocked(s.cursorY, clampInt(s.cursorX, 0, s.width), s.width, ' ')
+		s.fillLineLocked(s.cursorY, clampInt(s.cursorX, 0, s.width), s.width, ' ', false)
 	}
 }
 
 func (s *Screen) eraseCharsLocked(count int) {
 	start := clampInt(s.cursorX, 0, s.width)
 	end := clampInt(start+count, 0, s.width)
-	s.fillLineLocked(s.cursorY, start, end, ' ')
+	s.fillLineLocked(s.cursorY, start, end, ' ', false)
 }
 
 func (s *Screen) deleteCharsLocked(count int) {
@@ -446,7 +472,7 @@ func (s *Screen) deleteCharsLocked(count int) {
 	}
 	copy(row[x:], row[minInt(x+count, s.width):])
 	for i := maxInt(s.width-count, x); i < s.width; i++ {
-		row[i] = ' '
+		row[i] = blankCell()
 	}
 }
 
@@ -462,7 +488,7 @@ func (s *Screen) insertBlankCharsLocked(count int) {
 	count = minInt(count, s.width-x)
 	copy(row[x+count:], row[x:s.width-count])
 	for i := x; i < x+count; i++ {
-		row[i] = ' '
+		row[i] = blankCell()
 	}
 }
 
@@ -475,7 +501,7 @@ func (s *Screen) insertLinesLocked(count int) {
 		copy(s.cells[y], s.cells[y-count])
 	}
 	for y := s.cursorY; y < s.cursorY+count; y++ {
-		s.fillLineLocked(y, 0, s.width, ' ')
+		s.fillLineLocked(y, 0, s.width, ' ', false)
 	}
 }
 
@@ -488,7 +514,7 @@ func (s *Screen) deleteLinesLocked(count int) {
 		copy(s.cells[y], s.cells[y+count])
 	}
 	for y := s.height - count; y < s.height; y++ {
-		s.fillLineLocked(y, 0, s.width, ' ')
+		s.fillLineLocked(y, 0, s.width, ' ', false)
 	}
 }
 
@@ -501,7 +527,7 @@ func (s *Screen) scrollUpLocked(count int) {
 		copy(s.cells[y], s.cells[y+count])
 	}
 	for y := s.height - count; y < s.height; y++ {
-		s.fillLineLocked(y, 0, s.width, ' ')
+		s.fillLineLocked(y, 0, s.width, ' ', false)
 	}
 }
 
@@ -514,47 +540,75 @@ func (s *Screen) scrollDownLocked(count int) {
 		copy(s.cells[y], s.cells[y-count])
 	}
 	for y := 0; y < count; y++ {
-		s.fillLineLocked(y, 0, s.width, ' ')
+		s.fillLineLocked(y, 0, s.width, ' ', false)
 	}
 }
 
-func (s *Screen) fillLineLocked(y, start, end int, r rune) {
+func (s *Screen) fillLineLocked(y, start, end int, r rune, used bool) {
 	if y < 0 || y >= s.height {
 		return
 	}
 	start = clampInt(start, 0, s.width)
 	end = clampInt(end, 0, s.width)
 	for x := start; x < end; x++ {
-		s.cells[y][x] = r
+		s.cells[y][x] = cell{r: r, used: used}
 	}
 }
 
-func newCells(width, height int) [][]rune {
-	cells := make([][]rune, height)
+func newCells(width, height int) [][]cell {
+	cells := make([][]cell, height)
 	for y := range cells {
-		cells[y] = make([]rune, width)
+		cells[y] = make([]cell, width)
 		for x := range cells[y] {
-			cells[y][x] = ' '
+			cells[y][x] = blankCell()
 		}
 	}
 	return cells
 }
 
-func cloneCells(cells [][]rune) [][]rune {
-	clone := make([][]rune, len(cells))
+func cloneCells(cells [][]cell) [][]cell {
+	clone := make([][]cell, len(cells))
 	for y := range cells {
-		clone[y] = make([]rune, len(cells[y]))
+		clone[y] = make([]cell, len(cells[y]))
 		copy(clone[y], cells[y])
 	}
 	return clone
 }
 
-func resizeCells(old [][]rune, width, height int) [][]rune {
+func resizeCells(old [][]cell, width, height int) [][]cell {
 	cells := newCells(width, height)
 	for y := 0; y < minInt(len(old), height); y++ {
 		copy(cells[y], old[y])
 	}
 	return cells
+}
+
+func cellsString(cells []cell, width int) string {
+	if width > len(cells) {
+		width = len(cells)
+	}
+	runes := make([]rune, width)
+	for i := 0; i < width; i++ {
+		r := cells[i].r
+		if r == 0 {
+			r = ' '
+		}
+		runes[i] = r
+	}
+	return string(runes)
+}
+
+func lastUsedCell(cells []cell) int {
+	for i := len(cells) - 1; i >= 0; i-- {
+		if cells[i].used {
+			return i
+		}
+	}
+	return -1
+}
+
+func blankCell() cell {
+	return cell{r: ' '}
 }
 
 func clampInt(v, low, high int) int {

@@ -86,6 +86,37 @@ func TestScreenAlternateScreenRestoresMainAfterResize(t *testing.T) {
 	assertLines(t, screen.Lines(), want)
 }
 
+func TestScreenCaptureLinesPreserveOnlyUsedTrailingSpaces(t *testing.T) {
+	screen := NewScreen(8, 3)
+	screen.Write([]byte("one  \r\ntwo\r\nthree"))
+
+	assertLines(t, screen.CaptureLines(false), []string{
+		"one",
+		"two",
+		"three",
+	})
+	assertLines(t, screen.CaptureLines(true), []string{
+		"one  ",
+		"two",
+		"three",
+	})
+}
+
+func TestScreenCaptureLinesClearsUsedCells(t *testing.T) {
+	screen := NewScreen(8, 2)
+	screen.Write([]byte("abcdef"))
+	screen.Write([]byte("\x1b[1;4H\x1b[K"))
+
+	assertLines(t, screen.Lines(), []string{
+		"abc     ",
+		"        ",
+	})
+	assertLines(t, screen.CaptureLines(true), []string{
+		"abc",
+		"",
+	})
+}
+
 func assertLines(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {
