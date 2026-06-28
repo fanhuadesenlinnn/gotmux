@@ -57,6 +57,12 @@ border rendering, zoom, and pane movement commands remain.
 - Implement copy-mode, view-mode, paste buffers, capture-pane, choose-tree,
   prompts, menus, mouse handling, and key tables.
 
+Status: in progress. Basic `capture-pane -p` now captures visible screen
+lines with simple `-S`/`-E` ranges and is compared with tmux in
+`scripts/compat_probe.sh`. History capture, paste-buffer capture, copy mode,
+mode screens, joined/wrapped output, style/escape output, and complete target
+resolution remain.
+
 ## Phase 6: Advanced tmux Surfaces
 
 - Implement hooks, control mode, popups, session groups, linked windows,

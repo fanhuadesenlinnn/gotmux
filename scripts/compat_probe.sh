@@ -100,6 +100,13 @@ compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{wind
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 
+"${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone\\ntwo\\nthree\\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone\\ntwo\\nthree\\n'" Enter >/dev/null
+sleep 0.4
+compare "capture-pane visible text" capture-pane -p -t cap -S 0 -E 2
+
 "${tmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layh -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh >/dev/null

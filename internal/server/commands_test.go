@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
+	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func TestCommandCreatesAndListsSession(t *testing.T) {
@@ -98,6 +99,30 @@ func TestSourceFile(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestNewWindowHonorsTargetSession(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "aaa", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session aaa failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "src", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session src failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"new-window", "-t", "src", "-n", "targeted", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-window failed: %s", msg.Text)
+	}
+	src := rt.execute([]string{"list-windows", "-t", "src", "-F", "#{window_index}:#{window_name}"}, "", 80, 24)
+	if !strings.Contains(src.Text, "1:targeted") {
+		t.Fatalf("target session missing new window: %q", src.Text)
+	}
+	aaa := rt.execute([]string{"list-windows", "-t", "aaa", "-F", "#{window_index}:#{window_name}"}, "", 80, 24)
+	if strings.Contains(aaa.Text, "targeted") {
+		t.Fatalf("new window created in wrong session: %q", aaa.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "aaa"}, "aaa", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
+}
+
 func TestEnvironmentCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "env", "/bin/sh"}, "", 80, 24)
@@ -170,4 +195,29 @@ func TestRootKeyBindingDispatch(t *testing.T) {
 	}
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
+}
+
+func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, pane, err := rt.state.NewSession("cap", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	screen := terminal.NewScreen(8, 3)
+	screen.Write([]byte("one\r\ntwo\r\nthree"))
+	rt.screens[pane.ID] = screen
+
+	msg := rt.execute([]string{"capture-pane", "-p", "-t", "cap"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("capture-pane failed: %s", msg.Text)
+	}
+	if msg.Text != "one\ntwo\nthree" {
+		t.Fatalf("capture-pane = %q", msg.Text)
+	}
+
+	msg = rt.execute([]string{"capture-pane", "-p", "-S", "1", "-E", "1", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "two" {
+		t.Fatalf("capture-pane range = %q", msg.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "cap"}, "cap", 80, 24)
 }

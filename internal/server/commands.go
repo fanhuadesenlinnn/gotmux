@@ -190,6 +190,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok("")
 	case "display-message":
 		return rt.cmdDisplayMessage(args, currentSession)
+	case "capture-pane":
+		return rt.cmdCapturePane(args, currentSession)
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
@@ -222,6 +224,9 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 }
 
 func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, height int) protocol.Message {
+	if target := targetSession(args, currentSession); target != "" {
+		currentSession = target
+	}
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
@@ -240,6 +245,9 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 }
 
 func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, height int) protocol.Message {
+	if target := targetSession(args, currentSession); target != "" {
+		currentSession = target
+	}
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
@@ -323,6 +331,22 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 		template = "#{session_name}: #{window_index}:#{window_name}, current pane #{pane_index}"
 	}
 	return ok(formatString(template, activeFormatContext(rt.state, currentSession)))
+}
+
+func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {
+	if !hasAny(args, "-p") {
+		return ok("")
+	}
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	lines := rt.capturePaneLines(pane, !hasAny(args, "-N"))
+	lines = sliceCaptureLines(lines, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
+	if hasAny(args, "-J") {
+		return ok(strings.Join(lines, " "))
+	}
+	return ok(strings.Join(lines, "\n"))
 }
 
 func (rt *Runtime) cmdSourceFile(args []string, currentSession string, width, height int) protocol.Message {
@@ -634,6 +658,8 @@ func normalizeCommandName(name string) string {
 		return "previous-window"
 	case "selectp":
 		return "select-pane"
+	case "capturep":
+		return "capture-pane"
 	case "killp":
 		return "kill-pane"
 	case "killw":
@@ -661,7 +687,7 @@ func normalizeCommandName(name string) string {
 	case "selectl":
 		return "select-layout"
 	case "kill-server", "kill-session", "rename-session", "rename-window",
-		"send-keys", "display-message", "detach-client", "version",
+		"send-keys", "display-message", "capture-pane", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "select-layout":
@@ -749,7 +775,7 @@ func nonOptionArgs(args []string) []string {
 
 func optionOperands(args []string) []string {
 	valueFlags := map[string]bool{
-		"-c": true, "-d": true, "-F": true, "-f": true,
+		"-c": true, "-d": true, "-E": true, "-F": true, "-f": true,
 		"-N": true, "-S": true, "-T": true, "-t": true, "-x": true,
 		"-y": true,
 	}
@@ -984,6 +1010,141 @@ func activePane(session *model.Session) *model.Pane {
 		return nil
 	}
 	return window.ActivePane()
+}
+
+func (rt *Runtime) targetPane(target string, currentSession string) *model.Pane {
+	sessionName, windowIndex, paneIndex, hasWindow, hasPane := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(rt.state)
+	}
+	for _, session := range snapshotSessions(rt.state) {
+		if session.Name != sessionName {
+			continue
+		}
+		window := session.ActiveWindow()
+		if hasWindow {
+			window = nil
+			for _, candidate := range session.Windows {
+				if candidate.Index == windowIndex {
+					window = candidate
+					break
+				}
+			}
+		}
+		if window == nil {
+			return nil
+		}
+		if hasPane {
+			for _, pane := range window.Panes {
+				if pane.Index == paneIndex {
+					return pane
+				}
+			}
+			return nil
+		}
+		return window.ActivePane()
+	}
+	return nil
+}
+
+func parsePaneTarget(target string) (session string, window int, pane int, hasWindow bool, hasPane bool) {
+	target = cleanSessionTarget(target)
+	if target == "" {
+		return "", 0, 0, false, false
+	}
+	if strings.HasPrefix(target, ":") {
+		target = target[1:]
+	} else if before, after, ok := strings.Cut(target, ":"); ok {
+		session = before
+		target = after
+	} else if !strings.Contains(target, ".") {
+		session = target
+		return session, 0, 0, false, false
+	}
+	if before, after, ok := strings.Cut(target, "."); ok {
+		if before != "" {
+			if parsed, err := strconv.Atoi(strings.TrimPrefix(before, "=")); err == nil {
+				window = parsed
+				hasWindow = true
+			}
+		}
+		if after != "" {
+			if parsed, err := strconv.Atoi(strings.TrimPrefix(after, "=")); err == nil {
+				pane = parsed
+				hasPane = true
+			}
+		}
+		return session, window, pane, hasWindow, hasPane
+	}
+	if target != "" {
+		if parsed, err := strconv.Atoi(strings.TrimPrefix(target, "=")); err == nil {
+			window = parsed
+			hasWindow = true
+		}
+	}
+	return session, window, pane, hasWindow, hasPane
+}
+
+func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []string {
+	var lines []string
+	rt.screensMu.RLock()
+	screen := rt.screens[pane.ID]
+	rt.screensMu.RUnlock()
+	if screen != nil {
+		lines = screen.Lines()
+	} else {
+		lines = visibleTextLines(pane.History.Bytes(), pane.Height)
+		if pane.Height > 0 && len(lines) < pane.Height {
+			padding := make([]string, pane.Height-len(lines))
+			lines = append(lines, padding...)
+		}
+	}
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		if trimTrailing {
+			line = strings.TrimRight(line, " ")
+		}
+		out[i] = line
+	}
+	return out
+}
+
+func sliceCaptureLines(lines []string, startValue string, endValue string) []string {
+	if len(lines) == 0 {
+		return nil
+	}
+	start := 0
+	end := len(lines) - 1
+	if startValue != "" {
+		start = parseCaptureLineIndex(startValue, len(lines), 0)
+	}
+	if endValue != "" {
+		end = parseCaptureLineIndex(endValue, len(lines), end)
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end >= len(lines) {
+		end = len(lines) - 1
+	}
+	if end < start {
+		return nil
+	}
+	return lines[start : end+1]
+}
+
+func parseCaptureLineIndex(value string, lineCount int, fallback int) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	if parsed < 0 {
+		return lineCount + parsed
+	}
+	return parsed
 }
 
 func parsePaneDelta(target string) (int, bool) {

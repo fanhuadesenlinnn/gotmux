@@ -26,7 +26,8 @@ manual verification note.
 | Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, `resize-pane`, and `select-layout even-horizontal` in the probe subset |
 | Basic terminal screen grid | Implemented for common printable output, cursor movement, clear line/screen, insertion/deletion, scrolling, and alternate-screen escape sequences |
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |
-| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, and pane-geometry subsets |
+| Basic `capture-pane` | Implemented for `-p`, visible screen lines, simple `-S`/`-E` ranges, and simple pane targets in the probe subset |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, and `capture-pane` subsets |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
@@ -40,6 +41,7 @@ manual verification note.
 | Copy mode | Not implemented. |
 | Mouse support | Not implemented. |
 | Buffers and paste buffers | Not implemented. |
+| Full `capture-pane` semantics | History ranges, alternate screen selection, mode screen capture, paste buffers, `-N`/`-J`/`-T`, escape/style output, hyperlinks, line flags, and complete target resolution are incomplete. |
 | Full option semantics | Only a small string-backed subset exists. Most documented options and option side effects are not implemented. |
 | Full environment semantics | Hidden variables, remove markers, update-environment integration, and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
