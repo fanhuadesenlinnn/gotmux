@@ -24,3 +24,15 @@ func SocketPath(label, explicit string) (string, error) {
 	}
 	return filepath.Join(base, label), nil
 }
+
+func DefaultConfigFiles() []string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return nil
+	}
+	path := filepath.Join(home, ".tmux.conf")
+	if st, err := os.Stat(path); err == nil && !st.IsDir() {
+		return []string{path}
+	}
+	return nil
+}

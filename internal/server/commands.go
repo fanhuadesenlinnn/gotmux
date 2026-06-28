@@ -100,6 +100,12 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdUnbindKey(args)
 	case "list-keys":
 		return rt.cmdListKeys(args)
+	case "set-environment":
+		return rt.cmdSetEnvironment(args, currentSession)
+	case "show-environment":
+		return rt.cmdShowEnvironment(args, currentSession)
+	case "send-prefix":
+		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
 		target := optionValue(args, "-t", "")
 		index, parsed := parseWindowTarget(target)
@@ -427,6 +433,84 @@ func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing variable")
+	}
+	scope := "session"
+	if hasAny(args, "-g") {
+		scope = "global"
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	name := values[0]
+	if hasAny(args, "-u") {
+		if err := rt.state.UnsetEnvironment(scope, currentSession, name); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+	value := ""
+	if len(values) > 1 {
+		value = strings.Join(values[1:], " ")
+	}
+	if err := rt.state.SetEnvironment(scope, currentSession, name, value); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) protocol.Message {
+	scope := "session"
+	if hasAny(args, "-g") {
+		scope = "global"
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	env, err := rt.state.Environment(scope, currentSession)
+	if err != nil {
+		return fail(err.Error())
+	}
+	names := optionOperands(args)
+	shellFormat := hasAny(args, "-s")
+	if len(names) > 0 {
+		value, exists := env[names[0]]
+		if !exists {
+			return fail(fmt.Sprintf("unknown variable: %s", names[0]))
+		}
+		if shellFormat {
+			return ok(fmt.Sprintf("%s=%s; export %s;", names[0], shellQuote(value), names[0]))
+		}
+		return ok(fmt.Sprintf("%s=%s", names[0], value))
+	}
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	lines := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if shellFormat {
+			lines = append(lines, fmt.Sprintf("%s=%s; export %s;", key, shellQuote(env[key]), key))
+		} else {
+			lines = append(lines, fmt.Sprintf("%s=%s", key, env[key]))
+		}
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) cmdSendPrefix(args []string, currentSession string) protocol.Message {
+	pane := rt.state.ActivePane(currentSession)
+	if pane == nil || pane.PTY == nil {
+		return ok("")
+	}
+	_, _ = pane.PTY.Write([]byte{rt.prefixByte()})
+	return ok("")
+}
+
 func (rt *Runtime) sendKeys(session string, keys []string) {
 	pane := rt.state.ActivePane(session)
 	if pane == nil || pane.PTY == nil {
@@ -449,6 +533,16 @@ func (rt *Runtime) sendKeys(session string, keys []string) {
 			_, _ = pane.PTY.Write([]byte(key))
 		}
 	}
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "\"\""
+	}
+	if !strings.ContainsAny(value, " \t\n\"'\\$`") {
+		return "\"" + value + "\""
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
 func normalizeCommandName(name string) string {
@@ -495,10 +589,15 @@ func normalizeCommandName(name string) string {
 		return "unbind-key"
 	case "lsk":
 		return "list-keys"
+	case "setenv":
+		return "set-environment"
+	case "showenv":
+		return "show-environment"
 	case "kill-server", "kill-session", "rename-session", "rename-window",
 		"send-keys", "display-message", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
-		"bind-key", "unbind-key", "list-keys":
+		"bind-key", "unbind-key", "list-keys", "set-environment",
+		"show-environment", "send-prefix":
 		return name
 	default:
 		return name

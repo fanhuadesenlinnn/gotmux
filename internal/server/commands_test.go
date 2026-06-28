@@ -97,3 +97,77 @@ func TestSourceFile(t *testing.T) {
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
+
+func TestEnvironmentCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "env", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "FOO", "bar"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("setenv failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "FOO"}, "env", 80, 24)
+	if msg.Text != "FOO=bar" {
+		t.Fatalf("showenv = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-s", "FOO"}, "env", 80, 24)
+	if msg.Text != `FOO="bar"; export FOO;` {
+		t.Fatalf("showenv -s = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"new-window", "-t", "env", "-n", "usesenv", "/bin/sh"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-window failed: %s", msg.Text)
+	}
+	found := false
+	for _, session := range snapshotSessions(rt.state) {
+		if session.Name != "env" {
+			continue
+		}
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				for _, item := range pane.Env {
+					if item == "FOO=bar" {
+						found = true
+					}
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("new pane did not inherit FOO=bar")
+	}
+	msg = rt.execute([]string{"setenv", "-u", "FOO"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("setenv -u failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "FOO"}, "env", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
+		t.Fatalf("showenv after unset = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "env"}, "env", 80, 24)
+}
+
+func TestRootKeyBindingDispatch(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "root", "-n", "first", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("root", 80, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg = rt.execute([]string{"bind-key", "-n", "C-a", "new-window", "-n", "rooted", "/bin/sh"}, "root", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind-key -n failed: %s", msg.Text)
+	}
+	rt.handleInput(client.ID, []byte{0x01})
+	msg = rt.execute([]string{"list-windows", "-t", "root", "-F", "#{window_index}:#{window_name}"}, "root", 80, 24)
+	if !strings.Contains(msg.Text, "1:rooted") {
+		t.Fatalf("root binding did not create window: %q", msg.Text)
+	}
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
+}

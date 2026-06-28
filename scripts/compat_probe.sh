@@ -17,33 +17,39 @@ tmux_sock="gotmux-compat-tmux-$$"
 gotmux_sock="/tmp/gotmux-compat-gotmux-$$.sock"
 tmux_config_sock="gotmux-compat-tmux-config-$$"
 gotmux_config_sock="/tmp/gotmux-compat-gotmux-config-$$.sock"
+tmux_default_config_sock="gotmux-compat-tmux-default-config-$$"
+gotmux_default_config_sock="/tmp/gotmux-compat-gotmux-default-config-$$.sock"
 
 cleanup() {
   "${TMUX_BIN}" -L "${tmux_sock}" kill-server >/dev/null 2>&1 || true
   "${TMUX_BIN}" -L "${tmux_config_sock}" kill-server >/dev/null 2>&1 || true
+  "${TMUX_BIN}" -L "${tmux_default_config_sock}" kill-server >/dev/null 2>&1 || true
   "${BIN}" -S "${gotmux_sock}" kill-server >/dev/null 2>&1 || true
   "${BIN}" -S "${gotmux_config_sock}" kill-server >/dev/null 2>&1 || true
+  "${BIN}" -S "${gotmux_default_config_sock}" kill-server >/dev/null 2>&1 || true
   rm -f "${gotmux_sock}"
   rm -f "${gotmux_config_sock}"
+  rm -f "${gotmux_default_config_sock}"
 }
 trap cleanup EXIT
 
 tmux_cmd=("${TMUX_BIN}" -f /dev/null -L "${tmux_sock}")
+gotmux_cmd=("${BIN}" -S "${gotmux_sock}" -f /dev/null)
 
 "${tmux_cmd[@]}" new-session -d -s compat -n first -x 80 -y 24 /bin/sh
 "${tmux_cmd[@]}" new-window -t compat -n second /bin/sh
 "${tmux_cmd[@]}" split-window -t compat -h /bin/sh
 
-"${BIN}" -S "${gotmux_sock}" new-session -d -s compat -n first /bin/sh >/dev/null
-"${BIN}" -S "${gotmux_sock}" new-window -t compat -n second /bin/sh >/dev/null
-"${BIN}" -S "${gotmux_sock}" split-window -t compat -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-session -d -s compat -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t compat -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t compat -h /bin/sh >/dev/null
 
 compare() {
   local name="$1"
   shift
   local tmux_output gotmux_output
   tmux_output="$("${tmux_cmd[@]}" "$@")"
-  gotmux_output="$("${BIN}" -S "${gotmux_sock}" "$@")"
+  gotmux_output="$("${gotmux_cmd[@]}" "$@")"
   if [[ "${tmux_output}" != "${gotmux_output}" ]]; then
     echo "compat probe failed: ${name}" >&2
     echo "--- tmux" >&2
@@ -60,7 +66,7 @@ compare_normalized() {
   shift
   local tmux_output gotmux_output
   tmux_output="$("${tmux_cmd[@]}" "$@" | sed -E 's/[[:space:]]+/ /g')"
-  gotmux_output="$("${BIN}" -S "${gotmux_sock}" "$@" | sed -E 's/[[:space:]]+/ /g')"
+  gotmux_output="$("${gotmux_cmd[@]}" "$@" | sed -E 's/[[:space:]]+/ /g')"
   if [[ "${tmux_output}" != "${gotmux_output}" ]]; then
     echo "compat probe failed: ${name}" >&2
     echo "--- tmux" >&2
@@ -77,7 +83,7 @@ compare_key_line() {
   local key="$2"
   local tmux_output gotmux_output
   tmux_output="$("${tmux_cmd[@]}" list-keys -T prefix | grep -E "[[:space:]]${key}[[:space:]]" | sed -E 's/[[:space:]]+/ /g')"
-  gotmux_output="$("${BIN}" -S "${gotmux_sock}" list-keys -T prefix | grep -E "[[:space:]]${key}[[:space:]]" | sed -E 's/[[:space:]]+/ /g')"
+  gotmux_output="$("${gotmux_cmd[@]}" list-keys -T prefix | grep -E "[[:space:]]${key}[[:space:]]" | sed -E 's/[[:space:]]+/ /g')"
   if [[ "${tmux_output}" != "${gotmux_output}" ]]; then
     echo "compat probe failed: ${name}" >&2
     echo "--- tmux" >&2
@@ -95,28 +101,49 @@ compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_activ
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 
 "${tmux_cmd[@]}" set -g status off
-"${BIN}" -S "${gotmux_sock}" set -g status off >/dev/null
+"${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
 compare "show global option value" show -gqv status
 
 "${tmux_cmd[@]}" setw -g mode-keys vi
-"${BIN}" -S "${gotmux_sock}" setw -g mode-keys vi >/dev/null
+"${gotmux_cmd[@]}" setw -g mode-keys vi >/dev/null
 compare "show global window option" show -gw mode-keys
 
 "${tmux_cmd[@]}" bind-key C-a send-prefix
-"${BIN}" -S "${gotmux_sock}" bind-key C-a send-prefix >/dev/null
+"${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null
 compare_key_line "list custom key" C-a
+
+"${tmux_cmd[@]}" setenv FOO bar
+"${gotmux_cmd[@]}" setenv FOO bar >/dev/null
+compare "show environment" showenv FOO
+compare "show environment shell" showenv -s FOO
+"${tmux_cmd[@]}" setenv -g GLOBAL yes
+"${gotmux_cmd[@]}" setenv -g GLOBAL yes >/dev/null
+compare "show global environment" showenv -g GLOBAL
+"${tmux_cmd[@]}" setenv -u FOO
+"${gotmux_cmd[@]}" setenv -u FOO >/dev/null
+tmux_showenv_missing="$("${tmux_cmd[@]}" showenv FOO 2>&1 || true)"
+gotmux_showenv_missing="$("${gotmux_cmd[@]}" showenv FOO 2>&1 || true)"
+if [[ "${tmux_showenv_missing}" != "${gotmux_showenv_missing}" ]]; then
+  echo "compat probe failed: unset environment" >&2
+  echo "--- tmux" >&2
+  printf '%s\n' "${tmux_showenv_missing}" >&2
+  echo "--- gotmux" >&2
+  printf '%s\n' "${gotmux_showenv_missing}" >&2
+  exit 1
+fi
+printf 'ok unset environment\n'
 
 source_file="$(mktemp)"
 printf 'set -g status on\nnew-window -n sourced /bin/sh\n' > "${source_file}"
 "${tmux_cmd[@]}" source-file "${source_file}"
-"${BIN}" -S "${gotmux_sock}" source-file "${source_file}" >/dev/null
+"${gotmux_cmd[@]}" source-file "${source_file}" >/dev/null
 rm -f "${source_file}"
 compare "source-file option" show -gqv status
 compare "source-file window" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 
 "${tmux_cmd[@]}" new-session -d -s seq -n first /bin/sh \; new-window -t seq -n second /bin/sh
-"${BIN}" -S "${gotmux_sock}" new-session -d -s seq -n first /bin/sh \; new-window -t seq -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-session -d -s seq -n first /bin/sh \; new-window -t seq -n second /bin/sh >/dev/null
 compare "command sequence" list-windows -t seq -F "#{window_index}:#{window_name}"
 
 config_file="$(mktemp)"
@@ -136,3 +163,20 @@ if [[ "${tmux_config_status}" != "${gotmux_config_status}" ]]; then
   exit 1
 fi
 printf 'ok startup config\n'
+
+default_home="$(mktemp -d)"
+printf 'set -g status off\n' > "${default_home}/.tmux.conf"
+HOME="${default_home}" "${TMUX_BIN}" -L "${tmux_default_config_sock}" new-session -d -s defaultconf -n first /bin/sh
+HOME="${default_home}" "${BIN}" -S "${gotmux_default_config_sock}" new-session -d -s defaultconf -n first /bin/sh >/dev/null
+tmux_default_status="$(HOME="${default_home}" "${TMUX_BIN}" -L "${tmux_default_config_sock}" show -gqv status)"
+gotmux_default_status="$(HOME="${default_home}" "${BIN}" -S "${gotmux_default_config_sock}" show -gqv status)"
+rm -rf "${default_home}"
+if [[ "${tmux_default_status}" != "${gotmux_default_status}" ]]; then
+  echo "compat probe failed: default config discovery" >&2
+  echo "--- tmux" >&2
+  printf '%s\n' "${tmux_default_status}" >&2
+  echo "--- gotmux" >&2
+  printf '%s\n' "${gotmux_default_status}" >&2
+  exit 1
+fi
+printf 'ok default config discovery\n'

@@ -152,7 +152,11 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	args := model.NormalizeCommand(pane.Command)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = pane.CWD
-	cmd.Env = append(os.Environ(),
+	env := pane.Env
+	if len(env) == 0 {
+		env = os.Environ()
+	}
+	cmd.Env = append(env,
 		"TERM=screen-256color",
 		"GOTMUX=1",
 		fmt.Sprintf("TMUX=%s,%d,%d", rt.state.SocketPath, os.Getpid(), pane.ID),

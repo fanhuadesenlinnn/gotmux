@@ -18,6 +18,15 @@ func (rt *Runtime) handleInput(clientID int64, data []byte) {
 			data = data[consumed:]
 			continue
 		}
+		key, consumed := inputKeyName(data)
+		if binding, ok := rt.state.KeyBinding("root", key); ok {
+			rt.executeBinding(clientID, binding.Command)
+			if consumed <= 0 {
+				consumed = 1
+			}
+			data = data[consumed:]
+			continue
+		}
 		idx := bytes.IndexByte(data, rt.prefixByte())
 		if idx == -1 {
 			rt.writeActivePane(clientID, data)
@@ -35,7 +44,6 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 	if len(data) == 0 {
 		return 0
 	}
-	session := rt.state.ActiveSessionName(clientID)
 	key, consumed := inputKeyName(data)
 	if key == "?" {
 		rt.showKeys(clientID)
@@ -46,10 +54,15 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 		return consumed
 	}
 	if binding, ok := rt.state.KeyBinding("prefix", key); ok {
-		result := rt.execute(binding.Command, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
-		rt.writeCommandResult(clientID, result)
+		rt.executeBinding(clientID, binding.Command)
 	}
 	return consumed
+}
+
+func (rt *Runtime) executeBinding(clientID int64, command []string) {
+	session := rt.state.ActiveSessionName(clientID)
+	result := rt.execute(command, session, rt.clientWidth(clientID), rt.clientHeight(clientID))
+	rt.writeCommandResult(clientID, result)
 }
 
 func (rt *Runtime) writeActivePane(clientID int64, data []byte) {

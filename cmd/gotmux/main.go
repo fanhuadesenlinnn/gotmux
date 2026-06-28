@@ -39,8 +39,12 @@ func run(args []string) int {
 		usage()
 		return 0
 	}
+	configFiles := global.configFiles
+	if len(configFiles) == 0 {
+		configFiles = config.DefaultConfigFiles()
+	}
 	if global.server {
-		if err := server.Run(context.Background(), socketPath, global.configFiles); err != nil {
+		if err := server.Run(context.Background(), socketPath, configFiles); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
@@ -61,7 +65,7 @@ func run(args []string) int {
 	name := normalize(commands[0][0])
 	switch name {
 	case "new-session":
-		if err := daemon.Ensure(socketPath, global.configFiles); err != nil {
+		if err := daemon.Ensure(socketPath, configFiles); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ type Server struct {
 	Clients             map[int64]*Client
 	GlobalOptions       map[string]string
 	GlobalWindowOptions map[string]string
+	GlobalEnvironment   map[string]string
 	KeyBindings         map[string]map[string]KeyBinding
 	NextSessionID       int
 	NextWindowID        int
@@ -28,15 +30,16 @@ type Server struct {
 }
 
 type Session struct {
-	ID        int
-	Name      string
-	CWD       string
-	CreatedAt time.Time
-	Activity  time.Time
-	Windows   []*Window
-	Active    int
-	Attached  int
-	Options   map[string]string
+	ID          int
+	Name        string
+	CWD         string
+	CreatedAt   time.Time
+	Activity    time.Time
+	Windows     []*Window
+	Active      int
+	Attached    int
+	Options     map[string]string
+	Environment map[string]string
 }
 
 type Window struct {
@@ -54,6 +57,7 @@ type Pane struct {
 	ID        int
 	Index     int
 	Command   []string
+	Env       []string
 	CWD       string
 	CreatedAt time.Time
 	Activity  time.Time
@@ -89,6 +93,7 @@ func NewServer(socketPath string) *Server {
 		Clients:             make(map[int64]*Client),
 		GlobalOptions:       defaultOptions(),
 		GlobalWindowOptions: defaultWindowOptions(),
+		GlobalEnvironment:   environmentMap(os.Environ()),
 		KeyBindings:         defaultKeyBindings(),
 		SocketPath:          socketPath,
 		StartedAt:           time.Now(),
@@ -190,7 +195,7 @@ func (s *Server) NewSession(name, cwd string, windowName string, command []strin
 	s.Sessions[name] = session
 
 	window := s.newWindowLocked(session, defaultWindowName(windowName, command))
-	pane := s.newPaneLocked(window, cwd, command)
+	pane := s.newPaneLocked(session, window, cwd, command)
 	return session, window, pane, nil
 }
 
@@ -206,7 +211,7 @@ func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Wi
 		cwd = session.CWD
 	}
 	window := s.newWindowLocked(session, defaultWindowName(name, command))
-	pane := s.newPaneLocked(window, cwd, command)
+	pane := s.newPaneLocked(session, window, cwd, command)
 	session.Active = len(session.Windows) - 1
 	session.Activity = time.Now()
 	return window, pane, nil
@@ -227,7 +232,7 @@ func (s *Server) SplitPane(sessionName, cwd string, command []string) (*Pane, er
 	if cwd == "" {
 		cwd = session.CWD
 	}
-	pane := s.newPaneLocked(window, cwd, command)
+	pane := s.newPaneLocked(session, window, cwd, command)
 	window.Active = len(window.Panes) - 1
 	window.Activity = time.Now()
 	session.Activity = time.Now()
@@ -681,6 +686,92 @@ func (s *Server) ListKeyBindings(table string) []KeyBinding {
 	return out
 }
 
+func (s *Server) SetEnvironment(scope, sessionName, name, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch scope {
+	case "global":
+		s.GlobalEnvironment[name] = value
+	case "session":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return fmt.Errorf("can't find session: %s", sessionName)
+		}
+		if session.Environment == nil {
+			session.Environment = make(map[string]string)
+		}
+		session.Environment[name] = value
+	default:
+		return fmt.Errorf("unknown environment scope: %s", scope)
+	}
+	return nil
+}
+
+func (s *Server) UnsetEnvironment(scope, sessionName, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch scope {
+	case "global":
+		delete(s.GlobalEnvironment, name)
+	case "session":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return fmt.Errorf("can't find session: %s", sessionName)
+		}
+		delete(session.Environment, name)
+	default:
+		return fmt.Errorf("unknown environment scope: %s", scope)
+	}
+	return nil
+}
+
+func (s *Server) Environment(scope, sessionName string) (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make(map[string]string)
+	for key, value := range s.GlobalEnvironment {
+		out[key] = value
+	}
+	if scope == "global" {
+		return out, nil
+	}
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil, fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for key, value := range session.Environment {
+		out[key] = value
+	}
+	return out, nil
+}
+
+func environmentMap(values []string) map[string]string {
+	env := make(map[string]string, len(values))
+	for _, item := range values {
+		name, value, ok := strings.Cut(item, "=")
+		if ok {
+			env[name] = value
+		}
+	}
+	return env
+}
+
+func environmentList(env map[string]string) []string {
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+env[key])
+	}
+	return out
+}
+
 func (s *Session) ActiveWindow() *Window {
 	if s == nil || s.Active < 0 || s.Active >= len(s.Windows) {
 		return nil
@@ -725,11 +816,12 @@ func defaultWindowName(name string, command []string) string {
 	return strings.TrimPrefix(base, "-")
 }
 
-func (s *Server) newPaneLocked(window *Window, cwd string, command []string) *Pane {
+func (s *Server) newPaneLocked(session *Session, window *Window, cwd string, command []string) *Pane {
 	pane := &Pane{
 		ID:        s.NextPaneID,
 		Index:     len(window.Panes),
 		Command:   NormalizeCommand(command),
+		Env:       s.environmentLocked(session),
 		CWD:       cwd,
 		CreatedAt: time.Now(),
 		Activity:  time.Now(),
@@ -738,6 +830,17 @@ func (s *Server) newPaneLocked(window *Window, cwd string, command []string) *Pa
 	s.NextPaneID++
 	window.Panes = append(window.Panes, pane)
 	return pane
+}
+
+func (s *Server) environmentLocked(session *Session) []string {
+	env := make(map[string]string, len(s.GlobalEnvironment)+len(session.Environment))
+	for key, value := range s.GlobalEnvironment {
+		env[key] = value
+	}
+	for key, value := range session.Environment {
+		env[key] = value
+	}
+	return environmentList(env)
 }
 
 func DefaultShellName() string {

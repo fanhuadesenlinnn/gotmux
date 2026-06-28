@@ -18,10 +18,12 @@ manual verification note.
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | `source-file` | Implemented for simple command files and line continuations |
-| Explicit `-f` startup config | Implemented for server startup, not yet default `.tmux.conf` discovery |
+| Explicit `-f` startup config | Implemented for server startup |
+| Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
 | Basic options | Implemented for string-backed `set-option`, `set-window-option`, and `show-options` |
-| Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, and prefix dispatch |
-| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, source-file, and command-sequence subsets |
+| Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
+| Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, and command-sequence subsets |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
@@ -36,8 +38,8 @@ manual verification note.
 | Mouse support | Not implemented. |
 | Buffers and paste buffers | Not implemented. |
 | Full option semantics | Only a small string-backed subset exists. Most documented options and option side effects are not implemented. |
-| Key tables and custom bindings | Prefix/root table storage exists, but full key tables, repeat behavior, notes, mode tables, and multi-command bindings are incomplete. |
-| Default `.tmux.conf` discovery | Not implemented. |
+| Full environment semantics | Hidden variables, remove markers, update-environment integration, and complete session/global behavior are incomplete. |
+| Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
 | Status format language | Only a simple status line is implemented. |
 | Hooks | Not implemented. |
 | Control mode | Not implemented. |

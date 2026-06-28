@@ -31,6 +31,8 @@ This first implementation supports:
 - `source-file`, explicit `-f` startup config loading, and a first subset of
   `set-option`, `show-options`, `set-window-option`, `bind-key`,
   `unbind-key`, and `list-keys`
+- default `$HOME/.tmux.conf` discovery when starting a new server
+- a first subset of `set-environment` / `show-environment`
 - macOS and Linux builds with `CGO_ENABLED=0`
 
 Full tmux parity is not complete yet. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
