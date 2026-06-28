@@ -106,6 +106,17 @@ compare "display-message formats" display-message -p -t compat -F "#{session_nam
 "${gotmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone\\ntwo\\nthree\\n'" Enter >/dev/null
 sleep 0.4
 compare "capture-pane visible text" capture-pane -p -t cap -S 0 -E 2
+"${tmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2
+"${gotmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2 >/dev/null
+compare "capture-pane buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
+
+"${tmux_cmd[@]}" set-buffer -b named "hello world"
+"${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null
+compare "show named buffer" show-buffer -b named
+compare "list buffers format" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
+"${tmux_cmd[@]}" delete-buffer -b named
+"${gotmux_cmd[@]}" delete-buffer -b named >/dev/null
+compare "delete named buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
 
 "${tmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layh -h /bin/sh

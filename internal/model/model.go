@@ -17,6 +17,7 @@ type Server struct {
 	mu                  sync.RWMutex
 	Sessions            map[string]*Session
 	Clients             map[int64]*Client
+	Buffers             map[string]*Buffer
 	GlobalOptions       map[string]string
 	GlobalWindowOptions map[string]string
 	GlobalEnvironment   map[string]string
@@ -25,6 +26,8 @@ type Server struct {
 	NextWindowID        int
 	NextPaneID          int
 	NextClientID        int64
+	NextBufferID        int
+	NextBufferOrder     int64
 	SocketPath          string
 	StartedAt           time.Time
 }
@@ -102,10 +105,18 @@ type KeyBinding struct {
 	Repeat  bool
 }
 
+type Buffer struct {
+	Name      string
+	Data      string
+	CreatedAt time.Time
+	Order     int64
+}
+
 func NewServer(socketPath string) *Server {
 	return &Server{
 		Sessions:            make(map[string]*Session),
 		Clients:             make(map[int64]*Client),
+		Buffers:             make(map[string]*Buffer),
 		GlobalOptions:       defaultOptions(),
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
@@ -845,6 +856,93 @@ func (s *Server) UnsetEnvironment(scope, sessionName, name string) error {
 		return fmt.Errorf("unknown environment scope: %s", scope)
 	}
 	return nil
+}
+
+func (s *Server) SetBuffer(name, data string, appendData bool) Buffer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.Buffers == nil {
+		s.Buffers = make(map[string]*Buffer)
+	}
+	if name == "" {
+		for {
+			name = fmt.Sprintf("buffer%d", s.NextBufferID)
+			s.NextBufferID++
+			if _, exists := s.Buffers[name]; !exists {
+				break
+			}
+		}
+	}
+	buffer := s.Buffers[name]
+	if buffer == nil {
+		buffer = &Buffer{Name: name, CreatedAt: time.Now()}
+		s.Buffers[name] = buffer
+	}
+	if appendData {
+		buffer.Data += data
+	} else {
+		buffer.Data = data
+	}
+	s.NextBufferOrder++
+	buffer.Order = s.NextBufferOrder
+	return *buffer
+}
+
+func (s *Server) ShowBuffer(name string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	buffer := s.bufferLocked(name)
+	if buffer == nil {
+		return "", fmt.Errorf("no buffer named")
+	}
+	return buffer.Data, nil
+}
+
+func (s *Server) DeleteBuffer(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	buffer := s.bufferLocked(name)
+	if buffer == nil {
+		return fmt.Errorf("no buffer named")
+	}
+	delete(s.Buffers, buffer.Name)
+	return nil
+}
+
+func (s *Server) ListBuffers() []Buffer {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	buffers := make([]Buffer, 0, len(s.Buffers))
+	for _, buffer := range s.Buffers {
+		buffers = append(buffers, *buffer)
+	}
+	sort.Slice(buffers, func(i, j int) bool {
+		if buffers[i].Order == buffers[j].Order {
+			return buffers[i].Name < buffers[j].Name
+		}
+		return buffers[i].Order > buffers[j].Order
+	})
+	return buffers
+}
+
+func (s *Server) bufferLocked(name string) *Buffer {
+	if len(s.Buffers) == 0 {
+		return nil
+	}
+	if name != "" {
+		return s.Buffers[name]
+	}
+	var selected *Buffer
+	for _, buffer := range s.Buffers {
+		if selected == nil || buffer.Order > selected.Order {
+			selected = buffer
+		}
+	}
+	return selected
 }
 
 func (s *Server) Environment(scope, sessionName string) (map[string]string, error) {

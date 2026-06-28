@@ -60,9 +60,11 @@ border rendering, zoom, and pane movement commands remain.
 Status: in progress. Basic `capture-pane -p` now captures visible screen
 lines with simple `-S`/`-E` ranges and is compared with tmux in
 `scripts/compat_probe.sh`. Screen cells also track written positions for basic
-`capture-pane -N` trailing-space preservation. History capture, paste-buffer
-capture, copy mode, mode screens, joined/wrapped output, style/escape output,
-and complete target resolution remain.
+`capture-pane -N` trailing-space preservation. Basic in-memory paste buffers
+now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
+`paste-buffer`, and `capture-pane -b`. History capture, file-backed buffer
+load/save, buffer chooser, copy mode, mode screens, joined/wrapped output,
+style/escape output, and complete target resolution remain.
 
 ## Phase 6: Advanced tmux Surfaces
 

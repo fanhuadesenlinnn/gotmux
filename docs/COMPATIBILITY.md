@@ -27,7 +27,8 @@ manual verification note.
 | Basic terminal screen grid | Implemented for common printable output, cursor movement, clear line/screen, insertion/deletion, scrolling, and alternate-screen escape sequences |
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |
 | Basic `capture-pane` | Implemented for `-p`, visible screen lines, simple `-S`/`-E` ranges, simple pane targets in the probe subset, and basic `-N` trailing-space preservation |
-| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, and `capture-pane` subsets |
+| Basic paste buffers | Implemented for `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`, `paste-buffer`, and `capture-pane -b`; the probe covers set/show/list/delete and capture capture-to-buffer |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, `capture-pane`, and buffer subsets |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
@@ -40,7 +41,7 @@ manual verification note.
 | Screen model | A basic grid, common CSI parser, and alternate-screen switching exist, but full scrollback, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
 | Copy mode | Not implemented. |
 | Mouse support | Not implemented. |
-| Buffers and paste buffers | Not implemented. |
+| Full buffers and paste buffers | Basic in-memory buffers exist, but `load-buffer`, `save-buffer`, `choose-buffer`, buffer limits, stack pruning, file I/O, copy-mode integration, and complete paste options are incomplete. |
 | Full `capture-pane` semantics | History ranges, alternate screen selection, mode screen capture, paste buffers, wrapped-line joining, `-T`, escape/style output, hyperlinks, tmux line flags, and complete target resolution are incomplete. |
 | Full option semantics | Only a small string-backed subset exists. Most documented options and option side effects are not implemented. |
 | Full environment semantics | Hidden variables, remove markers, update-environment integration, and complete session/global behavior are incomplete. |

@@ -197,6 +197,38 @@ func TestRootKeyBindingDispatch(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
 }
 
+func TestBufferCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"set-buffer", "-b", "named", "hello world"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-buffer failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-buffer", "-b", "named"}, "", 80, 24)
+	if msg.Text != "hello world" {
+		t.Fatalf("show-buffer = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, "", 80, 24)
+	if msg.Text != "named:11:hello world" {
+		t.Fatalf("list-buffers named = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set-buffer", "plain"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-buffer auto failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, "", 80, 24)
+	if !strings.Contains(msg.Text, "buffer0:5:plain") || !strings.Contains(msg.Text, "named:11:hello world") {
+		t.Fatalf("list-buffers auto = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"delete-buffer", "-b", "named"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("delete-buffer failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-buffer", "-b", "named"}, "", 80, 24)
+	if msg.OK || msg.Text != "no buffer named" {
+		t.Fatalf("show deleted buffer = %#v", msg)
+	}
+}
+
 func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, pane, err := rt.state.NewSession("cap", "", "first", []string{"/bin/sh"})
@@ -226,6 +258,15 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	msg = rt.execute([]string{"capture-pane", "-p", "-N", "-S", "0", "-E", "1", "-t", "cap"}, session.Name, 80, 24)
 	if msg.Text != "one  \ntwo" {
 		t.Fatalf("capture-pane -N = %q", msg.Text)
+	}
+
+	msg = rt.execute([]string{"capture-pane", "-b", "capbuf", "-S", "0", "-E", "1", "-t", "cap"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("capture-pane to buffer failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, session.Name, 80, 24)
+	if msg.Text != `capbuf:8:one\ntwo\n` {
+		t.Fatalf("capture buffer list = %q", msg.Text)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "cap"}, "cap", 80, 24)
 }

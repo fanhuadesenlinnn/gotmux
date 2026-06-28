@@ -192,6 +192,16 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdDisplayMessage(args, currentSession)
 	case "capture-pane":
 		return rt.cmdCapturePane(args, currentSession)
+	case "set-buffer":
+		return rt.cmdSetBuffer(args)
+	case "show-buffer":
+		return rt.cmdShowBuffer(args)
+	case "list-buffers":
+		return rt.cmdListBuffers(args)
+	case "delete-buffer":
+		return rt.cmdDeleteBuffer(args)
+	case "paste-buffer":
+		return rt.cmdPasteBuffer(args, currentSession)
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
@@ -334,19 +344,75 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 }
 
 func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {
-	if !hasAny(args, "-p") {
-		return ok("")
-	}
 	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
 	if pane == nil {
 		return fail("can't find pane")
 	}
 	lines := rt.capturePaneLines(pane, !hasAny(args, "-N"))
 	lines = sliceCaptureLines(lines, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
+	text := strings.Join(lines, "\n")
 	if hasAny(args, "-J") {
-		return ok(strings.Join(lines, " "))
+		text = strings.Join(lines, " ")
+	}
+	if !hasAny(args, "-p") {
+		rt.state.SetBuffer(optionValue(args, "-b", ""), text+"\n", hasAny(args, "-a"))
+		return ok("")
+	}
+	return ok(text)
+}
+
+func (rt *Runtime) cmdSetBuffer(args []string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing buffer data")
+	}
+	rt.state.SetBuffer(optionValue(args, "-b", ""), strings.Join(values, " "), hasAny(args, "-a"))
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowBuffer(args []string) protocol.Message {
+	data, err := rt.state.ShowBuffer(optionValue(args, "-b", ""))
+	if err != nil {
+		return fail(err.Error())
+	}
+	return ok(data)
+}
+
+func (rt *Runtime) cmdListBuffers(args []string) protocol.Message {
+	format := optionValue(args, "-F", "")
+	buffers := rt.state.ListBuffers()
+	lines := make([]string, 0, len(buffers))
+	for _, buffer := range buffers {
+		if format != "" {
+			lines = append(lines, formatBuffer(format, buffer))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %d bytes: %s", buffer.Name, len(buffer.Data), quoteBufferSample(buffer.Data)))
 	}
 	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) cmdDeleteBuffer(args []string) protocol.Message {
+	if err := rt.state.DeleteBuffer(optionValue(args, "-b", "")); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdPasteBuffer(args []string, currentSession string) protocol.Message {
+	data, err := rt.state.ShowBuffer(optionValue(args, "-b", ""))
+	if err != nil {
+		return fail(err.Error())
+	}
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil || pane.PTY == nil {
+		return ok("")
+	}
+	_, _ = pane.PTY.Write([]byte(data))
+	if hasAny(args, "-d") {
+		_ = rt.state.DeleteBuffer(optionValue(args, "-b", ""))
+	}
+	return ok("")
 }
 
 func (rt *Runtime) cmdSourceFile(args []string, currentSession string, width, height int) protocol.Message {
@@ -660,6 +726,16 @@ func normalizeCommandName(name string) string {
 		return "select-pane"
 	case "capturep":
 		return "capture-pane"
+	case "setb":
+		return "set-buffer"
+	case "showb":
+		return "show-buffer"
+	case "lsb":
+		return "list-buffers"
+	case "deleteb":
+		return "delete-buffer"
+	case "pasteb":
+		return "paste-buffer"
 	case "killp":
 		return "kill-pane"
 	case "killw":
@@ -690,7 +766,9 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "select-layout":
+		"show-environment", "send-prefix", "resize-pane", "select-layout",
+		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
+		"paste-buffer":
 		return name
 	default:
 		return name
@@ -775,7 +853,7 @@ func nonOptionArgs(args []string) []string {
 
 func optionOperands(args []string) []string {
 	valueFlags := map[string]bool{
-		"-c": true, "-d": true, "-E": true, "-F": true, "-f": true,
+		"-b": true, "-c": true, "-d": true, "-E": true, "-F": true, "-f": true,
 		"-N": true, "-S": true, "-T": true, "-t": true, "-x": true,
 		"-y": true,
 	}
@@ -985,6 +1063,33 @@ func formatKeyBinding(template string, binding model.KeyBinding) string {
 		out = strings.ReplaceAll(out, old, newValue)
 	}
 	return out
+}
+
+func formatBuffer(template string, buffer model.Buffer) string {
+	out := template
+	replacements := map[string]string{
+		"#{buffer_name}":   buffer.Name,
+		"#{buffer_size}":   strconv.Itoa(len(buffer.Data)),
+		"#{buffer_sample}": bufferSample(buffer.Data),
+	}
+	for old, newValue := range replacements {
+		out = strings.ReplaceAll(out, old, newValue)
+	}
+	return out
+}
+
+func bufferSample(data string) string {
+	data = strings.ReplaceAll(data, "\\", "\\\\")
+	data = strings.ReplaceAll(data, "\r", "\\r")
+	data = strings.ReplaceAll(data, "\n", "\\n")
+	if len(data) > 50 {
+		data = data[:50]
+	}
+	return data
+}
+
+func quoteBufferSample(data string) string {
+	return `"` + strings.ReplaceAll(bufferSample(data), `"`, `\"`) + `"`
 }
 
 func activeWidth(session *model.Session) int {
