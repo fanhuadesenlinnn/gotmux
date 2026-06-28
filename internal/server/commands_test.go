@@ -229,6 +229,52 @@ func TestBufferCommands(t *testing.T) {
 	}
 }
 
+func TestLoadAndSaveBufferCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	dir := t.TempDir()
+	input := dir + "/input.txt"
+	output := dir + "/output.txt"
+	if err := os.WriteFile(input, []byte("alpha\nbeta\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"load-buffer", input}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("load-buffer failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, "", 80, 24)
+	if msg.Text != `buffer0:11:alpha\nbeta\n` {
+		t.Fatalf("list after load = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"save-buffer", output}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("save-buffer failed: %s", msg.Text)
+	}
+	got, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "alpha\nbeta\n" {
+		t.Fatalf("saved data = %q", string(got))
+	}
+	if err := os.WriteFile(output, []byte("prefix:"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if msg := rt.execute([]string{"set-buffer", "-b", "named", "tail"}, "", 80, 24); !msg.OK {
+		t.Fatalf("set-buffer named failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"save-buffer", "-a", "-b", "named", output}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("save-buffer append failed: %s", msg.Text)
+	}
+	got, err = os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "prefix:tail" {
+		t.Fatalf("appended data = %q", string(got))
+	}
+}
+
 func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, pane, err := rt.state.NewSession("cap", "", "first", []string{"/bin/sh"})

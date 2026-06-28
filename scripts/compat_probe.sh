@@ -118,6 +118,26 @@ compare "list buffers format" list-buffers -F "#{buffer_name}:#{buffer_size}:#{b
 "${gotmux_cmd[@]}" delete-buffer -b named >/dev/null
 compare "delete named buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
 
+buffer_file="$(mktemp)"
+tmux_saved_file="$(mktemp)"
+gotmux_saved_file="$(mktemp)"
+printf 'alpha\nbeta\n' > "${buffer_file}"
+"${tmux_cmd[@]}" load-buffer -b loaded "${buffer_file}"
+"${gotmux_cmd[@]}" load-buffer -b loaded "${buffer_file}" >/dev/null
+compare "load buffer file" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
+"${tmux_cmd[@]}" save-buffer -b loaded "${tmux_saved_file}"
+"${gotmux_cmd[@]}" save-buffer -b loaded "${gotmux_saved_file}" >/dev/null
+if ! cmp -s "${tmux_saved_file}" "${gotmux_saved_file}"; then
+  echo "compat probe failed: save buffer file" >&2
+  echo "--- tmux" >&2
+  od -An -t x1 "${tmux_saved_file}" >&2
+  echo "--- gotmux" >&2
+  od -An -t x1 "${gotmux_saved_file}" >&2
+  exit 1
+fi
+printf 'ok save buffer file\n'
+rm -f "${buffer_file}" "${tmux_saved_file}" "${gotmux_saved_file}"
+
 "${tmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layh -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh >/dev/null

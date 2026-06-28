@@ -62,8 +62,8 @@ lines with simple `-S`/`-E` ranges and is compared with tmux in
 `scripts/compat_probe.sh`. Screen cells also track written positions for basic
 `capture-pane -N` trailing-space preservation. Basic in-memory paste buffers
 now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
-`paste-buffer`, and `capture-pane -b`. History capture, file-backed buffer
-load/save, buffer chooser, copy mode, mode screens, joined/wrapped output,
+`paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`. History
+capture, buffer chooser, copy mode, mode screens, joined/wrapped output,
 style/escape output, and complete target resolution remain.
 
 ## Phase 6: Advanced tmux Surfaces

@@ -895,7 +895,7 @@ func (s *Server) ShowBuffer(name string) (string, error) {
 
 	buffer := s.bufferLocked(name)
 	if buffer == nil {
-		return "", fmt.Errorf("no buffer named")
+		return "", noBufferError(name)
 	}
 	return buffer.Data, nil
 }
@@ -906,7 +906,7 @@ func (s *Server) DeleteBuffer(name string) error {
 
 	buffer := s.bufferLocked(name)
 	if buffer == nil {
-		return fmt.Errorf("no buffer named")
+		return noBufferError(name)
 	}
 	delete(s.Buffers, buffer.Name)
 	return nil
@@ -943,6 +943,13 @@ func (s *Server) bufferLocked(name string) *Buffer {
 		}
 	}
 	return selected
+}
+
+func noBufferError(name string) error {
+	if name == "" {
+		return fmt.Errorf("no buffers")
+	}
+	return fmt.Errorf("no buffer %s", name)
 }
 
 func (s *Server) Environment(scope, sessionName string) (map[string]string, error) {

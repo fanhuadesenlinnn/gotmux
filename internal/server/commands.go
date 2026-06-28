@@ -202,6 +202,10 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdDeleteBuffer(args)
 	case "paste-buffer":
 		return rt.cmdPasteBuffer(args, currentSession)
+	case "load-buffer":
+		return rt.cmdLoadBuffer(args)
+	case "save-buffer":
+		return rt.cmdSaveBuffer(args)
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
@@ -411,6 +415,48 @@ func (rt *Runtime) cmdPasteBuffer(args []string, currentSession string) protocol
 	_, _ = pane.PTY.Write([]byte(data))
 	if hasAny(args, "-d") {
 		_ = rt.state.DeleteBuffer(optionValue(args, "-b", ""))
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdLoadBuffer(args []string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing path")
+	}
+	path := expandPath(values[len(values)-1])
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fail(fmt.Sprintf("No such file or directory: %s", path))
+		}
+		return fail(err.Error())
+	}
+	rt.state.SetBuffer(optionValue(args, "-b", ""), string(data), false)
+	return ok("")
+}
+
+func (rt *Runtime) cmdSaveBuffer(args []string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing path")
+	}
+	data, err := rt.state.ShowBuffer(optionValue(args, "-b", ""))
+	if err != nil {
+		return fail(err.Error())
+	}
+	path := expandPath(values[len(values)-1])
+	flag := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	if hasAny(args, "-a") {
+		flag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	}
+	file, err := os.OpenFile(path, flag, 0o666)
+	if err != nil {
+		return fail(err.Error())
+	}
+	defer file.Close()
+	if _, err := file.WriteString(data); err != nil {
+		return fail(err.Error())
 	}
 	return ok("")
 }
@@ -736,6 +782,10 @@ func normalizeCommandName(name string) string {
 		return "delete-buffer"
 	case "pasteb":
 		return "paste-buffer"
+	case "loadb":
+		return "load-buffer"
+	case "saveb":
+		return "save-buffer"
 	case "killp":
 		return "kill-pane"
 	case "killw":
@@ -768,7 +818,7 @@ func normalizeCommandName(name string) string {
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "select-layout",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer":
+		"paste-buffer", "load-buffer", "save-buffer":
 		return name
 	default:
 		return name
