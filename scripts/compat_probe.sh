@@ -206,6 +206,13 @@ compare "select-layout even-horizontal geometry" list-panes -t layselect -F "#{p
 compare "kill-pane target command" kill-pane -t killp:.0
 compare "kill-pane target panes" list-panes -t killp -F "#{pane_index}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s killw -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t killw -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s killw -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t killw -n second /bin/sh >/dev/null
+compare "kill-window target command" kill-window -t killw:1
+compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" set -g status off
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status

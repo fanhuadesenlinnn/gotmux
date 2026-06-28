@@ -366,10 +366,33 @@ func (s *Server) KillActiveWindow(sessionName string) error {
 	if window == nil {
 		return fmt.Errorf("session has no active window")
 	}
+	s.killWindowAtLocked(session, session.Active)
+	return nil
+}
+
+func (s *Server) KillWindow(sessionName string, windowIndex int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for index, window := range session.Windows {
+		if window.Index == windowIndex {
+			s.killWindowAtLocked(session, index)
+			return nil
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func (s *Server) killWindowAtLocked(session *Session, windowIndex int) {
+	window := session.Windows[windowIndex]
 	for _, pane := range window.Panes {
 		killPane(pane)
 	}
-	session.Windows = append(session.Windows[:session.Active], session.Windows[session.Active+1:]...)
+	session.Windows = append(session.Windows[:windowIndex], session.Windows[windowIndex+1:]...)
 	reindexWindows(session)
 	if session.Active >= len(session.Windows) {
 		session.Active = len(session.Windows) - 1
@@ -377,7 +400,6 @@ func (s *Server) KillActiveWindow(sessionName string) error {
 	if len(session.Windows) == 0 {
 		delete(s.Sessions, session.Name)
 	}
-	return nil
 }
 
 func (s *Server) RenameSession(oldName, newName string) error {

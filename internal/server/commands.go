@@ -154,9 +154,25 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		rt.resizeSessionPanes(currentSession)
 		return ok("")
 	case "kill-window":
-		if err := rt.state.KillActiveWindow(currentSession); err != nil {
+		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+		if !found {
+			return fail("can't find window")
+		}
+		var err error
+		if hasWindow {
+			err = rt.state.KillWindow(sessionName, windowIndex)
+		} else {
+			err = rt.state.KillActiveWindow(sessionName)
+		}
+		if err != nil {
 			return fail(err.Error())
 		}
+		rt.screensMu.Lock()
+		for _, paneID := range paneIDs {
+			delete(rt.screens, paneID)
+		}
+		rt.screensMu.Unlock()
+		rt.resizeSessionPanes(currentSession)
 		return ok("")
 	case "kill-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
@@ -1229,6 +1245,40 @@ func (rt *Runtime) targetPane(target string, currentSession string) *model.Pane 
 		return window.ActivePane()
 	}
 	return nil
+}
+
+func (rt *Runtime) targetWindowInfo(target string, currentSession string) (string, int, bool, []int, bool) {
+	sessionName, windowIndex, _, hasWindow, _ := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(rt.state)
+	}
+	for _, session := range snapshotSessions(rt.state) {
+		if session.Name != sessionName {
+			continue
+		}
+		window := session.ActiveWindow()
+		if hasWindow {
+			window = nil
+			for _, candidate := range session.Windows {
+				if candidate.Index == windowIndex {
+					window = candidate
+					break
+				}
+			}
+		}
+		if window == nil {
+			return sessionName, windowIndex, hasWindow, nil, false
+		}
+		paneIDs := make([]int, 0, len(window.Panes))
+		for _, pane := range window.Panes {
+			paneIDs = append(paneIDs, pane.ID)
+		}
+		return sessionName, window.Index, hasWindow, paneIDs, true
+	}
+	return sessionName, windowIndex, hasWindow, nil, false
 }
 
 func parsePaneTarget(target string) (session string, window int, pane int, hasWindow bool, hasPane bool) {

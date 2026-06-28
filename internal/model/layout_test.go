@@ -87,3 +87,24 @@ func TestKillPaneByIDRemovesTargetPaneAndLayoutLeaf(t *testing.T) {
 		t.Fatalf("layout after kill = %#v, want leaf pane %d", window.Layout, second.ID)
 	}
 }
+
+func TestKillWindowRemovesTargetWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("windows", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.KillWindow(session.Name, secondWindow.Index); err != nil {
+		t.Fatal(err)
+	}
+	if len(session.Windows) != 1 || session.Windows[0].ID != firstWindow.ID {
+		t.Fatalf("windows after kill = %#v, want only window %d", session.Windows, firstWindow.ID)
+	}
+	if session.Active != 0 {
+		t.Fatalf("active window after kill = %d, want 0", session.Active)
+	}
+}

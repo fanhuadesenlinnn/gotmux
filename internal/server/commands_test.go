@@ -412,3 +412,33 @@ func TestKillPaneTargetsPaneAndDropsScreen(t *testing.T) {
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "kill"}, "kill", 80, 24)
 }
+
+func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, secondPane, err := rt.state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.screens[firstPane.ID] = terminal.NewScreen(8, 1)
+	rt.screens[secondPane.ID] = terminal.NewScreen(8, 1)
+
+	msg := rt.execute([]string{"kill-window", "-t", "killw:1"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("kill-window failed: %s", msg.Text)
+	}
+	windows := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_name}:#{window_active}")
+	if windows != "0:first:1" {
+		t.Fatalf("windows after kill-window = %q", windows)
+	}
+	if _, ok := rt.screens[secondPane.ID]; ok {
+		t.Fatalf("screen for killed window pane %d still exists", secondPane.ID)
+	}
+	if _, ok := rt.screens[firstPane.ID]; !ok {
+		t.Fatalf("screen for remaining pane %d was removed", firstPane.ID)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "killw"}, "killw", 80, 24)
+}
