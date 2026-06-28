@@ -192,6 +192,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdDisplayMessage(args, currentSession)
 	case "capture-pane":
 		return rt.cmdCapturePane(args, currentSession)
+	case "clear-history":
+		return rt.cmdClearHistory(args, currentSession)
 	case "set-buffer":
 		return rt.cmdSetBuffer(args)
 	case "show-buffer":
@@ -366,6 +368,17 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 		return ok("")
 	}
 	return ok(text)
+}
+
+func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protocol.Message {
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	if pane.History != nil {
+		pane.History.Reset()
+	}
+	return ok("")
 }
 
 func (rt *Runtime) cmdSetBuffer(args []string) protocol.Message {
@@ -775,6 +788,8 @@ func normalizeCommandName(name string) string {
 		return "select-pane"
 	case "capturep":
 		return "capture-pane"
+	case "clearhist":
+		return "clear-history"
 	case "setb":
 		return "set-buffer"
 	case "showb":
@@ -816,7 +831,7 @@ func normalizeCommandName(name string) string {
 	case "selectl":
 		return "select-layout"
 	case "kill-server", "kill-session", "rename-session", "rename-window",
-		"send-keys", "display-message", "capture-pane", "detach-client", "version",
+		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "select-layout",

@@ -24,6 +24,10 @@ func (r *Ring) Write(p []byte) {
 	}
 }
 
+func (r *Ring) Reset() {
+	r.buf = r.buf[:0]
+}
+
 func (r *Ring) Bytes() []byte {
 	out := make([]byte, len(r.buf))
 	copy(out, r.buf)

@@ -130,6 +130,9 @@ compare "capture-pane joined flags and numbers" capture-pane -p -L -F -J -t capj
 sleep 0.4
 compare "capture-pane escaped backslash" capture-pane -p -C -t capc -S 0 -E 0
 
+compare "clear history command" clear-history -t cap
+compare "clear history alias" clearhist -t cap
+
 "${tmux_cmd[@]}" set-buffer -b named "hello world"
 "${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null
 compare "show named buffer" show-buffer -b named

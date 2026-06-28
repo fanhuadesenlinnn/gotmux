@@ -355,3 +355,30 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "cap"}, "cap", 80, 24)
 }
+
+func TestClearHistoryClearsPaneHistory(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, pane, err := rt.state.NewSession("clear", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pane.History.Write([]byte("old\nhistory\n"))
+
+	msg := rt.execute([]string{"clear-history", "-t", "clear"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("clear-history failed: %s", msg.Text)
+	}
+	if got := string(pane.History.Bytes()); got != "" {
+		t.Fatalf("history after clear-history = %q", got)
+	}
+
+	pane.History.Write([]byte("again\n"))
+	msg = rt.execute([]string{"clearhist", "-t", "clear"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("clearhist failed: %s", msg.Text)
+	}
+	if got := string(pane.History.Bytes()); got != "" {
+		t.Fatalf("history after clearhist = %q", got)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "clear"}, "clear", 80, 24)
+}

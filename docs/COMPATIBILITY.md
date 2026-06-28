@@ -27,6 +27,7 @@ manual verification note.
 | Basic terminal screen grid | Implemented for common printable output, cursor movement, clear line/screen, insertion/deletion, scrolling, and alternate-screen escape sequences |
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |
 | Basic `capture-pane` | Implemented for `-p`, visible screen lines, simple `-S`/`-E` ranges, simple pane targets in the probe subset, basic `-N`/`-T` whitespace handling, basic `-J` wrapped-line joining, visible-line `-F`/`-L` prefixes, and basic `-C` visible text escaping |
+| Basic `clear-history` | Implemented for clearing gotmux's pane history ring; the visible screen snapshot is left unchanged |
 | Basic paste buffers | Implemented for `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`, `paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`; the probe covers set/show/list/delete, file load/save, and capture-to-buffer |
 | tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, `capture-pane`, and buffer subsets |
 | macOS/Linux static Go builds | Implemented |
@@ -38,7 +39,7 @@ manual verification note.
 | Full command parser | Advanced tmux quoting, parse-time formats, command queues, `%if`, includes, and full target resolution are incomplete. |
 | Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
 | Full layout rendering | Pane geometry and basic redraw exist for a small subset, but full layout algorithms, tmux-style border cells, zoom, custom layouts, and pane movement are incomplete. |
-| Screen model | A basic grid, common CSI parser, and alternate-screen switching exist, but full scrollback, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
+| Screen model | A basic grid, common CSI parser, alternate-screen switching, and a separate byte history ring exist, but full tmux-style scrollback grid, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
 | Copy mode | Not implemented. |
 | Mouse support | Not implemented. |
 | Full buffers and paste buffers | Basic in-memory buffers and file load/save exist, but `choose-buffer`, buffer limits, stack pruning, copy-mode integration, and complete paste options are incomplete. |

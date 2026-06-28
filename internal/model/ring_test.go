@@ -18,3 +18,12 @@ func TestRingLargeWrite(t *testing.T) {
 		t.Fatalf("ring bytes = %q, want %q", got, "6789")
 	}
 }
+
+func TestRingReset(t *testing.T) {
+	r := NewRing(5)
+	r.Write([]byte("abc"))
+	r.Reset()
+	if got := string(r.Bytes()); got != "" {
+		t.Fatalf("ring bytes after reset = %q, want empty", got)
+	}
+}
