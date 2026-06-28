@@ -9,11 +9,11 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 )
 
-func renderPanes(width, height int, panes []*model.Pane) []byte {
+func renderPanes(width, height int, panes []*model.Pane, screenLines ...map[int][]string) []byte {
 	if width <= 0 || height <= 0 {
 		return nil
 	}
-	lines := renderPaneCanvas(width, height, panes)
+	lines := renderPaneCanvas(width, height, panes, screenLines...)
 	var out bytes.Buffer
 	out.WriteString("\x1b[?25l\x1b[2J")
 	for y, line := range lines {
@@ -23,7 +23,11 @@ func renderPanes(width, height int, panes []*model.Pane) []byte {
 	return out.Bytes()
 }
 
-func renderPaneCanvas(width, height int, panes []*model.Pane) []string {
+func renderPaneCanvas(width, height int, panes []*model.Pane, screenLines ...map[int][]string) []string {
+	paneLines := map[int][]string(nil)
+	if len(screenLines) > 0 {
+		paneLines = screenLines[0]
+	}
 	canvas := make([][]rune, height)
 	covered := make([][]bool, height)
 	for y := range canvas {
@@ -32,7 +36,7 @@ func renderPaneCanvas(width, height int, panes []*model.Pane) []string {
 	}
 
 	for _, pane := range panes {
-		drawPane(canvas, covered, pane)
+		drawPane(canvas, covered, pane, paneLines)
 	}
 	drawBorders(canvas, covered)
 
@@ -43,7 +47,7 @@ func renderPaneCanvas(width, height int, panes []*model.Pane) []string {
 	return lines
 }
 
-func drawPane(canvas [][]rune, covered [][]bool, pane *model.Pane) {
+func drawPane(canvas [][]rune, covered [][]bool, pane *model.Pane, screenLines map[int][]string) {
 	if pane == nil {
 		return
 	}
@@ -65,8 +69,19 @@ func drawPane(canvas [][]rune, covered [][]bool, pane *model.Pane) {
 		}
 	}
 
+	if lines, ok := screenLines[pane.ID]; ok {
+		drawTextLines(canvas, left, top, right, bottom, lines, true)
+		return
+	}
 	textLines := visibleTextLines(pane.History.Bytes(), bottom-top)
-	startY := bottom - len(textLines)
+	drawTextLines(canvas, left, top, right, bottom, textLines, false)
+}
+
+func drawTextLines(canvas [][]rune, left, top, right, bottom int, textLines []string, fromTop bool) {
+	startY := top
+	if !fromTop {
+		startY = bottom - len(textLines)
+	}
 	for i, line := range textLines {
 		y := startY + i
 		if y < top || y >= bottom {

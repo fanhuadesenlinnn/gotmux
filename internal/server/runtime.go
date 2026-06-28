@@ -20,8 +20,10 @@ import (
 type Runtime struct {
 	state *model.Server
 
-	mu      sync.RWMutex
-	clients map[int64]*attachedClient
+	mu        sync.RWMutex
+	clients   map[int64]*attachedClient
+	screensMu sync.RWMutex
+	screens   map[int]*terminal.Screen
 }
 
 type attachedClient struct {
@@ -45,6 +47,7 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	rt := &Runtime{
 		state:   model.NewServer(socketPath),
 		clients: make(map[int64]*attachedClient),
+		screens: make(map[int]*terminal.Screen),
 	}
 	for _, file := range configFiles {
 		result := rt.cmdSourceFile([]string{file}, "", 80, 24)
@@ -185,6 +188,7 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	pane.Process = cmd
 	pane.Width = paneWidth
 	pane.Height = paneHeight
+	rt.ensurePaneScreen(pane, paneWidth, paneHeight)
 
 	go rt.readPane(pane)
 	go func() {
@@ -207,6 +211,9 @@ func (rt *Runtime) readPane(pane *model.Pane) {
 		if n > 0 {
 			data := append([]byte(nil), buf[:n]...)
 			pane.History.Write(data)
+			if screen := rt.ensurePaneScreen(pane, pane.Width, pane.Height); screen != nil {
+				screen.Write(data)
+			}
 			pane.Activity = time.Now()
 			rt.broadcastPaneOutput(pane, data)
 		}
@@ -279,7 +286,10 @@ func (rt *Runtime) renderClientContent(clientID int64, client *attachedClient, p
 			_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: []byte(err.Error() + "\r\n")})
 		}
 	}
-	_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: renderPanes(width, contentHeight, panes)})
+	_ = client.conn.Write(protocol.Message{
+		Type: protocol.TypeOutput,
+		Data: rt.renderPanes(width, contentHeight, panes),
+	})
 }
 
 func (rt *Runtime) redrawStatus(clientID int64) {
@@ -343,6 +353,9 @@ func (rt *Runtime) resizeActivePane(clientID int64) {
 		return
 	}
 	width, height := rt.state.ClientSize(clientID)
+	if pane.Width > 0 && pane.Height > 0 {
+		rt.ensurePaneScreen(pane, pane.Width, pane.Height)
+	}
 	_ = pty.Setsize(pane.PTY, &pty.Winsize{
 		Rows: uint16(max(1, height)),
 		Cols: uint16(max(1, width)),
@@ -351,6 +364,7 @@ func (rt *Runtime) resizeActivePane(clientID int64) {
 
 func (rt *Runtime) resizeSessionPanes(sessionName string) {
 	for _, pane := range rt.state.ActiveWindowPanes(sessionName) {
+		rt.ensurePaneScreen(pane, pane.Width, pane.Height)
 		if pane == nil || pane.PTY == nil {
 			continue
 		}
@@ -359,6 +373,55 @@ func (rt *Runtime) resizeSessionPanes(sessionName string) {
 			Cols: uint16(max(1, pane.Width)),
 		})
 	}
+}
+
+func (rt *Runtime) renderPanes(width, height int, panes []*model.Pane) []byte {
+	return renderPanes(width, height, panes, rt.paneScreenLines(panes))
+}
+
+func (rt *Runtime) ensurePaneScreen(pane *model.Pane, width, height int) *terminal.Screen {
+	if pane == nil {
+		return nil
+	}
+	if width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+	rt.screensMu.Lock()
+	defer rt.screensMu.Unlock()
+	if rt.screens == nil {
+		rt.screens = make(map[int]*terminal.Screen)
+	}
+	screen := rt.screens[pane.ID]
+	if screen == nil {
+		screen = terminal.NewScreen(width, height)
+		rt.screens[pane.ID] = screen
+		return screen
+	}
+	screen.Resize(width, height)
+	return screen
+}
+
+func (rt *Runtime) paneScreenLines(panes []*model.Pane) map[int][]string {
+	rt.screensMu.RLock()
+	defer rt.screensMu.RUnlock()
+	if len(rt.screens) == 0 {
+		return nil
+	}
+	lines := make(map[int][]string, len(panes))
+	for _, pane := range panes {
+		if pane == nil {
+			continue
+		}
+		screen := rt.screens[pane.ID]
+		if screen == nil {
+			continue
+		}
+		lines[pane.ID] = screen.Lines()
+	}
+	return lines
 }
 
 func (rt *Runtime) clientWidth(id int64) int {

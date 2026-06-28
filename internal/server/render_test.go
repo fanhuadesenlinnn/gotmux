@@ -25,6 +25,21 @@ func TestRenderPaneCanvasDrawsSplitBorderAndContent(t *testing.T) {
 	}
 }
 
+func TestRenderPaneCanvasUsesScreenLinesFromTop(t *testing.T) {
+	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 6, Height: 2, History: model.NewRing(1024)}
+	pane.History.Write([]byte("old\nhistory\n"))
+
+	got := renderPaneCanvas(6, 2, []*model.Pane{pane}, map[int][]string{
+		pane.ID: {"top   ", "next  "},
+	})
+	want := []string{"top   ", "next  "}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("line %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
 func TestVisibleTextLinesStripsANSIEscapes(t *testing.T) {
 	got := visibleTextLines([]byte("\x1b[31mred\x1b[0m\r\nplain\n"), 10)
 	want := []string{"red", "plain"}

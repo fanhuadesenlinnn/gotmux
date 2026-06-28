@@ -34,13 +34,19 @@ environment edge cases, and complete option/key semantics remain.
   negotiation.
 - Replace raw active-pane passthrough with tmux-style rendered panes.
 
+Status: in progress. A basic pane screen grid now tracks printable output,
+cursor movement, clear line/screen, insertion/deletion, and scrolling escape
+sequences, and multi-pane redraw uses screen snapshots when available. Full
+alternate screen handling, scrollback integration, styles/colors, wide
+characters, redraw diffing, and terminal capability negotiation remain.
+
 ## Phase 4: Layouts and Panes
 
 - Implement tmux layout tree behavior, pane borders, tiled rendering, resize
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
 Status: in progress. Basic split geometry, nested split geometry,
-`resize-pane`, `select-layout even-horizontal`, and history-backed multi-pane
+`resize-pane`, `select-layout even-horizontal`, and screen-backed multi-pane
 redraw with simple borders are implemented. Geometry is compared with tmux
 through `scripts/compat_probe.sh`; complete layout algorithms, tmux-style
 border rendering, zoom, and pane movement commands remain.
