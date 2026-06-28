@@ -61,7 +61,8 @@ Status: in progress. Basic `capture-pane -p` now captures visible screen
 lines with simple `-S`/`-E` ranges and is compared with tmux in
 `scripts/compat_probe.sh`. Screen cells also track written positions for basic
 `capture-pane -N` trailing-space preservation and tmux-style wrapped-line flags
-for basic `capture-pane -J` joining. Basic in-memory paste buffers
+for basic `capture-pane -J` joining. Visible-line `capture-pane -F` flags and
+`-L` line numbers are implemented in the same probe subset. Basic in-memory paste buffers
 now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`. History
 capture, buffer chooser, copy mode, mode screens, complete joined/wrapped

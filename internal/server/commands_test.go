@@ -317,6 +317,18 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	if msg.Text != "abcdefgh\nxy" {
 		t.Fatalf("capture-pane -J = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"capture-pane", "-p", "-F", "-S", "0", "-E", "2", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "W abcde\n- fgh\n- xy" {
+		t.Fatalf("capture-pane -F = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"capture-pane", "-p", "-L", "-S", "0", "-E", "2", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "0 abcde\n1 fgh\n2 xy" {
+		t.Fatalf("capture-pane -L = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"capture-pane", "-p", "-L", "-F", "-J", "-S", "0", "-E", "2", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "0 W abcde1 - fgh\n2 - xy" {
+		t.Fatalf("capture-pane -L -F -J = %q", msg.Text)
+	}
 
 	screen = terminal.NewScreen(8, 2)
 	screen.Write([]byte("one  \r\ntwo"))

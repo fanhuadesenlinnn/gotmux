@@ -117,6 +117,9 @@ compare "capture-pane buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{b
 sleep 0.4
 compare "capture-pane wrapped visible text" capture-pane -p -t capj -S 0 -E 2
 compare "capture-pane joins wrapped lines" capture-pane -p -J -t capj -S 0 -E 2
+compare "capture-pane line flags" capture-pane -p -F -t capj -S 0 -E 2
+compare "capture-pane line numbers" capture-pane -p -L -t capj -S 0 -E 2
+compare "capture-pane joined flags and numbers" capture-pane -p -L -F -J -t capj -S 0 -E 2
 
 "${tmux_cmd[@]}" set-buffer -b named "hello world"
 "${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null

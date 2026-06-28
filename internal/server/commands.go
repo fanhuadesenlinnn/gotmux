@@ -11,7 +11,6 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/command"
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
-	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
@@ -353,24 +352,15 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 	if pane == nil {
 		return fail("can't find pane")
 	}
-	if hasAny(args, "-J") {
-		rows := rt.capturePaneRows(pane, true)
-		rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
-		text := joinCaptureRows(rows)
-		if !hasAny(args, "-p") {
-			if len(rows) == 0 || !rows[len(rows)-1].Wrapped {
-				text += "\n"
-			}
-			rt.state.SetBuffer(optionValue(args, "-b", ""), text, hasAny(args, "-a"))
-			return ok("")
-		}
-		return ok(text)
-	}
-	lines := rt.capturePaneLines(pane, !hasAny(args, "-N"))
-	lines = sliceCaptureLines(lines, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
-	text := strings.Join(lines, "\n")
+	joinLines := hasAny(args, "-J")
+	rows := rt.capturePaneRows(pane, hasAny(args, "-N") || joinLines)
+	rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
+	text := formatCaptureRows(rows, hasAny(args, "-L"), hasAny(args, "-F"), joinLines)
 	if !hasAny(args, "-p") {
-		rt.state.SetBuffer(optionValue(args, "-b", ""), text+"\n", hasAny(args, "-a"))
+		if len(rows) == 0 || !joinLines || !rows[len(rows)-1].Wrapped {
+			text += "\n"
+		}
+		rt.state.SetBuffer(optionValue(args, "-b", ""), text, hasAny(args, "-a"))
 		return ok("")
 	}
 	return ok(text)
@@ -1263,24 +1253,34 @@ func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []strin
 	return lines
 }
 
-func (rt *Runtime) capturePaneRows(pane *model.Pane, preserveTrailing bool) []terminal.CaptureRow {
-	var rows []terminal.CaptureRow
+type capturePaneRow struct {
+	Text    string
+	Wrapped bool
+	Number  int
+}
+
+func (rt *Runtime) capturePaneRows(pane *model.Pane, preserveTrailing bool) []capturePaneRow {
+	var rows []capturePaneRow
 	rt.screensMu.RLock()
 	screen := rt.screens[pane.ID]
 	rt.screensMu.RUnlock()
 	if screen != nil {
-		rows = screen.CaptureRows(preserveTrailing)
+		screenRows := screen.CaptureRows(preserveTrailing)
+		rows = make([]capturePaneRow, len(screenRows))
+		for i, row := range screenRows {
+			rows[i] = capturePaneRow{Text: row.Text, Wrapped: row.Wrapped, Number: i}
+		}
 	} else {
 		lines := visibleTextLines(pane.History.Bytes(), pane.Height)
 		if pane.Height > 0 && len(lines) < pane.Height {
 			lines = append(lines, make([]string, pane.Height-len(lines))...)
 		}
-		rows = make([]terminal.CaptureRow, len(lines))
+		rows = make([]capturePaneRow, len(lines))
 		for i, line := range lines {
 			if !preserveTrailing {
 				line = strings.TrimRight(line, " ")
 			}
-			rows[i] = terminal.CaptureRow{Text: line}
+			rows[i] = capturePaneRow{Text: line, Number: i}
 		}
 	}
 	return rows
@@ -1310,7 +1310,7 @@ func sliceCaptureLines(lines []string, startValue string, endValue string) []str
 	return lines[start : end+1]
 }
 
-func sliceCaptureRows(rows []terminal.CaptureRow, startValue string, endValue string) []terminal.CaptureRow {
+func sliceCaptureRows(rows []capturePaneRow, startValue string, endValue string) []capturePaneRow {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -1334,11 +1334,23 @@ func sliceCaptureRows(rows []terminal.CaptureRow, startValue string, endValue st
 	return rows[start : end+1]
 }
 
-func joinCaptureRows(rows []terminal.CaptureRow) string {
+func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, joinLines bool) string {
 	var b strings.Builder
 	for i, row := range rows {
+		if numberLines {
+			b.WriteString(strconv.Itoa(row.Number))
+			b.WriteByte(' ')
+		}
+		if showFlags {
+			if row.Wrapped {
+				b.WriteByte('W')
+			} else {
+				b.WriteByte('-')
+			}
+			b.WriteByte(' ')
+		}
 		b.WriteString(row.Text)
-		if i < len(rows)-1 && !row.Wrapped {
+		if i < len(rows)-1 && (!joinLines || !row.Wrapped) {
 			b.WriteByte('\n')
 		}
 	}
