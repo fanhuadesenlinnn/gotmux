@@ -39,6 +39,11 @@ environment edge cases, and complete option/key semantics remain.
 - Implement tmux layout tree behavior, pane borders, tiled rendering, resize
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
+Status: in progress. Basic split geometry, nested split geometry,
+`resize-pane`, and `select-layout even-horizontal` are implemented and compared
+with tmux through `scripts/compat_probe.sh`. Rendering multiple panes with
+borders, complete layout algorithms, zoom, and pane movement commands remain.
+
 ## Phase 5: Modes, Buffers, and Input
 
 - Implement copy-mode, view-mode, paste buffers, capture-pane, choose-tree,

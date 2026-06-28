@@ -100,6 +100,44 @@ compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{wind
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 
+"${tmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layh -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layh -h /bin/sh >/dev/null
+compare "horizontal pane geometry" list-panes -t layh -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
+"${tmux_cmd[@]}" new-session -d -s layv -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layv -v /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s layv -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layv -v /bin/sh >/dev/null
+compare "vertical pane geometry" list-panes -t layv -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
+"${tmux_cmd[@]}" new-session -d -s lay3 -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t lay3 -h /bin/sh
+"${tmux_cmd[@]}" split-window -t lay3 -v /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s lay3 -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t lay3 -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t lay3 -v /bin/sh >/dev/null
+compare "nested pane geometry" list-panes -t lay3 -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
+"${tmux_cmd[@]}" new-session -d -s layresize -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layresize -h /bin/sh
+"${tmux_cmd[@]}" resize-pane -t layresize -L 5
+"${gotmux_cmd[@]}" new-session -d -s layresize -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layresize -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" resize-pane -t layresize -L 5 >/dev/null
+compare "resize pane geometry" list-panes -t layresize -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
+"${tmux_cmd[@]}" new-session -d -s layselect -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layselect -h /bin/sh
+"${tmux_cmd[@]}" split-window -t layselect -h /bin/sh
+"${tmux_cmd[@]}" select-layout -t layselect even-horizontal
+"${gotmux_cmd[@]}" new-session -d -s layselect -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layselect -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layselect -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" select-layout -t layselect even-horizontal >/dev/null
+compare "select-layout even-horizontal geometry" list-panes -t layselect -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" set -g status off
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
@@ -135,7 +173,7 @@ fi
 printf 'ok unset environment\n'
 
 source_file="$(mktemp)"
-printf 'set -g status on\nnew-window -n sourced /bin/sh\n' > "${source_file}"
+printf 'set -g status on\nnew-window -t compat -n sourced /bin/sh\n' > "${source_file}"
 "${tmux_cmd[@]}" source-file "${source_file}"
 "${gotmux_cmd[@]}" source-file "${source_file}" >/dev/null
 rm -f "${source_file}"

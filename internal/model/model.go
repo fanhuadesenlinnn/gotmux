@@ -50,6 +50,9 @@ type Window struct {
 	Activity  time.Time
 	Panes     []*Pane
 	Active    int
+	Width     int
+	Height    int
+	Layout    *LayoutNode
 	Options   map[string]string
 }
 
@@ -59,6 +62,10 @@ type Pane struct {
 	Command   []string
 	Env       []string
 	CWD       string
+	Left      int
+	Top       int
+	Width     int
+	Height    int
 	CreatedAt time.Time
 	Activity  time.Time
 	PTY       *os.File
@@ -66,8 +73,16 @@ type Pane struct {
 	History   *Ring
 	Exited    bool
 	ExitState string
-	Width     int
-	Height    int
+}
+
+type LayoutNode struct {
+	Orientation string
+	PaneID      int
+	Children    []*LayoutNode
+	Left        int
+	Top         int
+	Width       int
+	Height      int
 }
 
 type Client struct {
@@ -218,6 +233,10 @@ func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Wi
 }
 
 func (s *Server) SplitPane(sessionName, cwd string, command []string) (*Pane, error) {
+	return s.SplitPaneWithLayout(sessionName, cwd, command, "vertical")
+}
+
+func (s *Server) SplitPaneWithLayout(sessionName, cwd string, command []string, orientation string) (*Pane, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -232,8 +251,13 @@ func (s *Server) SplitPane(sessionName, cwd string, command []string) (*Pane, er
 	if cwd == "" {
 		cwd = session.CWD
 	}
+	active := window.ActivePane()
 	pane := s.newPaneLocked(session, window, cwd, command)
+	if active != nil && active.ID != pane.ID {
+		window.splitLeaf(active.ID, pane.ID, orientation)
+	}
 	window.Active = len(window.Panes) - 1
+	window.recalculateLayout()
 	window.Activity = time.Now()
 	session.Activity = time.Now()
 	return pane, nil
@@ -405,6 +429,102 @@ func (s *Server) SelectRelativePane(sessionName string, delta int) error {
 	window.Active = (window.Active + delta + len(window.Panes)) % len(window.Panes)
 	window.Activity = time.Now()
 	session.Activity = time.Now()
+	return nil
+}
+
+func (s *Server) SetActiveWindowSize(sessionName string, width, height int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return
+	}
+	if width > 0 {
+		window.Width = width
+	}
+	if height > 0 {
+		window.Height = height
+	}
+	window.recalculateLayout()
+}
+
+func (s *Server) ActiveWindowPanes(sessionName string) []*Pane {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return nil
+	}
+	out := make([]*Pane, len(window.Panes))
+	copy(out, window.Panes)
+	return out
+}
+
+func (s *Server) ResizeActivePane(sessionName, direction string, amount int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if amount <= 0 {
+		amount = 1
+	}
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return fmt.Errorf("session has no active window")
+	}
+	pane := window.ActivePane()
+	if pane == nil {
+		return fmt.Errorf("window has no active pane")
+	}
+	if resizeLayout(window.Layout, pane.ID, direction, amount) {
+		window.recalculateLayout()
+	}
+	return nil
+}
+
+func (s *Server) SelectEvenLayout(sessionName, layout string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return fmt.Errorf("session has no active window")
+	}
+	if len(window.Panes) == 0 {
+		return nil
+	}
+	if len(window.Panes) == 1 {
+		window.Layout = &LayoutNode{PaneID: window.Panes[0].ID}
+		window.recalculateLayout()
+		return nil
+	}
+	orientation := "horizontal"
+	if layout == "even-vertical" {
+		orientation = "vertical"
+	}
+	root := &LayoutNode{Orientation: orientation}
+	for _, pane := range window.Panes {
+		root.Children = append(root.Children, &LayoutNode{PaneID: pane.ID})
+	}
+	window.Layout = root
+	window.recalculateLayout()
 	return nil
 }
 
@@ -794,6 +914,8 @@ func (s *Server) newWindowLocked(session *Session, name string) *Window {
 		ID:        s.NextWindowID,
 		Index:     len(session.Windows),
 		Name:      name,
+		Width:     80,
+		Height:    24,
 		CreatedAt: time.Now(),
 		Activity:  time.Now(),
 	}
@@ -829,6 +951,10 @@ func (s *Server) newPaneLocked(session *Session, window *Window, cwd string, com
 	}
 	s.NextPaneID++
 	window.Panes = append(window.Panes, pane)
+	if window.Layout == nil {
+		window.Layout = &LayoutNode{PaneID: pane.ID}
+	}
+	window.recalculateLayout()
 	return pane
 }
 
@@ -841,6 +967,237 @@ func (s *Server) environmentLocked(session *Session) []string {
 		env[key] = value
 	}
 	return environmentList(env)
+}
+
+func (w *Window) splitLeaf(oldPaneID, newPaneID int, orientation string) {
+	if orientation != "horizontal" {
+		orientation = "vertical"
+	}
+	if w.Layout == nil {
+		w.Layout = &LayoutNode{PaneID: oldPaneID}
+	}
+	w.Layout = splitLeaf(w.Layout, oldPaneID, newPaneID, orientation)
+}
+
+func splitLeaf(node *LayoutNode, oldPaneID, newPaneID int, orientation string) *LayoutNode {
+	if node == nil {
+		return &LayoutNode{PaneID: newPaneID}
+	}
+	if node.isLeaf() {
+		if node.PaneID != oldPaneID {
+			return node
+		}
+		return &LayoutNode{
+			Orientation: orientation,
+			Children: []*LayoutNode{
+				{PaneID: oldPaneID},
+				{PaneID: newPaneID},
+			},
+		}
+	}
+	for i, child := range node.Children {
+		node.Children[i] = splitLeaf(child, oldPaneID, newPaneID, orientation)
+	}
+	return node
+}
+
+func (w *Window) recalculateLayout() {
+	if w.Width <= 0 {
+		w.Width = 80
+	}
+	if w.Height <= 0 {
+		w.Height = 24
+	}
+	if w.Layout == nil && len(w.Panes) > 0 {
+		w.Layout = &LayoutNode{PaneID: w.Panes[0].ID}
+	}
+	w.applyLayout(w.Layout, 0, 0, w.Width, w.Height)
+}
+
+func (w *Window) applyLayout(node *LayoutNode, left, top, width, height int) {
+	if node == nil {
+		return
+	}
+	node.Left = left
+	node.Top = top
+	node.Width = maxInt(0, width)
+	node.Height = maxInt(0, height)
+	if node.isLeaf() {
+		if pane := w.paneByID(node.PaneID); pane != nil {
+			pane.Left = node.Left
+			pane.Top = node.Top
+			pane.Width = node.Width
+			pane.Height = node.Height
+		}
+		return
+	}
+	if len(node.Children) == 0 {
+		return
+	}
+	if len(node.Children) == 1 {
+		w.applyLayout(node.Children[0], left, top, width, height)
+		return
+	}
+	if node.Orientation == "horizontal" {
+		if len(node.Children) == 2 && node.Children[0].Width > 0 && node.Children[0].Width < width {
+			firstWidth := node.Children[0].Width
+			secondWidth := maxInt(0, width-firstWidth-1)
+			w.applyLayout(node.Children[0], left, top, firstWidth, height)
+			w.applyLayout(node.Children[1], left+firstWidth+1, top, secondWidth, height)
+			return
+		}
+		available := maxInt(0, width-(len(node.Children)-1))
+		x := left
+		for i, child := range node.Children {
+			childWidth := available / len(node.Children)
+			if i < available%len(node.Children) {
+				childWidth++
+			}
+			w.applyLayout(child, x, top, childWidth, height)
+			x += childWidth + 1
+		}
+		return
+	}
+	if len(node.Children) == 2 && node.Children[0].Height > 0 && node.Children[0].Height < height {
+		firstHeight := node.Children[0].Height
+		secondHeight := maxInt(0, height-firstHeight-1)
+		w.applyLayout(node.Children[0], left, top, width, firstHeight)
+		w.applyLayout(node.Children[1], left, top+firstHeight+1, width, secondHeight)
+		return
+	}
+	available := maxInt(0, height-(len(node.Children)-1))
+	y := top
+	for i, child := range node.Children {
+		childHeight := available / len(node.Children)
+		if i < available%len(node.Children) {
+			childHeight++
+		}
+		w.applyLayout(child, left, y, width, childHeight)
+		y += childHeight + 1
+	}
+}
+
+func (w *Window) paneByID(id int) *Pane {
+	for _, pane := range w.Panes {
+		if pane.ID == id {
+			return pane
+		}
+	}
+	return nil
+}
+
+func (n *LayoutNode) isLeaf() bool {
+	return n != nil && len(n.Children) == 0
+}
+
+func resizeLayout(node *LayoutNode, paneID int, direction string, amount int) bool {
+	if node == nil || node.isLeaf() || len(node.Children) < 2 {
+		return false
+	}
+	first := node.Children[0]
+	second := node.Children[1]
+	if containsPane(first, paneID) || containsPane(second, paneID) {
+		inFirst := containsPane(first, paneID)
+		if node.Orientation == "horizontal" && (direction == "L" || direction == "R") {
+			if inFirst && direction == "R" {
+				return shiftHorizontal(first, second, amount)
+			}
+			if inFirst && direction == "L" {
+				return shiftHorizontal(first, second, -amount)
+			}
+			if !inFirst && direction == "L" {
+				return shiftHorizontal(first, second, -amount)
+			}
+			if !inFirst && direction == "R" {
+				return shiftHorizontal(first, second, amount)
+			}
+		}
+		if node.Orientation == "vertical" && (direction == "U" || direction == "D") {
+			if inFirst && direction == "D" {
+				return shiftVertical(first, second, amount)
+			}
+			if inFirst && direction == "U" {
+				return shiftVertical(first, second, -amount)
+			}
+			if !inFirst && direction == "U" {
+				return shiftVertical(first, second, -amount)
+			}
+			if !inFirst && direction == "D" {
+				return shiftVertical(first, second, amount)
+			}
+		}
+	}
+	return resizeLayout(first, paneID, direction, amount) || resizeLayout(second, paneID, direction, amount)
+}
+
+func shiftHorizontal(first, second *LayoutNode, amount int) bool {
+	if first == nil || second == nil {
+		return false
+	}
+	if amount > 0 {
+		if second.Width <= amount+1 {
+			return false
+		}
+		first.Width += amount
+		second.Width -= amount
+		return true
+	}
+	if amount < 0 {
+		amount = -amount
+		if first.Width <= amount+1 {
+			return false
+		}
+		first.Width -= amount
+		second.Width += amount
+		return true
+	}
+	return false
+}
+
+func shiftVertical(first, second *LayoutNode, amount int) bool {
+	if first == nil || second == nil {
+		return false
+	}
+	if amount > 0 {
+		if second.Height <= amount+1 {
+			return false
+		}
+		first.Height += amount
+		second.Height -= amount
+		return true
+	}
+	if amount < 0 {
+		amount = -amount
+		if first.Height <= amount+1 {
+			return false
+		}
+		first.Height -= amount
+		second.Height += amount
+		return true
+	}
+	return false
+}
+
+func containsPane(node *LayoutNode, paneID int) bool {
+	if node == nil {
+		return false
+	}
+	if node.isLeaf() {
+		return node.PaneID == paneID
+	}
+	for _, child := range node.Children {
+		if containsPane(child, paneID) {
+			return true
+		}
+	}
+	return false
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func DefaultShellName() string {

@@ -33,6 +33,8 @@ This first implementation supports:
   `unbind-key`, and `list-keys`
 - default `$HOME/.tmux.conf` discovery when starting a new server
 - a first subset of `set-environment` / `show-environment`
+- pane geometry tracking for basic horizontal/vertical splits, `resize-pane`,
+  and `select-layout even-horizontal`
 - macOS and Linux builds with `CGO_ENABLED=0`
 
 Full tmux parity is not complete yet. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
@@ -84,3 +86,5 @@ scripts/compat_probe.sh
 The probe starts isolated tmux and gotmux servers, creates matching sessions,
 windows, and panes, then compares format-driven `list-*`, `display-message`,
 basic options, key bindings, `source-file`, and command sequence behavior.
+It also checks the first pane geometry subset for split, resize, and layout
+commands.

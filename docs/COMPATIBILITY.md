@@ -23,7 +23,8 @@ manual verification note.
 | Basic options | Implemented for string-backed `set-option`, `set-window-option`, and `show-options` |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
-| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, and command-sequence subsets |
+| Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, `resize-pane`, and `select-layout even-horizontal` in the probe subset |
+| tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, and pane-geometry subsets |
 | macOS/Linux static Go builds | Implemented |
 
 ## Not Yet Compatible With tmux
@@ -32,7 +33,7 @@ manual verification note.
 | --- | --- |
 | Full command parser | Advanced tmux quoting, parse-time formats, command queues, `%if`, includes, and full target resolution are incomplete. |
 | Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
-| Layout rendering | Multiple panes exist, but tiled split rendering is not equivalent to tmux yet. |
+| Full layout rendering | Pane geometry exists for a small subset, but full layout algorithms, borders, zoom, custom layouts, and rendered multi-pane output are incomplete. |
 | Screen model | Full grid, scrollback, alternate screen, redraw diffing, and terminal escape interpretation are incomplete. |
 | Copy mode | Not implemented. |
 | Mouse support | Not implemented. |

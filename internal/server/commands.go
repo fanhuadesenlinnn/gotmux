@@ -136,6 +136,10 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 			return fail(err.Error())
 		}
 		return ok("")
+	case "resize-pane":
+		return rt.cmdResizePane(args, currentSession)
+	case "select-layout":
+		return rt.cmdSelectLayout(args, currentSession)
 	case "kill-pane":
 		if err := rt.state.KillActivePane(currentSession); err != nil {
 			return fail(err.Error())
@@ -196,6 +200,7 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 }
 
 func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Message {
+	width, height = commandSize(args, width, height)
 	name := optionValue(args, "-s", "")
 	windowName := optionValue(args, "-n", "")
 	cwd := optionValue(args, "-c", "")
@@ -209,6 +214,7 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.SetActiveWindowSize(session.Name, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
@@ -226,6 +232,7 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.SetActiveWindowSize(currentSession, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
@@ -238,14 +245,70 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 	}
 	cwd := optionValue(args, "-c", "")
 	command := trailingCommand(args, map[string]bool{"-c": true, "-t": true, "-l": true, "-p": true})
-	pane, err := rt.state.SplitPane(currentSession, cwd, command)
+	rt.state.SetActiveWindowSize(currentSession, width, height)
+	orientation := "vertical"
+	if hasAny(args, "-h") {
+		orientation = "horizontal"
+	}
+	pane, err := rt.state.SplitPaneWithLayout(currentSession, cwd, command, orientation)
 	if err != nil {
 		return fail(err.Error())
 	}
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
+	rt.resizeSessionPanes(currentSession)
 	return ok(fmt.Sprintf("pane %d", pane.Index))
+}
+
+func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	direction := "R"
+	switch {
+	case hasAny(args, "-L"):
+		direction = "L"
+	case hasAny(args, "-R"):
+		direction = "R"
+	case hasAny(args, "-U"):
+		direction = "U"
+	case hasAny(args, "-D"):
+		direction = "D"
+	}
+	amount := 1
+	for _, value := range optionOperands(args) {
+		if parsed, err := strconv.Atoi(value); err == nil {
+			amount = parsed
+			break
+		}
+	}
+	if err := rt.state.ResizeActivePane(currentSession, direction, amount); err != nil {
+		return fail(err.Error())
+	}
+	rt.resizeSessionPanes(currentSession)
+	return ok("")
+}
+
+func (rt *Runtime) cmdSelectLayout(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	layout := "even-horizontal"
+	values := optionOperands(args)
+	if len(values) > 0 {
+		layout = values[len(values)-1]
+	}
+	switch layout {
+	case "even-horizontal", "even-vertical":
+		if err := rt.state.SelectEvenLayout(currentSession, layout); err != nil {
+			return fail(err.Error())
+		}
+		rt.resizeSessionPanes(currentSession)
+		return ok("")
+	default:
+		return fail(fmt.Sprintf("unsupported layout: %s", layout))
+	}
 }
 
 func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
@@ -593,11 +656,15 @@ func normalizeCommandName(name string) string {
 		return "set-environment"
 	case "showenv":
 		return "show-environment"
+	case "resizep":
+		return "resize-pane"
+	case "selectl":
+		return "select-layout"
 	case "kill-server", "kill-session", "rename-session", "rename-window",
 		"send-keys", "display-message", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix":
+		"show-environment", "send-prefix", "resize-pane", "select-layout":
 		return name
 	default:
 		return name
@@ -623,6 +690,20 @@ func optionValue(args []string, name string, fallback string) string {
 		}
 	}
 	return fallback
+}
+
+func commandSize(args []string, width, height int) (int, int) {
+	if value := optionValue(args, "-x", ""); value != "" && value != "-" {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+			width = parsed
+		}
+	}
+	if value := optionValue(args, "-y", ""); value != "" && value != "-" {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+			height = parsed
+		}
+	}
+	return width, height
 }
 
 func targetSession(args []string, currentSession string) string {
@@ -668,7 +749,7 @@ func nonOptionArgs(args []string) []string {
 
 func optionOperands(args []string) []string {
 	valueFlags := map[string]bool{
-		"-c": true, "-d": true, "-F": true, "-f": true, "-L": true,
+		"-c": true, "-d": true, "-F": true, "-f": true,
 		"-N": true, "-S": true, "-T": true, "-t": true, "-x": true,
 		"-y": true,
 	}

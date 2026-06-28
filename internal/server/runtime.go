@@ -95,6 +95,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		_ = conn.Write(protocol.Message{Type: protocol.TypeError, Text: err.Error(), Code: 1})
 		return
 	}
+	rt.state.SetActiveWindowSize(session.Name, msg.Width, msg.Height)
 	ac := &attachedClient{id: client.ID, conn: conn, done: make(chan struct{})}
 	rt.mu.Lock()
 	rt.clients[client.ID] = ac
@@ -121,7 +122,9 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 			rt.handleInput(client.ID, next.Data)
 		case protocol.TypeResize:
 			rt.state.SetClientSize(client.ID, next.Width, next.Height)
-			rt.resizeActivePane(client.ID)
+			sessionName := rt.state.ActiveSessionName(client.ID)
+			rt.state.SetActiveWindowSize(sessionName, next.Width, next.Height)
+			rt.resizeSessionPanes(sessionName)
 			rt.redrawStatus(client.ID)
 		case protocol.TypeDetach:
 			_ = conn.Write(protocol.Message{Type: protocol.TypeExit, Text: "detached"})
@@ -149,6 +152,14 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	if height <= 1 {
 		height = 24
 	}
+	paneWidth := pane.Width
+	if paneWidth <= 0 {
+		paneWidth = width
+	}
+	paneHeight := pane.Height
+	if paneHeight <= 0 {
+		paneHeight = height
+	}
 	args := model.NormalizeCommand(pane.Command)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = pane.CWD
@@ -162,8 +173,8 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 		fmt.Sprintf("TMUX=%s,%d,%d", rt.state.SocketPath, os.Getpid(), pane.ID),
 	)
 	file, err := pty.StartWithSize(cmd, &pty.Winsize{
-		Rows: uint16(max(1, height-1)),
-		Cols: uint16(max(1, width)),
+		Rows: uint16(max(1, paneHeight)),
+		Cols: uint16(max(1, paneWidth)),
 	})
 	if err != nil {
 		pane.Exited = true
@@ -172,8 +183,8 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	}
 	pane.PTY = file
 	pane.Process = cmd
-	pane.Width = width
-	pane.Height = height - 1
+	pane.Width = paneWidth
+	pane.Height = paneHeight
 
 	go rt.readPane(pane)
 	go func() {
@@ -296,9 +307,21 @@ func (rt *Runtime) resizeActivePane(clientID int64) {
 	}
 	width, height := rt.state.ClientSize(clientID)
 	_ = pty.Setsize(pane.PTY, &pty.Winsize{
-		Rows: uint16(max(1, height-1)),
+		Rows: uint16(max(1, height)),
 		Cols: uint16(max(1, width)),
 	})
+}
+
+func (rt *Runtime) resizeSessionPanes(sessionName string) {
+	for _, pane := range rt.state.ActiveWindowPanes(sessionName) {
+		if pane == nil || pane.PTY == nil {
+			continue
+		}
+		_ = pty.Setsize(pane.PTY, &pty.Winsize{
+			Rows: uint16(max(1, pane.Height)),
+			Cols: uint16(max(1, pane.Width)),
+		})
+	}
 }
 
 func (rt *Runtime) clientWidth(id int64) int {

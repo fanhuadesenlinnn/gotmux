@@ -72,6 +72,14 @@ func formatValue(key string, ctx formatContext) string {
 		if ctx.window != nil {
 			return ctx.window.Name
 		}
+	case "window_width":
+		if ctx.window != nil {
+			return strconv.Itoa(ctx.window.Width)
+		}
+	case "window_height":
+		if ctx.window != nil {
+			return strconv.Itoa(ctx.window.Height)
+		}
 	case "window_panes":
 		if ctx.window != nil {
 			return strconv.Itoa(len(ctx.window.Panes))
@@ -88,6 +96,14 @@ func formatValue(key string, ctx formatContext) string {
 	case "pane_index":
 		if ctx.pane != nil {
 			return strconv.Itoa(ctx.pane.Index)
+		}
+	case "pane_left":
+		if ctx.pane != nil {
+			return strconv.Itoa(ctx.pane.Left)
+		}
+	case "pane_top":
+		if ctx.pane != nil {
+			return strconv.Itoa(ctx.pane.Top)
 		}
 	case "pane_active":
 		if ctx.window != nil && ctx.pane != nil && ctx.window.Active == ctx.pane.Index {
