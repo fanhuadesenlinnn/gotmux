@@ -117,6 +117,17 @@ func TestScreenCaptureLinesClearsUsedCells(t *testing.T) {
 	})
 }
 
+func TestScreenCaptureRowsMarksAutoWrappedLines(t *testing.T) {
+	screen := NewScreen(5, 3)
+	screen.Write([]byte("abcdefgh\r\nxy"))
+
+	assertCaptureRows(t, screen.CaptureRows(false), []CaptureRow{
+		{Text: "abcde", Wrapped: true},
+		{Text: "fgh", Wrapped: false},
+		{Text: "xy", Wrapped: false},
+	})
+}
+
 func assertLines(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {
@@ -125,6 +136,18 @@ func assertLines(t *testing.T, got, want []string) {
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("line %d = %q, want %q (all lines %#v)", i, got[i], want[i], got)
+		}
+	}
+}
+
+func assertCaptureRows(t *testing.T, got, want []CaptureRow) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("rows = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("row %d = %#v, want %#v (all rows %#v)", i, got[i], want[i], got)
 		}
 	}
 }

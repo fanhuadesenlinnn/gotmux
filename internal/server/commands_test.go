@@ -306,6 +306,21 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 		t.Fatalf("capture-pane -N = %q", msg.Text)
 	}
 
+	screen = terminal.NewScreen(5, 3)
+	screen.Write([]byte("abcdefgh\r\nxy"))
+	rt.screens[pane.ID] = screen
+	msg = rt.execute([]string{"capture-pane", "-p", "-S", "0", "-E", "2", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "abcde\nfgh\nxy" {
+		t.Fatalf("capture-pane wrapped lines = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"capture-pane", "-p", "-J", "-S", "0", "-E", "2", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "abcdefgh\nxy" {
+		t.Fatalf("capture-pane -J = %q", msg.Text)
+	}
+
+	screen = terminal.NewScreen(8, 2)
+	screen.Write([]byte("one  \r\ntwo"))
+	rt.screens[pane.ID] = screen
 	msg = rt.execute([]string{"capture-pane", "-b", "capbuf", "-S", "0", "-E", "1", "-t", "cap"}, session.Name, 80, 24)
 	if !msg.OK {
 		t.Fatalf("capture-pane to buffer failed: %s", msg.Text)

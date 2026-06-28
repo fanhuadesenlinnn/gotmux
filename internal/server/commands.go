@@ -11,6 +11,7 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/command"
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
+	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
@@ -352,12 +353,22 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 	if pane == nil {
 		return fail("can't find pane")
 	}
+	if hasAny(args, "-J") {
+		rows := rt.capturePaneRows(pane, true)
+		rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
+		text := joinCaptureRows(rows)
+		if !hasAny(args, "-p") {
+			if len(rows) == 0 || !rows[len(rows)-1].Wrapped {
+				text += "\n"
+			}
+			rt.state.SetBuffer(optionValue(args, "-b", ""), text, hasAny(args, "-a"))
+			return ok("")
+		}
+		return ok(text)
+	}
 	lines := rt.capturePaneLines(pane, !hasAny(args, "-N"))
 	lines = sliceCaptureLines(lines, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
 	text := strings.Join(lines, "\n")
-	if hasAny(args, "-J") {
-		text = strings.Join(lines, " ")
-	}
 	if !hasAny(args, "-p") {
 		rt.state.SetBuffer(optionValue(args, "-b", ""), text+"\n", hasAny(args, "-a"))
 		return ok("")
@@ -1244,27 +1255,35 @@ func parsePaneTarget(target string) (session string, window int, pane int, hasWi
 }
 
 func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []string {
-	var lines []string
+	rows := rt.capturePaneRows(pane, !trimTrailing)
+	lines := make([]string, len(rows))
+	for i, row := range rows {
+		lines[i] = row.Text
+	}
+	return lines
+}
+
+func (rt *Runtime) capturePaneRows(pane *model.Pane, preserveTrailing bool) []terminal.CaptureRow {
+	var rows []terminal.CaptureRow
 	rt.screensMu.RLock()
 	screen := rt.screens[pane.ID]
 	rt.screensMu.RUnlock()
 	if screen != nil {
-		lines = screen.CaptureLines(!trimTrailing)
+		rows = screen.CaptureRows(preserveTrailing)
 	} else {
-		lines = visibleTextLines(pane.History.Bytes(), pane.Height)
+		lines := visibleTextLines(pane.History.Bytes(), pane.Height)
 		if pane.Height > 0 && len(lines) < pane.Height {
-			padding := make([]string, pane.Height-len(lines))
-			lines = append(lines, padding...)
+			lines = append(lines, make([]string, pane.Height-len(lines))...)
+		}
+		rows = make([]terminal.CaptureRow, len(lines))
+		for i, line := range lines {
+			if !preserveTrailing {
+				line = strings.TrimRight(line, " ")
+			}
+			rows[i] = terminal.CaptureRow{Text: line}
 		}
 	}
-	out := make([]string, len(lines))
-	for i, line := range lines {
-		if trimTrailing {
-			line = strings.TrimRight(line, " ")
-		}
-		out[i] = line
-	}
-	return out
+	return rows
 }
 
 func sliceCaptureLines(lines []string, startValue string, endValue string) []string {
@@ -1289,6 +1308,41 @@ func sliceCaptureLines(lines []string, startValue string, endValue string) []str
 		return nil
 	}
 	return lines[start : end+1]
+}
+
+func sliceCaptureRows(rows []terminal.CaptureRow, startValue string, endValue string) []terminal.CaptureRow {
+	if len(rows) == 0 {
+		return nil
+	}
+	start := 0
+	end := len(rows) - 1
+	if startValue != "" {
+		start = parseCaptureLineIndex(startValue, len(rows), 0)
+	}
+	if endValue != "" {
+		end = parseCaptureLineIndex(endValue, len(rows), end)
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end >= len(rows) {
+		end = len(rows) - 1
+	}
+	if end < start {
+		return nil
+	}
+	return rows[start : end+1]
+}
+
+func joinCaptureRows(rows []terminal.CaptureRow) string {
+	var b strings.Builder
+	for i, row := range rows {
+		b.WriteString(row.Text)
+		if i < len(rows)-1 && !row.Wrapped {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 func parseCaptureLineIndex(value string, lineCount int, fallback int) int {

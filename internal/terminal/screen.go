@@ -22,9 +22,11 @@ type Screen struct {
 	width  int
 	height int
 	cells  [][]cell
+	wraps  []bool
 
 	altScreen   bool
 	mainCells   [][]cell
+	mainWraps   []bool
 	mainCursorX int
 	mainCursorY int
 	mainSavedX  int
@@ -94,9 +96,23 @@ func (s *Screen) Lines() []string {
 }
 
 func (s *Screen) CaptureLines(preserveTrailing bool) []string {
+	rows := s.CaptureRows(preserveTrailing)
+	lines := make([]string, len(rows))
+	for i, row := range rows {
+		lines[i] = row.Text
+	}
+	return lines
+}
+
+type CaptureRow struct {
+	Text    string
+	Wrapped bool
+}
+
+func (s *Screen) CaptureRows(preserveTrailing bool) []CaptureRow {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	lines := make([]string, s.height)
+	rows := make([]CaptureRow, s.height)
 	for y := 0; y < s.height; y++ {
 		line := cellsString(s.cells[y], s.width)
 		if preserveTrailing {
@@ -109,15 +125,17 @@ func (s *Screen) CaptureLines(preserveTrailing bool) []string {
 		} else {
 			line = strings.TrimRight(line, " ")
 		}
-		lines[y] = line
+		rows[y] = CaptureRow{Text: line, Wrapped: y < len(s.wraps) && s.wraps[y]}
 	}
-	return lines
+	return rows
 }
 
 func (s *Screen) resizeLocked(width, height int) {
 	s.cells = resizeCells(s.cells, width, height)
+	s.wraps = resizeWraps(s.wraps, height)
 	if s.altScreen {
 		s.mainCells = resizeCells(s.mainCells, width, height)
+		s.mainWraps = resizeWraps(s.mainWraps, height)
 		s.mainCursorX = clampInt(s.mainCursorX, 0, width)
 		s.mainCursorY = clampInt(s.mainCursorY, 0, height-1)
 		s.mainSavedX = clampInt(s.mainSavedX, 0, width)
@@ -319,9 +337,11 @@ func (s *Screen) enterAltScreenLocked(saveCursor bool) {
 		return
 	}
 	s.mainCells = cloneCells(s.cells)
+	s.mainWraps = append([]bool(nil), s.wraps...)
 	s.mainCursorX, s.mainCursorY = s.cursorX, s.cursorY
 	s.mainSavedX, s.mainSavedY = s.savedX, s.savedY
 	s.cells = newCells(s.width, s.height)
+	s.wraps = make([]bool, s.height)
 	s.cursorX, s.cursorY = 0, 0
 	s.savedX, s.savedY = 0, 0
 	s.altScreen = true
@@ -340,12 +360,14 @@ func (s *Screen) leaveAltScreenLocked(restoreCursor bool) {
 	} else {
 		s.cells = newCells(s.width, s.height)
 	}
+	s.wraps = resizeWraps(s.mainWraps, s.height)
 	s.cursorX = clampInt(s.mainCursorX, 0, s.width)
 	s.cursorY = clampInt(s.mainCursorY, 0, s.height-1)
 	s.savedX = clampInt(s.mainSavedX, 0, s.width)
 	s.savedY = clampInt(s.mainSavedY, 0, s.height-1)
 	s.altScreen = false
 	s.mainCells = nil
+	s.mainWraps = nil
 }
 
 func parseCSIParams(raw string) []int {
@@ -381,8 +403,10 @@ func csiParam(params []int, index, fallback int) int {
 
 func (s *Screen) resetLocked() {
 	s.cells = newCells(s.width, s.height)
+	s.wraps = make([]bool, s.height)
 	s.altScreen = false
 	s.mainCells = nil
+	s.mainWraps = nil
 	s.mainCursorX, s.mainCursorY = 0, 0
 	s.mainSavedX, s.mainSavedY = 0, 0
 	s.cursorX, s.cursorY = 0, 0
@@ -397,8 +421,7 @@ func (s *Screen) putRuneLocked(r rune) {
 		return
 	}
 	if s.cursorX >= s.width {
-		s.cursorX = 0
-		s.lineFeedLocked()
+		s.autoWrapLocked()
 	}
 	if s.cursorY < 0 || s.cursorY >= s.height {
 		return
@@ -411,12 +434,27 @@ func (s *Screen) putRuneLocked(r rune) {
 }
 
 func (s *Screen) lineFeedLocked() {
+	s.setWrappedLocked(s.cursorY, false)
 	if s.cursorY >= s.height-1 {
 		s.scrollUpLocked(1)
 		s.cursorY = s.height - 1
+		s.setWrappedLocked(s.cursorY, false)
 		return
 	}
 	s.cursorY++
+	s.setWrappedLocked(s.cursorY, false)
+}
+
+func (s *Screen) autoWrapLocked() {
+	s.setWrappedLocked(s.cursorY, true)
+	if s.cursorY >= s.height-1 {
+		s.scrollUpLocked(1)
+		s.cursorY = s.height - 1
+	} else {
+		s.cursorY++
+	}
+	s.cursorX = 0
+	s.setWrappedLocked(s.cursorY, false)
 }
 
 func (s *Screen) clearScreenLocked(mode int) {
@@ -432,6 +470,7 @@ func (s *Screen) clearScreenLocked(mode int) {
 	case 2, 3:
 		for y := 0; y < s.height; y++ {
 			s.fillLineLocked(y, 0, s.width, ' ', false)
+			s.setWrappedLocked(y, false)
 		}
 	default:
 		for y := s.cursorY; y < s.height; y++ {
@@ -450,6 +489,7 @@ func (s *Screen) clearLineLocked(mode int) {
 		s.fillLineLocked(s.cursorY, 0, clampInt(s.cursorX+1, 0, s.width), ' ', false)
 	case 2:
 		s.fillLineLocked(s.cursorY, 0, s.width, ' ', false)
+		s.setWrappedLocked(s.cursorY, false)
 	default:
 		s.fillLineLocked(s.cursorY, clampInt(s.cursorX, 0, s.width), s.width, ' ', false)
 	}
@@ -499,9 +539,11 @@ func (s *Screen) insertLinesLocked(count int) {
 	count = minInt(count, s.height-s.cursorY)
 	for y := s.height - 1; y >= s.cursorY+count; y-- {
 		copy(s.cells[y], s.cells[y-count])
+		s.setWrappedLocked(y, s.isWrappedLocked(y-count))
 	}
 	for y := s.cursorY; y < s.cursorY+count; y++ {
 		s.fillLineLocked(y, 0, s.width, ' ', false)
+		s.setWrappedLocked(y, false)
 	}
 }
 
@@ -512,9 +554,11 @@ func (s *Screen) deleteLinesLocked(count int) {
 	count = minInt(count, s.height-s.cursorY)
 	for y := s.cursorY; y < s.height-count; y++ {
 		copy(s.cells[y], s.cells[y+count])
+		s.setWrappedLocked(y, s.isWrappedLocked(y+count))
 	}
 	for y := s.height - count; y < s.height; y++ {
 		s.fillLineLocked(y, 0, s.width, ' ', false)
+		s.setWrappedLocked(y, false)
 	}
 }
 
@@ -525,9 +569,11 @@ func (s *Screen) scrollUpLocked(count int) {
 	count = minInt(count, s.height)
 	for y := 0; y < s.height-count; y++ {
 		copy(s.cells[y], s.cells[y+count])
+		s.setWrappedLocked(y, s.isWrappedLocked(y+count))
 	}
 	for y := s.height - count; y < s.height; y++ {
 		s.fillLineLocked(y, 0, s.width, ' ', false)
+		s.setWrappedLocked(y, false)
 	}
 }
 
@@ -538,10 +584,22 @@ func (s *Screen) scrollDownLocked(count int) {
 	count = minInt(count, s.height)
 	for y := s.height - 1; y >= count; y-- {
 		copy(s.cells[y], s.cells[y-count])
+		s.setWrappedLocked(y, s.isWrappedLocked(y-count))
 	}
 	for y := 0; y < count; y++ {
 		s.fillLineLocked(y, 0, s.width, ' ', false)
+		s.setWrappedLocked(y, false)
 	}
+}
+
+func (s *Screen) setWrappedLocked(y int, wrapped bool) {
+	if y >= 0 && y < len(s.wraps) {
+		s.wraps[y] = wrapped
+	}
+}
+
+func (s *Screen) isWrappedLocked(y int) bool {
+	return y >= 0 && y < len(s.wraps) && s.wraps[y]
 }
 
 func (s *Screen) fillLineLocked(y, start, end int, r rune, used bool) {
@@ -581,6 +639,12 @@ func resizeCells(old [][]cell, width, height int) [][]cell {
 		copy(cells[y], old[y])
 	}
 	return cells
+}
+
+func resizeWraps(old []bool, height int) []bool {
+	wraps := make([]bool, height)
+	copy(wraps, old)
+	return wraps
 }
 
 func cellsString(cells []cell, width int) string {

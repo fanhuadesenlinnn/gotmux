@@ -110,6 +110,14 @@ compare "capture-pane visible text" capture-pane -p -t cap -S 0 -E 2
 "${gotmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2 >/dev/null
 compare "capture-pane buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
 
+"${tmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t capj "printf '\\033[H\\033[2Jabcdefgh\\nxy\\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t capj "printf '\\033[H\\033[2Jabcdefgh\\nxy\\n'" Enter >/dev/null
+sleep 0.4
+compare "capture-pane wrapped visible text" capture-pane -p -t capj -S 0 -E 2
+compare "capture-pane joins wrapped lines" capture-pane -p -J -t capj -S 0 -E 2
+
 "${tmux_cmd[@]}" set-buffer -b named "hello world"
 "${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null
 compare "show named buffer" show-buffer -b named
