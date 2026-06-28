@@ -129,6 +129,17 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "select-pane":
 		delta := 1
 		target := optionValue(args, "-t", "")
+		if target != "" && !strings.Contains(target, ".+") && !strings.Contains(target, ".-") &&
+			!hasAny(args, "-U", "-D", "-L", "-R") {
+			pane := rt.targetPane(target, currentSession)
+			if pane == nil {
+				return fail("can't find pane")
+			}
+			if err := rt.state.SelectPaneByID(pane.ID); err != nil {
+				return fail(err.Error())
+			}
+			return ok("")
+		}
 		if strings.Contains(target, ".-") || hasAny(args, "-U", "-L") {
 			delta = -1
 		}

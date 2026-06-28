@@ -48,12 +48,12 @@ terminal capability negotiation remain.
 
 Status: in progress. Basic split geometry, nested split geometry,
 `resize-pane`, `select-layout even-horizontal`, and screen-backed multi-pane
-redraw with simple borders are implemented. Basic targeted `kill-pane -t` and
-`kill-window -t` remove the target, drop related screen snapshots, and collapse
-pane layout leaves; `rename-window -t` renames non-active target windows.
-Geometry is compared with tmux through `scripts/compat_probe.sh`; complete
-layout algorithms, tmux-style border rendering, zoom, and pane movement
-commands remain.
+redraw with simple borders are implemented. Basic targeted `select-pane -t`,
+`kill-pane -t`, and `kill-window -t` operate on explicit targets, drop related
+screen snapshots where needed, and collapse pane layout leaves; targeted
+`rename-window -t` renames non-active target windows. Geometry is compared with tmux through
+`scripts/compat_probe.sh`; complete layout algorithms, tmux-style border
+rendering, zoom, and pane movement commands remain.
 
 ## Phase 5: Modes, Buffers, and Input
 

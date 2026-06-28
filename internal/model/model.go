@@ -510,6 +510,26 @@ func (s *Server) SelectRelativePane(sessionName string, delta int) error {
 	return nil
 }
 
+func (s *Server) SelectPaneByID(paneID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, session := range s.Sessions {
+		for windowIndex, window := range session.Windows {
+			for paneIndex, pane := range window.Panes {
+				if pane.ID == paneID {
+					session.Active = windowIndex
+					window.Active = paneIndex
+					window.Activity = time.Now()
+					session.Activity = time.Now()
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("can't find pane: %d", paneID)
+}
+
 func (s *Server) SetActiveWindowSize(sessionName string, width, height int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

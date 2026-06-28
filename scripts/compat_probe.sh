@@ -199,6 +199,13 @@ compare "resize pane geometry" list-panes -t layresize -F "#{pane_index}:#{pane_
 "${gotmux_cmd[@]}" select-layout -t layselect even-horizontal >/dev/null
 compare "select-layout even-horizontal geometry" list-panes -t layselect -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s selp -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t selp -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s selp -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t selp -h /bin/sh >/dev/null
+compare "select-pane target command" select-pane -t selp:.0
+compare "select-pane target panes" list-panes -t selp -F "#{pane_index}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t killp -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh >/dev/null

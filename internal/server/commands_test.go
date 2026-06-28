@@ -432,6 +432,26 @@ func TestKillPaneTargetsPaneAndDropsScreen(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "kill"}, "kill", 80, 24)
 }
 
+func TestSelectPaneTargetsPane(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("selp", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"select-pane", "-t", ".0"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-pane failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-panes", "-t", "selp", "-F", "#{pane_index}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:1\n1:0" {
+		t.Fatalf("panes after select-pane = %q", got.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "selp"}, "selp", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})
