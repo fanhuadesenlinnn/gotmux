@@ -141,9 +141,17 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "select-layout":
 		return rt.cmdSelectLayout(args, currentSession)
 	case "kill-pane":
-		if err := rt.state.KillActivePane(currentSession); err != nil {
+		pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+		if pane == nil {
+			return fail("can't find pane")
+		}
+		if err := rt.state.KillPaneByID(pane.ID); err != nil {
 			return fail(err.Error())
 		}
+		rt.screensMu.Lock()
+		delete(rt.screens, pane.ID)
+		rt.screensMu.Unlock()
+		rt.resizeSessionPanes(currentSession)
 		return ok("")
 	case "kill-window":
 		if err := rt.state.KillActiveWindow(currentSession); err != nil {

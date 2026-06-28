@@ -56,3 +56,34 @@ func TestResizeActivePaneGeometry(t *testing.T) {
 			got[1].Width, got[1].Height, got[1].Left, got[1].Top)
 	}
 }
+
+func TestKillPaneByIDRemovesTargetPaneAndLayoutLeaf(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, first, err := state.NewSession("layout", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.KillPaneByID(first.ID); err != nil {
+		t.Fatal(err)
+	}
+	got := state.ActiveWindowPanes(session.Name)
+	if len(got) != 1 || got[0].ID != second.ID {
+		t.Fatalf("panes after kill = %#v, want only pane %d", got, second.ID)
+	}
+	if got[0].Left != 0 || got[0].Top != 0 || got[0].Width != 80 || got[0].Height != 24 {
+		t.Fatalf("remaining pane geometry = %d,%d %dx%d",
+			got[0].Left, got[0].Top, got[0].Width, got[0].Height)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		t.Fatal("session has no active window after kill")
+	}
+	if window.Layout == nil || !window.Layout.isLeaf() || window.Layout.PaneID != second.ID {
+		t.Fatalf("layout after kill = %#v, want leaf pane %d", window.Layout, second.ID)
+	}
+}

@@ -13,7 +13,7 @@ manual verification note.
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
 | Attach/detach | Implemented |
-| Common window and pane commands | Implemented |
+| Common window and pane commands | Implemented, including basic targeted `kill-pane -t` |
 | Common `C-b` prefix bindings | Implemented |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |

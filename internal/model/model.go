@@ -307,11 +307,40 @@ func (s *Server) KillActivePane(sessionName string) error {
 	if pane == nil {
 		return fmt.Errorf("window has no active pane")
 	}
+	s.killPaneAtLocked(session, window, window.Active)
+	return nil
+}
+
+func (s *Server) KillPaneByID(paneID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, session := range s.Sessions {
+		for _, window := range session.Windows {
+			for index, pane := range window.Panes {
+				if pane.ID == paneID {
+					s.killPaneAtLocked(session, window, index)
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("can't find pane: %d", paneID)
+}
+
+func (s *Server) killPaneAtLocked(session *Session, window *Window, paneIndex int) {
+	pane := window.Panes[paneIndex]
 	killPane(pane)
-	window.Panes = append(window.Panes[:window.Active], window.Panes[window.Active+1:]...)
+	window.Panes = append(window.Panes[:paneIndex], window.Panes[paneIndex+1:]...)
+	window.removePaneFromLayout(pane.ID)
 	reindexPanes(window)
 	if len(window.Panes) == 0 {
-		session.Windows = append(session.Windows[:session.Active], session.Windows[session.Active+1:]...)
+		for index, candidate := range session.Windows {
+			if candidate.ID == window.ID {
+				session.Windows = append(session.Windows[:index], session.Windows[index+1:]...)
+				break
+			}
+		}
 		reindexWindows(session)
 	}
 	if window.Active >= len(window.Panes) {
@@ -323,7 +352,6 @@ func (s *Server) KillActivePane(sessionName string) error {
 	if len(session.Windows) == 0 {
 		delete(s.Sessions, session.Name)
 	}
-	return nil
 }
 
 func (s *Server) KillActiveWindow(sessionName string) error {
@@ -1103,6 +1131,40 @@ func splitLeaf(node *LayoutNode, oldPaneID, newPaneID int, orientation string) *
 	for i, child := range node.Children {
 		node.Children[i] = splitLeaf(child, oldPaneID, newPaneID, orientation)
 	}
+	return node
+}
+
+func (w *Window) removePaneFromLayout(paneID int) {
+	w.Layout = removeLayoutPane(w.Layout, paneID)
+	if w.Layout == nil && len(w.Panes) > 0 {
+		w.Layout = &LayoutNode{PaneID: w.Panes[0].ID}
+	}
+	w.recalculateLayout()
+}
+
+func removeLayoutPane(node *LayoutNode, paneID int) *LayoutNode {
+	if node == nil {
+		return nil
+	}
+	if node.isLeaf() {
+		if node.PaneID == paneID {
+			return nil
+		}
+		return node
+	}
+	children := node.Children[:0]
+	for _, child := range node.Children {
+		if updated := removeLayoutPane(child, paneID); updated != nil {
+			children = append(children, updated)
+		}
+	}
+	if len(children) == 0 {
+		return nil
+	}
+	if len(children) == 1 {
+		return children[0]
+	}
+	node.Children = children
 	return node
 }
 

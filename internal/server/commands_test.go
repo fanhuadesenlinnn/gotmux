@@ -382,3 +382,33 @@ func TestClearHistoryClearsPaneHistory(t *testing.T) {
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "clear"}, "clear", 80, 24)
 }
+
+func TestKillPaneTargetsPaneAndDropsScreen(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, first, err := rt.state.NewSession("kill", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.screens[first.ID] = terminal.NewScreen(8, 1)
+	rt.screens[second.ID] = terminal.NewScreen(8, 1)
+
+	msg := rt.execute([]string{"kill-pane", "-t", ".0"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("kill-pane failed: %s", msg.Text)
+	}
+	panes := rt.state.ActiveWindowPanes(session.Name)
+	if len(panes) != 1 || panes[0].ID != second.ID {
+		t.Fatalf("panes after kill-pane = %#v, want only pane %d", panes, second.ID)
+	}
+	if _, ok := rt.screens[first.ID]; ok {
+		t.Fatalf("screen for killed pane %d still exists", first.ID)
+	}
+	if _, ok := rt.screens[second.ID]; !ok {
+		t.Fatalf("screen for remaining pane %d was removed", second.ID)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "kill"}, "kill", 80, 24)
+}
