@@ -107,14 +107,19 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "send-prefix":
 		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
+		if hasAny(args, "-n") || hasAny(args, "-p") {
+			target := rt.windowSessionTarget(args, currentSession)
+			delta := 1
+			if hasAny(args, "-p") {
+				delta = -1
+			}
+			if err := rt.state.SelectRelativeWindow(target, delta); err != nil {
+				return fail(err.Error())
+			}
+			return ok("")
+		}
 		if hasAny(args, "-l") {
-			target := cleanSessionTarget(optionValue(args, "-t", currentSession))
-			if target == "" {
-				target = firstSessionName(rt.state)
-			}
-			if strings.Contains(target, ":") {
-				target, _, _, _, _ = parsePaneTarget(target)
-			}
+			target := rt.windowSessionTarget(args, currentSession)
 			if err := rt.state.SelectLastWindow(target); err != nil {
 				return fail(err.Error())
 			}
@@ -142,12 +147,12 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		}
 		return ok("")
 	case "next-window":
-		if err := rt.state.SelectRelativeWindow(currentSession, 1); err != nil {
+		if err := rt.state.SelectRelativeWindow(rt.windowSessionTarget(args, currentSession), 1); err != nil {
 			return fail(err.Error())
 		}
 		return ok("")
 	case "previous-window":
-		if err := rt.state.SelectRelativeWindow(currentSession, -1); err != nil {
+		if err := rt.state.SelectRelativeWindow(rt.windowSessionTarget(args, currentSession), -1); err != nil {
 			return fail(err.Error())
 		}
 		return ok("")
@@ -1349,6 +1354,27 @@ func positiveOption(args []string, name string, label string) (int, error) {
 
 func targetSession(args []string, currentSession string) string {
 	return cleanSessionTarget(optionValue(args, "-t", currentSession))
+}
+
+func (rt *Runtime) windowSessionTarget(args []string, currentSession string) string {
+	target := cleanSessionTarget(optionValue(args, "-t", currentSession))
+	if target == "" {
+		if currentSession != "" {
+			return currentSession
+		}
+		return firstSessionName(rt.state)
+	}
+	if strings.Contains(target, ":") {
+		session, _, _, _, _ := parsePaneTarget(target)
+		if session != "" {
+			return session
+		}
+		if currentSession != "" {
+			return currentSession
+		}
+		return firstSessionName(rt.state)
+	}
+	return target
 }
 
 func hasAny(args []string, names ...string) bool {

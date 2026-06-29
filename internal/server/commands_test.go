@@ -224,6 +224,44 @@ func TestSelectWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestSelectWindowFlagsAndRelativeTargets(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "selwflags", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "selwflags", "-n", "second", "/bin/sh"}, "selwflags", 80, 24); !msg.OK {
+		t.Fatalf("new-window second failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "selwflags", "-n", "third", "/bin/sh"}, "selwflags", 80, 24); !msg.OK {
+		t.Fatalf("new-window third failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"select-window", "-p", "-t", "selwflags"}, "", 80, 24); !msg.OK {
+		t.Fatalf("select-window -p failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "selwflags", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "0:first:0\n1:second:1\n2:third:0" {
+		t.Fatalf("windows after select-window -p = %q", windows.Text)
+	}
+	if msg := rt.execute([]string{"select-window", "-n", "-t", "selwflags"}, "", 80, 24); !msg.OK {
+		t.Fatalf("select-window -n failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"previous-window", "-t", "selwflags"}, "", 80, 24); !msg.OK {
+		t.Fatalf("previous-window -t failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "selwflags", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "0:first:0\n1:second:1\n2:third:0" {
+		t.Fatalf("windows after previous-window -t = %q", windows.Text)
+	}
+	if msg := rt.execute([]string{"next-window", "-t", "selwflags"}, "", 80, 24); !msg.OK {
+		t.Fatalf("next-window -t failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "selwflags", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "0:first:0\n1:second:0\n2:third:1" {
+		t.Fatalf("windows after next-window -t = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "selwflags"}, "selwflags", 80, 24)
+}
+
 func TestNewWindowDetachedAndPrint(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "newwd", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

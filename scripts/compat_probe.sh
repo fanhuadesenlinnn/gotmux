@@ -392,6 +392,21 @@ compare "rename aliases windows" list-windows -t aliasrenamed -F "#{window_index
 compare "select-window target command" select-window -t selectw:0
 compare "select-window target windows" list-windows -t selectw -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s selectwflags -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t selectwflags -n second /bin/sh
+"${tmux_cmd[@]}" new-window -t selectwflags -n third /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s selectwflags -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t selectwflags -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t selectwflags -n third /bin/sh >/dev/null
+compare "select-window previous flag command" select-window -p -t selectwflags
+compare "select-window previous flag windows" list-windows -t selectwflags -F "#{window_index}:#{window_name}:#{window_active}"
+compare "select-window next flag command" select-window -n -t selectwflags
+compare "select-window next flag windows" list-windows -t selectwflags -F "#{window_index}:#{window_name}:#{window_active}"
+compare "previous-window target command" previous-window -t selectwflags
+compare "previous-window target windows" list-windows -t selectwflags -F "#{window_index}:#{window_name}:#{window_active}"
+compare "next-window target command" next-window -t selectwflags
+compare "next-window target windows" list-windows -t selectwflags -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" new-session -d -s newwd -x 80 -y 24 -n first /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s newwd -x 80 -y 24 -n first /bin/sh >/dev/null
 compare "new-window detached command" new-window -d -t newwd -n second /bin/sh

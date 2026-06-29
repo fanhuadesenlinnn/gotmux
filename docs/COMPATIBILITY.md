@@ -13,7 +13,7 @@ manual verification note.
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
 | Attach/detach | Implemented |
-| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -l`, `last-window`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, basic `resize-window`, and basic `move-window`/renumber |
+| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, basic `resize-window`, and basic `move-window`/renumber |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-panes -t session:window`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
