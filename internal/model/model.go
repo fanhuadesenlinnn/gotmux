@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -139,9 +140,14 @@ func defaultOptions() map[string]string {
 
 func defaultWindowOptions() map[string]string {
 	return map[string]string{
-		"history-limit":   "2000",
-		"mode-keys":       "emacs",
-		"pane-base-index": "0",
+		"history-limit":            "2000",
+		"main-pane-height":         "24",
+		"main-pane-width":          "80",
+		"mode-keys":                "emacs",
+		"other-pane-height":        "0",
+		"other-pane-width":         "0",
+		"pane-base-index":          "0",
+		"tiled-layout-max-columns": "0",
 	}
 }
 
@@ -654,6 +660,10 @@ func (s *Server) WindowPanesContainingPane(paneID int) []*Pane {
 }
 
 func (s *Server) SelectEvenLayout(sessionName, layout string) error {
+	return s.SelectLayout(sessionName, layout)
+}
+
+func (s *Server) SelectLayout(sessionName, layout string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -665,11 +675,17 @@ func (s *Server) SelectEvenLayout(sessionName, layout string) error {
 	if window == nil {
 		return fmt.Errorf("session has no active window")
 	}
-	applyEvenLayout(window, layout)
+	if err := s.applyBuiltinLayoutLocked(window, layout); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (s *Server) SelectEvenLayoutByIndex(sessionName string, windowIndex int, layout string) error {
+	return s.SelectLayoutByIndex(sessionName, windowIndex, layout)
+}
+
+func (s *Server) SelectLayoutByIndex(sessionName string, windowIndex int, layout string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -679,11 +695,70 @@ func (s *Server) SelectEvenLayoutByIndex(sessionName string, windowIndex int, la
 	}
 	for _, window := range session.Windows {
 		if window.Index == windowIndex {
-			applyEvenLayout(window, layout)
-			return nil
+			return s.applyBuiltinLayoutLocked(window, layout)
 		}
 	}
 	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+var builtinLayouts = []string{
+	"even-horizontal",
+	"even-vertical",
+	"main-horizontal",
+	"main-horizontal-mirrored",
+	"main-vertical",
+	"main-vertical-mirrored",
+	"tiled",
+}
+
+func ResolveLayoutName(name string) (string, bool) {
+	for _, layout := range builtinLayouts {
+		if name == layout {
+			return layout, true
+		}
+	}
+	matched := ""
+	for _, layout := range builtinLayouts {
+		if strings.HasPrefix(layout, name) {
+			if matched != "" {
+				return "", false
+			}
+			matched = layout
+		}
+	}
+	return matched, matched != ""
+}
+
+func (s *Server) applyBuiltinLayoutLocked(window *Window, layout string) error {
+	requested := layout
+	layout, ok := ResolveLayoutName(layout)
+	if !ok {
+		return fmt.Errorf("unsupported layout: %s", requested)
+	}
+	option := func(name string) string {
+		value := s.GlobalWindowOptions[name]
+		if window.Options != nil {
+			if override, exists := window.Options[name]; exists {
+				value = override
+			}
+		}
+		return value
+	}
+	switch layout {
+	case "even-horizontal", "even-vertical":
+		applyEvenLayout(window, layout)
+	case "main-horizontal":
+		applyMainHorizontalLayout(window, false, option)
+	case "main-horizontal-mirrored":
+		applyMainHorizontalLayout(window, true, option)
+	case "main-vertical":
+		applyMainVerticalLayout(window, false, option)
+	case "main-vertical-mirrored":
+		applyMainVerticalLayout(window, true, option)
+	case "tiled":
+		applyTiledLayout(window, option)
+	}
+	return nil
 }
 
 func applyEvenLayout(window *Window, layout string) {
@@ -705,6 +780,169 @@ func applyEvenLayout(window *Window, layout string) {
 	}
 	window.Layout = root
 	window.recalculateLayout()
+}
+
+func applyMainHorizontalLayout(window *Window, mirrored bool, option func(string) string) {
+	if len(window.Panes) == 0 {
+		return
+	}
+	if len(window.Panes) == 1 {
+		window.Layout = &LayoutNode{PaneID: window.Panes[0].ID}
+		window.recalculateLayout()
+		return
+	}
+	mainHeight, otherHeight := mainLayoutSizes(
+		window.Height,
+		option("main-pane-height"),
+		option("other-pane-height"),
+		24,
+	)
+	main := &LayoutNode{PaneID: window.Panes[0].ID, Height: mainHeight}
+	other := horizontalPaneGroup(window.Panes[1:], otherHeight)
+	children := []*LayoutNode{main, other}
+	if mirrored {
+		children = []*LayoutNode{other, main}
+	}
+	window.Layout = &LayoutNode{Orientation: "vertical", Children: children}
+	window.recalculateLayout()
+}
+
+func applyMainVerticalLayout(window *Window, mirrored bool, option func(string) string) {
+	if len(window.Panes) == 0 {
+		return
+	}
+	if len(window.Panes) == 1 {
+		window.Layout = &LayoutNode{PaneID: window.Panes[0].ID}
+		window.recalculateLayout()
+		return
+	}
+	mainWidth, otherWidth := mainLayoutSizes(
+		window.Width,
+		option("main-pane-width"),
+		option("other-pane-width"),
+		80,
+	)
+	main := &LayoutNode{PaneID: window.Panes[0].ID, Width: mainWidth}
+	other := verticalPaneGroup(window.Panes[1:], otherWidth)
+	children := []*LayoutNode{main, other}
+	if mirrored {
+		children = []*LayoutNode{other, main}
+	}
+	window.Layout = &LayoutNode{Orientation: "horizontal", Children: children}
+	window.recalculateLayout()
+}
+
+func mainLayoutSizes(total int, mainOption string, otherOption string, fallback int) (int, int) {
+	available := maxInt(0, total-1)
+	mainSize := layoutOptionSize(mainOption, fallback, available)
+	if mainSize+1 >= available {
+		if available <= 2 {
+			mainSize = 1
+		} else {
+			mainSize = available - 1
+		}
+		return maxInt(0, mainSize), 1
+	}
+	otherSize := layoutOptionSize(otherOption, 0, available)
+	if otherSize <= 0 || otherSize > available || available-otherSize < mainSize {
+		otherSize = available - mainSize
+	} else {
+		mainSize = available - otherSize
+	}
+	return maxInt(0, mainSize), maxInt(0, otherSize)
+}
+
+func layoutOptionSize(value string, fallback int, total int) int {
+	value = strings.TrimSpace(value)
+	if strings.HasSuffix(value, "%") {
+		percent, err := strconv.Atoi(strings.TrimSuffix(value, "%"))
+		if err == nil {
+			return total * percent / 100
+		}
+		return fallback
+	}
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func horizontalPaneGroup(panes []*Pane, height int) *LayoutNode {
+	if len(panes) == 1 {
+		return &LayoutNode{PaneID: panes[0].ID, Height: height}
+	}
+	node := &LayoutNode{Orientation: "horizontal", Height: height}
+	for _, pane := range panes {
+		node.Children = append(node.Children, &LayoutNode{PaneID: pane.ID})
+	}
+	return node
+}
+
+func verticalPaneGroup(panes []*Pane, width int) *LayoutNode {
+	if len(panes) == 1 {
+		return &LayoutNode{PaneID: panes[0].ID, Width: width}
+	}
+	node := &LayoutNode{Orientation: "vertical", Width: width}
+	for _, pane := range panes {
+		node.Children = append(node.Children, &LayoutNode{PaneID: pane.ID})
+	}
+	return node
+}
+
+func applyTiledLayout(window *Window, option func(string) string) {
+	if len(window.Panes) == 0 {
+		return
+	}
+	if len(window.Panes) == 1 {
+		window.Layout = &LayoutNode{PaneID: window.Panes[0].ID}
+		window.recalculateLayout()
+		return
+	}
+	paneCount := len(window.Panes)
+	maxColumns := layoutOptionSize(option("tiled-layout-max-columns"), 0, paneCount)
+	rows, columns := 1, 1
+	for rows*columns < paneCount {
+		rows++
+		if rows*columns < paneCount && (maxColumns == 0 || columns < maxColumns) {
+			columns++
+		}
+	}
+	cellWidth := maxInt(1, (window.Width-(columns-1))/columns)
+	cellHeight := maxInt(1, (window.Height-(rows-1))/rows)
+
+	rowNodes := make([]*LayoutNode, 0, rows)
+	for start := 0; start < paneCount; start += columns {
+		end := start + columns
+		if end > paneCount {
+			end = paneCount
+		}
+		rowNodes = append(rowNodes, fixedHorizontalCells(window.Panes[start:end], cellWidth))
+	}
+	window.Layout = fixedVerticalRows(rowNodes, cellHeight)
+	window.recalculateLayout()
+}
+
+func fixedHorizontalCells(panes []*Pane, width int) *LayoutNode {
+	if len(panes) == 1 {
+		return &LayoutNode{PaneID: panes[0].ID}
+	}
+	first := &LayoutNode{PaneID: panes[0].ID, Width: width}
+	rest := fixedHorizontalCells(panes[1:], width)
+	return &LayoutNode{Orientation: "horizontal", Children: []*LayoutNode{first, rest}}
+}
+
+func fixedVerticalRows(rows []*LayoutNode, height int) *LayoutNode {
+	if len(rows) == 1 {
+		return rows[0]
+	}
+	first := rows[0]
+	first.Height = height
+	rest := fixedVerticalRows(rows[1:], height)
+	return &LayoutNode{Orientation: "vertical", Children: []*LayoutNode{first, rest}}
 }
 
 func (s *Server) AttachClient(sessionName string, width, height int) (*Client, *Session, error) {

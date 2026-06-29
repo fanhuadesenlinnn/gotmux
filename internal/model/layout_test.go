@@ -2,6 +2,10 @@ package model
 
 import "testing"
 
+type paneGeometry struct {
+	left, top, width, height int
+}
+
 func TestSplitPaneGeometryMatchesTmuxBasics(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, _, _, err := state.NewSession("layout", "", "first", []string{"/bin/sh"})
@@ -160,6 +164,83 @@ func TestSelectEvenLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	}
 }
 
+func TestSelectBuiltinLayoutsMatchTmuxGeometry(t *testing.T) {
+	tests := []struct {
+		layout string
+		want   []paneGeometry
+	}{
+		{
+			layout: "main-horizontal",
+			want: []paneGeometry{
+				{0, 0, 80, 22},
+				{0, 23, 20, 1},
+				{21, 23, 19, 1},
+				{41, 23, 19, 1},
+				{61, 23, 19, 1},
+			},
+		},
+		{
+			layout: "main-horizontal-mirrored",
+			want: []paneGeometry{
+				{0, 2, 80, 22},
+				{0, 0, 20, 1},
+				{21, 0, 19, 1},
+				{41, 0, 19, 1},
+				{61, 0, 19, 1},
+			},
+		},
+		{
+			layout: "main-vertical",
+			want: []paneGeometry{
+				{0, 0, 78, 24},
+				{79, 0, 1, 6},
+				{79, 7, 1, 5},
+				{79, 13, 1, 5},
+				{79, 19, 1, 5},
+			},
+		},
+		{
+			layout: "main-vertical-mirrored",
+			want: []paneGeometry{
+				{2, 0, 78, 24},
+				{0, 0, 1, 6},
+				{0, 7, 1, 5},
+				{0, 13, 1, 5},
+				{0, 19, 1, 5},
+			},
+		},
+		{
+			layout: "tiled",
+			want: []paneGeometry{
+				{0, 0, 39, 7},
+				{40, 0, 40, 7},
+				{0, 8, 39, 7},
+				{40, 8, 40, 7},
+				{0, 16, 80, 8},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.layout, func(t *testing.T) {
+			state := NewServer("/tmp/gotmux-layout-test.sock")
+			session, _, _, err := state.NewSession("layout-"+tt.layout, "", "first", []string{"/bin/sh"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			state.SetActiveWindowSize(session.Name, 80, 24)
+			for i := 1; i < 5; i++ {
+				if _, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := state.SelectLayout(session.Name, tt.layout); err != nil {
+				t.Fatal(err)
+			}
+			assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), tt.want)
+		})
+	}
+}
+
 func TestSplitPaneWithLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, firstWindow, _, err := state.NewSession("splits", "", "first", []string{"/bin/sh"})
@@ -181,5 +262,20 @@ func TestSplitPaneWithLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	}
 	if len(firstWindow.Panes) != 2 || firstWindow.Active != pane.Index {
 		t.Fatalf("target window panes = %d active %d, want new pane active", len(firstWindow.Panes), firstWindow.Active)
+	}
+}
+
+func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("panes = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].Left != want[i].left || got[i].Top != want[i].top ||
+			got[i].Width != want[i].width || got[i].Height != want[i].height {
+			t.Fatalf("pane %d geometry = %d,%d %dx%d, want %d,%d %dx%d",
+				i, got[i].Left, got[i].Top, got[i].Width, got[i].Height,
+				want[i].left, want[i].top, want[i].width, want[i].height)
+		}
 	}
 }

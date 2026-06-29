@@ -61,6 +61,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "off" {
 		t.Fatalf("show status = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-gwqv", "main-pane-width"}, "", 80, 24)
+	if msg.Text != "80" {
+		t.Fatalf("show main-pane-width = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"bind-key", "C-a", "send-prefix"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("bind failed: %s", msg.Text)
@@ -548,6 +552,30 @@ func TestSelectLayoutTargetsWindow(t *testing.T) {
 			firstWindow.Panes[0].Height, firstWindow.Panes[1].Top, firstWindow.Panes[1].Height)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "layoutt"}, "layoutt", 80, 24)
+}
+
+func TestSelectLayoutSupportsBuiltinPrefix(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("layoutprefix", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	for i := 1; i < 5; i++ {
+		if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	msg := rt.execute([]string{"select-layout", "til"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-layout prefix failed: %s", msg.Text)
+	}
+	got := listPanesFormat(rt.state, session.Name, "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}")
+	want := "0:0:0:39:7\n1:40:0:40:7\n2:0:8:39:7\n3:40:8:40:7\n4:0:16:80:8"
+	if got != want {
+		t.Fatalf("tiled prefix geometry = %q", got)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "layoutprefix"}, "layoutprefix", 80, 24)
 }
 
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {

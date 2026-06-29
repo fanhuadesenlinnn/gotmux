@@ -378,17 +378,18 @@ func (rt *Runtime) cmdSelectLayout(args []string, currentSession string) protoco
 	if len(values) > 0 {
 		layout = values[len(values)-1]
 	}
-	switch layout {
-	case "even-horizontal", "even-vertical":
+	resolvedLayout, supportedLayout := model.ResolveLayoutName(layout)
+	switch {
+	case supportedLayout:
 		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
 		if !found {
 			return fail("can't find window")
 		}
 		var err error
 		if hasWindow {
-			err = rt.state.SelectEvenLayoutByIndex(sessionName, windowIndex, layout)
+			err = rt.state.SelectLayoutByIndex(sessionName, windowIndex, resolvedLayout)
 		} else {
-			err = rt.state.SelectEvenLayout(sessionName, layout)
+			err = rt.state.SelectLayout(sessionName, resolvedLayout)
 		}
 		if err != nil {
 			return fail(err.Error())

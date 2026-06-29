@@ -207,6 +207,19 @@ compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane
 "${gotmux_cmd[@]}" select-layout -t layselect even-horizontal >/dev/null
 compare "select-layout even-horizontal geometry" list-panes -t layselect -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+for layout in main-horizontal main-horizontal-mirrored main-vertical main-vertical-mirrored tiled; do
+  session="lay_${layout//-/_}"
+  "${tmux_cmd[@]}" new-session -d -s "${session}" -x 80 -y 24 -n first /bin/sh
+  "${gotmux_cmd[@]}" new-session -d -s "${session}" -x 80 -y 24 -n first /bin/sh >/dev/null
+  for _ in 1 2 3 4; do
+    "${tmux_cmd[@]}" split-window -t "${session}" -h /bin/sh
+    "${gotmux_cmd[@]}" split-window -t "${session}" -h /bin/sh >/dev/null
+  done
+  "${tmux_cmd[@]}" select-layout -t "${session}" "${layout}"
+  "${gotmux_cmd[@]}" select-layout -t "${session}" "${layout}" >/dev/null
+  compare "select-layout ${layout} geometry" list-panes -t "${session}" -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+done
+
 "${tmux_cmd[@]}" new-session -d -s layselecttarget -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layselecttarget:0 -h /bin/sh
 "${tmux_cmd[@]}" new-window -t layselecttarget -n second /bin/sh
