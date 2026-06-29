@@ -134,6 +134,36 @@ func TestKillWindowRemovesTargetWindow(t *testing.T) {
 	}
 }
 
+func TestSwapWindowsPreservesOrSelectsActiveIndex(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("swapw", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thirdWindow, _, err := state.NewWindow(session.Name, "third", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SwapWindows(session.Name, firstWindow.Index, session.Name, thirdWindow.Index, false); err != nil {
+		t.Fatal(err)
+	}
+	assertWindowIDs(t, session.Windows, []int{thirdWindow.ID, secondWindow.ID, firstWindow.ID})
+	if session.Active != 2 {
+		t.Fatalf("active window after swap = %d, want 2", session.Active)
+	}
+	if err := state.SwapWindows(session.Name, 0, session.Name, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	assertWindowIDs(t, session.Windows, []int{firstWindow.ID, secondWindow.ID, thirdWindow.ID})
+	if session.Active != 2 {
+		t.Fatalf("active window after detached swap = %d, want 2", session.Active)
+	}
+}
+
 func TestSelectEvenLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, _, _, err := state.NewSession("layouts", "", "first", []string{"/bin/sh"})
@@ -490,6 +520,18 @@ func assertPaneIDs(t *testing.T, got []*Pane, want []int) {
 	for i := range want {
 		if got[i].ID != want[i] || got[i].Index != i {
 			t.Fatalf("pane %d = id %d index %d, want id %d index %d", i, got[i].ID, got[i].Index, want[i], i)
+		}
+	}
+}
+
+func assertWindowIDs(t *testing.T, got []*Window, want []int) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("windows = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].ID != want[i] || got[i].Index != i {
+			t.Fatalf("window %d = id %d index %d, want id %d index %d", i, got[i].ID, got[i].Index, want[i], i)
 		}
 	}
 }

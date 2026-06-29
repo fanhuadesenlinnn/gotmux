@@ -202,6 +202,36 @@ func TestSelectWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestSwapWindowCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "swapw", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "swapw", "-n", "second", "/bin/sh"}, "swapw", 80, 24); !msg.OK {
+		t.Fatalf("new-window second failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "swapw", "-n", "third", "/bin/sh"}, "swapw", 80, 24); !msg.OK {
+		t.Fatalf("new-window third failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"swap-window", "-s", "swapw:0", "-t", "swapw:2"}, "swapw", 80, 24)
+	if !msg.OK {
+		t.Fatalf("swap-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "swapw", "-F", "#{window_index}:#{window_name}:#{window_id}:#{window_active}"}, "swapw", 80, 24)
+	if windows.Text != "0:third:@2:0\n1:second:@1:0\n2:first:@0:1" {
+		t.Fatalf("windows after swap-window = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"swapw", "-d", "-s", "swapw:0", "-t", "swapw:2"}, "swapw", 80, 24)
+	if !msg.OK {
+		t.Fatalf("swapw -d failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "swapw", "-F", "#{window_index}:#{window_name}:#{window_id}:#{window_active}"}, "swapw", 80, 24)
+	if windows.Text != "0:first:@0:0\n1:second:@1:0\n2:third:@2:1" {
+		t.Fatalf("windows after swapw -d = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "swapw"}, "swapw", 80, 24)
+}
+
 func TestEnvironmentCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "env", "/bin/sh"}, "", 80, 24)

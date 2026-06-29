@@ -197,6 +197,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		rt.screensMu.Unlock()
 		rt.resizeSessionPanes(currentSession)
 		return ok("")
+	case "swap-window":
+		return rt.cmdSwapWindow(args, currentSession)
 	case "kill-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
 		if target == "" {
@@ -558,6 +560,24 @@ func (rt *Runtime) cmdJoinPane(args []string, currentSession string) protocol.Me
 		}
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	return ok("")
+}
+
+func (rt *Runtime) cmdSwapWindow(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	sourceSession, sourceWindow, _, _, sourceFound := rt.targetWindowInfo(optionValue(args, "-s", currentSession), currentSession)
+	if !sourceFound {
+		return fail("can't find window")
+	}
+	targetSession, targetWindow, _, _, targetFound := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !targetFound {
+		return fail("can't find window")
+	}
+	if err := rt.state.SwapWindows(sourceSession, sourceWindow, targetSession, targetWindow, hasAny(args, "-d")); err != nil {
+		return fail(err.Error())
+	}
 	return ok("")
 }
 
@@ -1056,6 +1076,8 @@ func normalizeCommandName(name string) string {
 		return "kill-pane"
 	case "killw":
 		return "kill-window"
+	case "swapw":
+		return "swap-window"
 	case "source":
 		return "source-file"
 	case "set":
@@ -1078,7 +1100,7 @@ func normalizeCommandName(name string) string {
 		return "resize-pane"
 	case "selectl":
 		return "select-layout"
-	case "kill-server", "kill-session", "rename-session", "rename-window",
+	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",

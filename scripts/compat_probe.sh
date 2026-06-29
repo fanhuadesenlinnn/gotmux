@@ -300,6 +300,17 @@ compare "kill-pane target panes" list-panes -t killp -F "#{pane_index}:#{pane_ac
 compare "kill-window target command" kill-window -t killw:1
 compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s swapw -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t swapw -n second /bin/sh
+"${tmux_cmd[@]}" new-window -t swapw -n third /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s swapw -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t swapw -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t swapw -n third /bin/sh >/dev/null
+compare "swap-window command" swap-window -s swapw:0 -t swapw:2
+compare "swap-window windows" list-windows -t swapw -F "#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "swap-window detached command" swapw -d -s swapw:0 -t swapw:2
+compare "swap-window detached windows" list-windows -t swapw -F "#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+
 "${tmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t renamew -n second /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh >/dev/null

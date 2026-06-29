@@ -519,6 +519,55 @@ func (s *Server) KillWindow(sessionName string, windowIndex int) error {
 	return fmt.Errorf("can't find window: %d", windowIndex)
 }
 
+func (s *Server) SwapWindows(sourceSessionName string, sourceWindowIndex int, targetSessionName string, targetWindowIndex int, detached bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sourceSession := s.Sessions[sourceSessionName]
+	if sourceSession == nil {
+		return fmt.Errorf("can't find session: %s", sourceSessionName)
+	}
+	targetSession := s.Sessions[targetSessionName]
+	if targetSession == nil {
+		return fmt.Errorf("can't find session: %s", targetSessionName)
+	}
+	sourceIndex := windowSliceIndex(sourceSession, sourceWindowIndex)
+	if sourceIndex == -1 {
+		return fmt.Errorf("can't find window: %d", sourceWindowIndex)
+	}
+	targetIndex := windowSliceIndex(targetSession, targetWindowIndex)
+	if targetIndex == -1 {
+		return fmt.Errorf("can't find window: %d", targetWindowIndex)
+	}
+	if sourceSession.Windows[sourceIndex].ID == targetSession.Windows[targetIndex].ID {
+		return nil
+	}
+
+	sourceActive := sourceSession.Active
+	targetActive := targetSession.Active
+	sourceSession.Windows[sourceIndex], targetSession.Windows[targetIndex] = targetSession.Windows[targetIndex], sourceSession.Windows[sourceIndex]
+	reindexWindows(sourceSession)
+	if sourceSession != targetSession {
+		reindexWindows(targetSession)
+	}
+	if detached {
+		if sourceSession == targetSession {
+			sourceSession.Active = targetIndex
+		} else {
+			sourceSession.Active = sourceIndex
+			targetSession.Active = targetIndex
+		}
+	} else {
+		sourceSession.Active = clampedWindowIndex(sourceSession, sourceActive)
+		if sourceSession != targetSession {
+			targetSession.Active = clampedWindowIndex(targetSession, targetActive)
+		}
+	}
+	sourceSession.Activity = time.Now()
+	targetSession.Activity = time.Now()
+	return nil
+}
+
 func (s *Server) killWindowAtLocked(session *Session, windowIndex int) {
 	window := session.Windows[windowIndex]
 	for _, pane := range window.Panes {
@@ -1776,6 +1825,15 @@ func setActiveWindowByID(session *Session, windowID int) bool {
 		}
 	}
 	return false
+}
+
+func windowSliceIndex(session *Session, windowIndex int) int {
+	for index, window := range session.Windows {
+		if window.Index == windowIndex {
+			return index
+		}
+	}
+	return -1
 }
 
 func removeWindowLocked(session *Session, window *Window) {
