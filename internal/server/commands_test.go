@@ -474,6 +474,33 @@ func TestSelectPaneTargetsPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "selp"}, "selp", 80, 24)
 }
 
+func TestResizePaneTargetsPane(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, first, err := rt.state.NewSession("resize", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.screens[first.ID] = terminal.NewScreen(40, 24)
+	rt.screens[second.ID] = terminal.NewScreen(39, 24)
+
+	msg := rt.execute([]string{"resize-pane", "-t", ".0", "-R", "5"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("resize-pane failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-panes", "-t", "resize", "-F", "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:0:45:0\n1:46:34:1" {
+		t.Fatalf("panes after resize-pane = %q", got.Text)
+	}
+	if lines := rt.screens[first.ID].Lines(); len(lines[0]) != 45 {
+		t.Fatalf("screen for resized pane width = %d, want 45", len(lines[0]))
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "resize"}, "resize", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})

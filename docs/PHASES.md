@@ -46,8 +46,8 @@ terminal capability negotiation remain.
 - Implement tmux layout tree behavior, pane borders, tiled rendering, resize
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
-Status: in progress. Basic split geometry, nested split geometry,
-`resize-pane`, `select-layout even-horizontal`, and screen-backed multi-pane
+Status: in progress. Basic split geometry, nested split geometry, targeted
+`resize-pane -t`, `select-layout even-horizontal`, and screen-backed multi-pane
 redraw with simple borders are implemented. Basic targeted `select-window -t`,
 `select-pane -t`, `kill-pane -t`, and `kill-window -t` operate on explicit
 targets, drop related screen snapshots where needed, and collapse pane layout

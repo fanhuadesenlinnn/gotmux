@@ -189,6 +189,14 @@ compare "nested pane geometry" list-panes -t lay3 -F "#{pane_index}:#{pane_left}
 "${gotmux_cmd[@]}" resize-pane -t layresize -L 5 >/dev/null
 compare "resize pane geometry" list-panes -t layresize -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s layresizetarget -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layresizetarget -h /bin/sh
+"${tmux_cmd[@]}" resize-pane -t layresizetarget:.0 -R 5
+"${gotmux_cmd[@]}" new-session -d -s layresizetarget -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layresizetarget -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" resize-pane -t layresizetarget:.0 -R 5 >/dev/null
+compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s layselect -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layselect -h /bin/sh
 "${tmux_cmd[@]}" split-window -t layselect -h /bin/sh

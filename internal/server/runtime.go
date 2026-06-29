@@ -363,7 +363,11 @@ func (rt *Runtime) resizeActivePane(clientID int64) {
 }
 
 func (rt *Runtime) resizeSessionPanes(sessionName string) {
-	for _, pane := range rt.state.ActiveWindowPanes(sessionName) {
+	rt.resizePanes(rt.state.ActiveWindowPanes(sessionName))
+}
+
+func (rt *Runtime) resizePanes(panes []*model.Pane) {
+	for _, pane := range panes {
 		rt.ensurePaneScreen(pane, pane.Width, pane.Height)
 		if pane == nil || pane.PTY == nil {
 			continue

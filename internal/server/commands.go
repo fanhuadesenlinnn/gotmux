@@ -352,10 +352,14 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 			break
 		}
 	}
-	if err := rt.state.ResizeActivePane(currentSession, direction, amount); err != nil {
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	if err := rt.state.ResizePaneByID(pane.ID, direction, amount); err != nil {
 		return fail(err.Error())
 	}
-	rt.resizeSessionPanes(currentSession)
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
 	return ok("")
 }
 

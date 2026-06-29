@@ -593,6 +593,46 @@ func (s *Server) ResizeActivePane(sessionName, direction string, amount int) err
 	return nil
 }
 
+func (s *Server) ResizePaneByID(paneID int, direction string, amount int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if amount <= 0 {
+		amount = 1
+	}
+	for _, session := range s.Sessions {
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				if pane.ID == paneID {
+					if resizeLayout(window.Layout, pane.ID, direction, amount) {
+						window.recalculateLayout()
+					}
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("can't find pane: %d", paneID)
+}
+
+func (s *Server) WindowPanesContainingPane(paneID int) []*Pane {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, session := range s.Sessions {
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				if pane.ID == paneID {
+					out := make([]*Pane, len(window.Panes))
+					copy(out, window.Panes)
+					return out
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Server) SelectEvenLayout(sessionName, layout string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
