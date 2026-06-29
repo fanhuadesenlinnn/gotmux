@@ -695,6 +695,43 @@ func (s *Server) SwapPanesByID(sourceID int, targetID int, detached bool) error 
 	return nil
 }
 
+func (s *Server) RotateWindow(sessionName string, reverse bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return fmt.Errorf("session has no active window")
+	}
+	rotateWindowLocked(window, reverse)
+	window.Activity = time.Now()
+	session.Activity = time.Now()
+	return nil
+}
+
+func (s *Server) RotateWindowByIndex(sessionName string, windowIndex int, reverse bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			rotateWindowLocked(window, reverse)
+			window.Activity = time.Now()
+			session.Activity = time.Now()
+			return nil
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
 func (s *Server) WindowPanesContainingPane(paneID int) []*Pane {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1642,6 +1679,40 @@ func renumberWindowPanes(window *Window) {
 	}
 }
 
+func rotateWindowLocked(window *Window, reverse bool) {
+	if len(window.Panes) <= 1 {
+		return
+	}
+	activeID := -1
+	if pane := window.ActivePane(); pane != nil {
+		activeID = pane.ID
+	}
+	if reverse {
+		last := window.Panes[len(window.Panes)-1]
+		copy(window.Panes[1:], window.Panes[:len(window.Panes)-1])
+		window.Panes[0] = last
+	} else {
+		first := window.Panes[0]
+		copy(window.Panes, window.Panes[1:])
+		window.Panes[len(window.Panes)-1] = first
+	}
+	rotateLayoutPaneIDs(window.Layout, reverse)
+	renumberWindowPanes(window)
+	activeIndex := 0
+	for index, pane := range window.Panes {
+		if pane.ID == activeID {
+			activeIndex = index
+			break
+		}
+	}
+	if reverse {
+		window.Active = (activeIndex - 1 + len(window.Panes)) % len(window.Panes)
+	} else {
+		window.Active = (activeIndex + 1) % len(window.Panes)
+	}
+	window.recalculateLayout()
+}
+
 func (s *Server) newWindowLocked(session *Session, name string) *Window {
 	if name == "" {
 		name = DefaultShellName()
@@ -1787,6 +1858,43 @@ func swapLayoutPaneIDs(node *LayoutNode, sourceID int, targetID int) {
 	for _, child := range node.Children {
 		swapLayoutPaneIDs(child, sourceID, targetID)
 	}
+}
+
+func rotateLayoutPaneIDs(node *LayoutNode, reverse bool) {
+	leaves := layoutLeaves(node)
+	if len(leaves) <= 1 {
+		return
+	}
+	ids := make([]int, len(leaves))
+	for i, leaf := range leaves {
+		ids[i] = leaf.PaneID
+	}
+	if reverse {
+		last := ids[len(ids)-1]
+		copy(ids[1:], ids[:len(ids)-1])
+		ids[0] = last
+	} else {
+		first := ids[0]
+		copy(ids, ids[1:])
+		ids[len(ids)-1] = first
+	}
+	for i, leaf := range leaves {
+		leaf.PaneID = ids[i]
+	}
+}
+
+func layoutLeaves(node *LayoutNode) []*LayoutNode {
+	if node == nil {
+		return nil
+	}
+	if node.isLeaf() {
+		return []*LayoutNode{node}
+	}
+	var out []*LayoutNode
+	for _, child := range node.Children {
+		out = append(out, layoutLeaves(child)...)
+	}
+	return out
 }
 
 func (w *Window) recalculateLayout() {

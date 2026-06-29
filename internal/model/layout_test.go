@@ -342,6 +342,44 @@ func TestSwapPanesByIDMovesPaneObjectsAndActivePane(t *testing.T) {
 	}
 }
 
+func TestRotateWindowMovesPaneObjectsAndActivePane(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, window, first, err := state.NewSession("rotate", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := state.RotateWindow(session.Name, false); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneIDs(t, window.Panes, []int{second.ID, third.ID, first.ID})
+	if window.Active != 2 {
+		t.Fatalf("active pane after rotate = %d, want 2", window.Active)
+	}
+	assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), []paneGeometry{
+		{0, 0, 40, 24},
+		{41, 0, 19, 24},
+		{61, 0, 19, 24},
+	})
+
+	if err := state.RotateWindow(session.Name, true); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneIDs(t, window.Panes, []int{first.ID, second.ID, third.ID})
+	if window.Active != 2 {
+		t.Fatalf("active pane after reverse rotate = %d, want 2", window.Active)
+	}
+}
+
 func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
 	t.Helper()
 	if len(got) != len(want) {

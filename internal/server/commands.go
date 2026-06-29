@@ -157,6 +157,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSelectLayout(args, currentSession)
 	case "swap-pane":
 		return rt.cmdSwapPane(args, currentSession)
+	case "rotate-window":
+		return rt.cmdRotateWindow(args, currentSession)
 	case "kill-pane":
 		pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
 		if pane == nil {
@@ -469,6 +471,29 @@ func (rt *Runtime) cmdSwapPane(args []string, currentSession string) protocol.Me
 	rt.resizePanes(rt.state.WindowPanesContainingPane(sourceID))
 	if sourceID != targetID {
 		rt.resizePanes(rt.state.WindowPanesContainingPane(targetID))
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdRotateWindow(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	var err error
+	if hasWindow {
+		err = rt.state.RotateWindowByIndex(sessionName, windowIndex, hasAny(args, "-D"))
+	} else {
+		err = rt.state.RotateWindow(sessionName, hasAny(args, "-D"))
+	}
+	if err != nil {
+		return fail(err.Error())
+	}
+	if len(paneIDs) > 0 {
+		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
 	}
 	return ok("")
 }
@@ -930,6 +955,8 @@ func normalizeCommandName(name string) string {
 		return "previous-layout"
 	case "swapp":
 		return "swap-pane"
+	case "rotatew":
+		return "rotate-window"
 	case "capturep":
 		return "capture-pane"
 	case "clearhist":
@@ -979,7 +1006,7 @@ func normalizeCommandName(name string) string {
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
-		"swap-pane",
+		"swap-pane", "rotate-window",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
 		return name

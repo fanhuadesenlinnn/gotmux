@@ -266,6 +266,17 @@ compare "swap-pane up panes" list-panes -t swapp -F "#{pane_index}:#{pane_id}:#{
 compare "swap-pane detached command" swap-pane -d -s swapp:.0 -t swapp:.1
 compare "swap-pane detached panes" list-panes -t swapp -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s rotatew -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t rotatew -h /bin/sh
+"${tmux_cmd[@]}" split-window -t rotatew -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s rotatew -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t rotatew -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t rotatew -h /bin/sh >/dev/null
+compare "rotate-window command" rotate-window -t rotatew
+compare "rotate-window panes" list-panes -t rotatew -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "rotate-window reverse command" rotate-window -D -t rotatew
+compare "rotate-window reverse panes" list-panes -t rotatew -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t killp -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh >/dev/null

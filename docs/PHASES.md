@@ -48,8 +48,9 @@ terminal capability negotiation remain.
 
 Status: in progress. Basic split geometry, nested split geometry, targeted
 `resize-pane -t`, targeted `select-layout -t` for tmux built-in layouts, basic
-next/previous layout cycling, basic same-window `swap-pane`, and screen-backed
-multi-pane redraw with simple borders are implemented. Basic targeted
+next/previous layout cycling, basic same-window `swap-pane`, basic
+`rotate-window`, and screen-backed multi-pane redraw with simple borders are
+implemented. Basic targeted
 `select-window -t`, `select-pane -t`, `kill-pane -t`, and `kill-window -t`
 operate on explicit targets, drop related screen snapshots where needed, and
 collapse pane layout leaves; targeted `rename-window -t` renames non-active
