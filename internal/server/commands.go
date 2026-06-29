@@ -189,6 +189,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdLastPane(args, currentSession)
 	case "resize-pane":
 		return rt.cmdResizePane(args, currentSession)
+	case "resize-window":
+		return rt.cmdResizeWindow(args, currentSession)
 	case "next-layout":
 		return rt.cmdApplyLayout(args, currentSession, "", "next")
 	case "previous-layout":
@@ -430,6 +432,49 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	return ok("")
+}
+
+func (rt *Runtime) cmdResizeWindow(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	sessionName, windowIndex, _, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	width, err := positiveOption(args, "-x", "width")
+	if err != nil {
+		return fail(err.Error())
+	}
+	height, err := positiveOption(args, "-y", "height")
+	if err != nil {
+		return fail(err.Error())
+	}
+	direction := ""
+	switch {
+	case hasAny(args, "-L"):
+		direction = "L"
+	case hasAny(args, "-R"):
+		direction = "R"
+	case hasAny(args, "-U"):
+		direction = "U"
+	case hasAny(args, "-D"):
+		direction = "D"
+	}
+	amount := 1
+	for _, value := range optionOperands(args) {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed > 0 {
+			amount = parsed
+			break
+		}
+	}
+	if err := rt.state.ResizeWindowByIndex(sessionName, windowIndex, width, height, direction, amount); err != nil {
+		return fail(err.Error())
+	}
+	if len(paneIDs) > 0 {
+		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
+	}
 	return ok("")
 }
 
@@ -1201,13 +1246,15 @@ func normalizeCommandName(name string) string {
 		return "show-environment"
 	case "resizep":
 		return "resize-pane"
+	case "resizew":
+		return "resize-window"
 	case "selectl":
 		return "select-layout"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
@@ -1250,6 +1297,18 @@ func commandSize(args []string, width, height int) (int, int) {
 		}
 	}
 	return width, height
+}
+
+func positiveOption(args []string, name string, label string) (int, error) {
+	value := optionValue(args, name, "")
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s invalid", label)
+	}
+	return parsed, nil
 }
 
 func targetSession(args []string, currentSession string) string {

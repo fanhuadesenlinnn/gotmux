@@ -61,7 +61,8 @@ track and switch back to the previous window in the probe subset. `new-window -d
 and `split-window -d` keep the existing active window or pane, and basic `-P`
 creation output is compared against tmux. `select-pane -L/-R/-U/-D`,
 `select-pane -l`, and `last-pane` cover direction and last-pane selection in
-the tested geometry subset.
+the tested geometry subset. Basic `resize-window -x/-y` and directional size
+adjustments recalculate pane layouts.
 Geometry is compared with tmux through `scripts/compat_probe.sh`;
 custom layout strings, old-layout restore, marked pane defaults, floating panes,
 target-index pane moves, join/move size and placement flags, tmux-style border

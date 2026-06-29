@@ -82,6 +82,36 @@ func TestResizePaneByIDTargetsNonActivePane(t *testing.T) {
 	}
 }
 
+func TestResizeWindowByIndexRecalculatesLayout(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, window, _, err := state.NewSession("resizew", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.ResizeWindowByIndex(session.Name, window.Index, 100, 30, "", 0); err != nil {
+		t.Fatal(err)
+	}
+	got := state.ActiveWindowPanes(session.Name)
+	if got[0].Width != 50 || got[0].Height != 30 || got[1].Left != 51 || got[1].Width != 49 || got[1].Height != 30 {
+		t.Fatalf("resized window geometry = pane0 %dx%d at %d,%d pane1 %dx%d at %d,%d",
+			got[0].Width, got[0].Height, got[0].Left, got[0].Top,
+			got[1].Width, got[1].Height, got[1].Left, got[1].Top)
+	}
+	if err := state.ResizeWindowByIndex(session.Name, window.Index, 0, 0, "L", 10); err != nil {
+		t.Fatal(err)
+	}
+	got = state.ActiveWindowPanes(session.Name)
+	if got[0].Width != 45 || got[1].Left != 46 || got[1].Width != 44 {
+		t.Fatalf("adjusted window geometry = pane0 %dx%d at %d,%d pane1 %dx%d at %d,%d",
+			got[0].Width, got[0].Height, got[0].Left, got[0].Top,
+			got[1].Width, got[1].Height, got[1].Left, got[1].Top)
+	}
+}
+
 func TestKillPaneByIDRemovesTargetPaneAndLayoutLeaf(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, _, first, err := state.NewSession("layout", "", "first", []string{"/bin/sh"})

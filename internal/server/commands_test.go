@@ -719,6 +719,39 @@ func TestResizePaneTargetsPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "resize"}, "resize", 80, 24)
 }
 
+func TestResizeWindowCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, _, err := rt.state.NewSession("resizew", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"resize-window", "-x", "100", "-y", "30", "-t", "resizew"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("resize-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "resizew", "-F", "#{window_width}:#{window_height}"}, session.Name, 80, 24)
+	if windows.Text != "100:30" {
+		t.Fatalf("window size after resize-window = %q", windows.Text)
+	}
+	panes := rt.execute([]string{"list-panes", "-t", "resizew", "-F", "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_height}"}, session.Name, 80, 24)
+	if panes.Text != "0:0:50:30\n1:51:49:30" {
+		t.Fatalf("panes after resize-window = %q", panes.Text)
+	}
+	msg = rt.execute([]string{"resizew", "-L", "-t", "resizew", "10"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("resizew -L failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "resizew", "-F", "#{window_width}:#{window_height}"}, session.Name, 80, 24)
+	if windows.Text != "90:30" {
+		t.Fatalf("window size after resizew -L = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "resizew"}, "resizew", 80, 24)
+}
+
 func TestSelectLayoutTargetsWindow(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	session, _, _, err := rt.state.NewSession("layoutt", "", "first", []string{"/bin/sh"})

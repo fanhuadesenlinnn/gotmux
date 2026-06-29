@@ -198,6 +198,17 @@ compare "resize pane geometry" list-panes -t layresize -F "#{pane_index}:#{pane_
 "${gotmux_cmd[@]}" resize-pane -t layresizetarget:.0 -R 5 >/dev/null
 compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s resizew -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t resizew -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s resizew -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t resizew -h /bin/sh >/dev/null
+compare "resize-window exact command" resize-window -x 100 -y 30 -t resizew
+compare "resize-window exact size" list-windows -t resizew -F "#{window_width}:#{window_height}"
+compare "resize-window exact panes" list-panes -t resizew -F "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_height}"
+compare "resize-window left command" resizew -L -t resizew 10
+compare "resize-window left size" list-windows -t resizew -F "#{window_width}:#{window_height}"
+compare "resize-window left panes" list-panes -t resizew -F "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_height}"
+
 "${tmux_cmd[@]}" new-session -d -s layselect -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layselect -h /bin/sh
 "${tmux_cmd[@]}" split-window -t layselect -h /bin/sh

@@ -909,13 +909,47 @@ func (s *Server) SetActiveWindowSize(sessionName string, width, height int) {
 	if window == nil {
 		return
 	}
+	window.resizeTo(width, height)
+}
+
+func (s *Server) ResizeWindowByIndex(sessionName string, windowIndex int, width, height int, direction string, amount int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	sliceIndex := windowSliceIndex(session, windowIndex)
+	if sliceIndex == -1 {
+		return fmt.Errorf("can't find window: %d", windowIndex)
+	}
+	window := session.Windows[sliceIndex]
+	nextWidth := window.Width
+	nextHeight := window.Height
 	if width > 0 {
-		window.Width = width
+		nextWidth = width
 	}
 	if height > 0 {
-		window.Height = height
+		nextHeight = height
 	}
-	window.recalculateLayout()
+	if amount <= 0 {
+		amount = 1
+	}
+	switch direction {
+	case "L":
+		nextWidth = maxInt(1, nextWidth-amount)
+	case "R":
+		nextWidth += amount
+	case "U":
+		nextHeight = maxInt(1, nextHeight-amount)
+	case "D":
+		nextHeight += amount
+	}
+	window.resizeTo(nextWidth, nextHeight)
+	window.Activity = time.Now()
+	session.Activity = time.Now()
+	return nil
 }
 
 func (s *Server) ActiveWindowPanes(sessionName string) []*Pane {
@@ -2429,6 +2463,44 @@ func (w *Window) recalculateLayout() {
 		w.Layout = &LayoutNode{PaneID: w.Panes[0].ID}
 	}
 	w.applyLayout(w.Layout, 0, 0, w.Width, w.Height)
+}
+
+func (w *Window) resizeTo(width, height int) {
+	oldWidth := w.Width
+	oldHeight := w.Height
+	if width <= 0 {
+		width = oldWidth
+	}
+	if height <= 0 {
+		height = oldHeight
+	}
+	scaleLayoutDimensions(w.Layout, oldWidth, oldHeight, width, height)
+	w.Width = width
+	w.Height = height
+	w.recalculateLayout()
+}
+
+func scaleLayoutDimensions(node *LayoutNode, oldWidth, oldHeight, newWidth, newHeight int) {
+	if node == nil {
+		return
+	}
+	if oldWidth > 0 && newWidth > 0 && node.Width > 0 {
+		node.Width = scaleDimension(node.Width, oldWidth, newWidth)
+	}
+	if oldHeight > 0 && newHeight > 0 && node.Height > 0 {
+		node.Height = scaleDimension(node.Height, oldHeight, newHeight)
+	}
+	for _, child := range node.Children {
+		scaleLayoutDimensions(child, oldWidth, oldHeight, newWidth, newHeight)
+	}
+}
+
+func scaleDimension(value, oldSize, newSize int) int {
+	if value <= 0 || oldSize <= 0 {
+		return value
+	}
+	scaled := (value*newSize + oldSize/2) / oldSize
+	return maxInt(1, scaled)
 }
 
 func (w *Window) applyLayout(node *LayoutNode, left, top, width, height int) {
