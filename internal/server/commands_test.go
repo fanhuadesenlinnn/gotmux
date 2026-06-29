@@ -51,6 +51,36 @@ func TestCommandSequence(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "seq"}, "seq", 80, 24)
 }
 
+func TestListWindowsAndPanesAllScopes(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lsta", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session lsta failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "lsta", "-n", "second", "/bin/sh"}, "lsta", 80, 24); !msg.OK {
+		t.Fatalf("new-window failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"split-window", "-t", "lsta:0", "-h", "/bin/sh"}, "lsta", 80, 24); !msg.OK {
+		t.Fatalf("split-window failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lstb", "-n", "only", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session lstb failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-a", "-F", "#{session_name}:#{window_index}:#{window_name}"}, "", 80, 24)
+	if windows.Text != "lsta:0:first\nlsta:1:second\nlstb:0:only" {
+		t.Fatalf("list-windows -a = %q", windows.Text)
+	}
+	panes := rt.execute([]string{"list-panes", "-s", "-t", "lsta", "-F", "#{session_name}:#{window_index}:#{pane_index}"}, "", 80, 24)
+	if panes.Text != "lsta:0:0\nlsta:0:1\nlsta:1:0" {
+		t.Fatalf("list-panes -s = %q", panes.Text)
+	}
+	panes = rt.execute([]string{"list-panes", "-a", "-F", "#{session_name}:#{window_index}:#{pane_index}"}, "", 80, 24)
+	if panes.Text != "lsta:0:0\nlsta:0:1\nlsta:1:0\nlstb:0:0" {
+		t.Fatalf("list-panes -a = %q", panes.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "lsta"}, "lsta", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "lstb"}, "lstb", 80, 24)
+}
+
 func TestOptionsAndKeyBindings(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"set", "-g", "status", "off"}, "", 80, 24)

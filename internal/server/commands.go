@@ -79,9 +79,9 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "list-sessions":
 		return ok(listSessionsFormat(rt.state, optionValue(args, "-F", "")))
 	case "list-windows":
-		return ok(listWindowsFormat(rt.state, targetSession(args, currentSession), optionValue(args, "-F", "")))
+		return ok(listWindowsCommand(rt.state, args, currentSession))
 	case "list-panes":
-		return ok(listPanesFormat(rt.state, targetSession(args, currentSession), optionValue(args, "-F", "")))
+		return ok(listPanesCommand(rt.state, args, currentSession))
 	case "new-window":
 		return rt.cmdNewWindow(args, currentSession, width, height)
 	case "split-window":
@@ -1504,6 +1504,18 @@ func listWindows(state *model.Server, sessionName string) string {
 	return listWindowsFormat(state, sessionName, "")
 }
 
+func listWindowsCommand(state *model.Server, args []string, currentSession string) string {
+	format := optionValue(args, "-F", "")
+	if hasAny(args, "-a") {
+		lines := make([]string, 0)
+		for _, session := range snapshotSessions(state) {
+			lines = append(lines, listWindowsForSession(session, format, true)...)
+		}
+		return strings.Join(lines, "\n")
+	}
+	return listWindowsFormat(state, targetSession(args, currentSession), format)
+}
+
 func listWindowsFormat(state *model.Server, sessionName string, format string) string {
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
@@ -1512,26 +1524,68 @@ func listWindowsFormat(state *model.Server, sessionName string, format string) s
 		if session.Name != sessionName {
 			continue
 		}
-		lines := make([]string, 0, len(session.Windows))
-		for _, window := range session.Windows {
-			if format != "" {
-				lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: window.ActivePane()}))
-			} else {
-				mark := ""
-				active := session.ActiveWindow()
-				if active != nil && active.ID == window.ID {
-					mark = "*"
-				}
-				lines = append(lines, fmt.Sprintf("%d: %s%s (%d panes)", window.Index, window.Name, mark, len(window.Panes)))
-			}
-		}
-		return strings.Join(lines, "\n")
+		return strings.Join(listWindowsForSession(session, format, false), "\n")
 	}
 	return ""
 }
 
+func listWindowsForSession(session *model.Session, format string, includeSession bool) []string {
+	lines := make([]string, 0, len(session.Windows))
+	for _, window := range session.Windows {
+		if format != "" {
+			lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: window.ActivePane()}))
+			continue
+		}
+		mark := ""
+		active := session.ActiveWindow()
+		if active != nil && active.ID == window.ID {
+			mark = "*"
+		}
+		prefix := ""
+		if includeSession {
+			prefix = session.Name + ":"
+		}
+		lines = append(lines, fmt.Sprintf("%s%d: %s%s (%d panes)", prefix, window.Index, window.Name, mark, len(window.Panes)))
+	}
+	return lines
+}
+
 func listPanes(state *model.Server, sessionName string) string {
 	return listPanesFormat(state, sessionName, "")
+}
+
+func listPanesCommand(state *model.Server, args []string, currentSession string) string {
+	format := optionValue(args, "-F", "")
+	if hasAny(args, "-a") {
+		lines := make([]string, 0)
+		for _, session := range snapshotSessions(state) {
+			for _, window := range session.Windows {
+				lines = append(lines, listPanesForWindow(session, window, format, true, true)...)
+			}
+		}
+		return strings.Join(lines, "\n")
+	}
+	if hasAny(args, "-s") {
+		sessionName, _, _, _, _ := parsePaneTarget(targetSession(args, currentSession))
+		if sessionName == "" {
+			sessionName = targetSession(args, currentSession)
+		}
+		if sessionName == "" {
+			sessionName = firstSessionName(state)
+		}
+		for _, session := range snapshotSessions(state) {
+			if session.Name != sessionName {
+				continue
+			}
+			lines := make([]string, 0)
+			for _, window := range session.Windows {
+				lines = append(lines, listPanesForWindow(session, window, format, false, true)...)
+			}
+			return strings.Join(lines, "\n")
+		}
+		return ""
+	}
+	return listPanesFormat(state, targetSession(args, currentSession), format)
 }
 
 func listPanesFormat(state *model.Server, sessionName string, format string) string {
@@ -1562,26 +1616,37 @@ func listPanesFormat(state *model.Server, sessionName string, format string) str
 		if window == nil {
 			return ""
 		}
-		lines := make([]string, 0, len(window.Panes))
-		for _, pane := range window.Panes {
-			if format != "" {
-				lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: pane}))
-			} else {
-				mark := ""
-				if pane.Index == window.Active {
-					mark = "*"
-				}
-				state := "running"
-				if pane.Exited {
-					state = "exited"
-				}
-				lines = append(lines, fmt.Sprintf("%d:%s [%dx%d] %s %s",
-					pane.Index, mark, pane.Width, pane.Height, state, model.CommandString(pane.Command)))
-			}
-		}
-		return strings.Join(lines, "\n")
+		return strings.Join(listPanesForWindow(session, window, format, false, false), "\n")
 	}
 	return ""
+}
+
+func listPanesForWindow(session *model.Session, window *model.Window, format string, includeSession bool, includeWindow bool) []string {
+	lines := make([]string, 0, len(window.Panes))
+	for _, pane := range window.Panes {
+		if format != "" {
+			lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: pane}))
+			continue
+		}
+		mark := ""
+		if pane.Index == window.Active {
+			mark = "*"
+		}
+		state := "running"
+		if pane.Exited {
+			state = "exited"
+		}
+		prefix := ""
+		if includeSession {
+			prefix += session.Name + ":"
+		}
+		if includeWindow {
+			prefix += fmt.Sprintf("%d.", window.Index)
+		}
+		lines = append(lines, fmt.Sprintf("%s%d:%s [%dx%d] %s %s",
+			prefix, pane.Index, mark, pane.Width, pane.Height, state, model.CommandString(pane.Command)))
+	}
+	return lines
 }
 
 func sessionExists(state *model.Server, name string) bool {

@@ -102,6 +102,18 @@ compare "display-message formats" display-message -p -t compat -F "#{session_nam
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s lsta -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t lsta -n second /bin/sh
+"${tmux_cmd[@]}" split-window -t lsta:0 -h /bin/sh
+"${tmux_cmd[@]}" new-session -d -s lstb -x 80 -y 24 -n only /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s lsta -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t lsta -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t lsta:0 -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-session -d -s lstb -x 80 -y 24 -n only /bin/sh >/dev/null
+compare "list-windows all sessions" list-windows -a -F "#{session_name}:#{window_index}:#{window_name}"
+compare "list-panes session scope" list-panes -s -t lsta -F "#{session_name}:#{window_index}:#{pane_index}"
+compare "list-panes all sessions" list-panes -a -F "#{session_name}:#{window_index}:#{pane_index}"
+
 "${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh >/dev/null
 "${tmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone  \\ntwo\\nthree\\n'" Enter
