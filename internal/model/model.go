@@ -397,6 +397,69 @@ func (s *Server) BreakPaneByID(paneID int, name string, detached bool) (*Session
 	return location.session, window, pane, nil
 }
 
+func (s *Server) JoinPaneByID(sourceID int, targetID int, orientation string, detached bool) (*Session, *Window, *Pane, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	source, ok := s.paneLocationLocked(sourceID)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("can't find pane: %d", sourceID)
+	}
+	target, ok := s.paneLocationLocked(targetID)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("can't find pane: %d", targetID)
+	}
+	if source.pane.ID == target.pane.ID {
+		return nil, nil, nil, fmt.Errorf("source and target panes must be different")
+	}
+	if source.window == target.window {
+		return nil, nil, nil, fmt.Errorf("source and target panes must be in different windows")
+	}
+	if orientation != "horizontal" {
+		orientation = "vertical"
+	}
+
+	sourcePane := source.pane
+	sourceActiveID := -1
+	if active := source.window.ActivePane(); active != nil {
+		sourceActiveID = active.ID
+	}
+	source.window.Panes = append(source.window.Panes[:source.paneIndex], source.window.Panes[source.paneIndex+1:]...)
+	source.window.removePaneFromLayout(sourcePane.ID)
+	reindexPanes(source.window)
+	if !setActivePaneByID(source.window, sourceActiveID) {
+		source.window.Active = clampedPaneIndex(source.window, source.window.Active)
+	}
+
+	insertIndex := target.paneIndex + 1
+	if insertIndex > len(target.window.Panes) {
+		insertIndex = len(target.window.Panes)
+	}
+	target.window.Panes = append(target.window.Panes, nil)
+	copy(target.window.Panes[insertIndex+1:], target.window.Panes[insertIndex:])
+	target.window.Panes[insertIndex] = sourcePane
+	reindexPanes(target.window)
+	target.window.splitLeaf(target.pane.ID, sourcePane.ID, orientation)
+	target.window.recalculateLayout()
+	if !detached {
+		setActivePaneByID(target.window, sourcePane.ID)
+	}
+
+	if len(source.window.Panes) == 0 {
+		removeWindowLocked(source.session, source.window)
+	} else {
+		source.window.recalculateLayout()
+		source.window.Activity = time.Now()
+	}
+	if !detached {
+		setActiveWindowByID(target.session, target.window.ID)
+	}
+	target.window.Activity = time.Now()
+	source.session.Activity = time.Now()
+	target.session.Activity = time.Now()
+	return target.session, target.window, sourcePane, nil
+}
+
 func (s *Server) killPaneAtLocked(session *Session, window *Window, paneIndex int) {
 	pane := window.Panes[paneIndex]
 	killPane(pane)
@@ -1701,6 +1764,40 @@ func clampedPaneIndex(window *Window, index int) int {
 	}
 	if index >= len(window.Panes) {
 		return len(window.Panes) - 1
+	}
+	return index
+}
+
+func setActiveWindowByID(session *Session, windowID int) bool {
+	for index, window := range session.Windows {
+		if window.ID == windowID {
+			session.Active = index
+			return true
+		}
+	}
+	return false
+}
+
+func removeWindowLocked(session *Session, window *Window) {
+	for index, candidate := range session.Windows {
+		if candidate.ID == window.ID {
+			session.Windows = append(session.Windows[:index], session.Windows[index+1:]...)
+			break
+		}
+	}
+	reindexWindows(session)
+	session.Active = clampedWindowIndex(session, session.Active)
+}
+
+func clampedWindowIndex(session *Session, index int) int {
+	if len(session.Windows) == 0 {
+		return 0
+	}
+	if index < 0 {
+		return 0
+	}
+	if index >= len(session.Windows) {
+		return len(session.Windows) - 1
 	}
 	return index
 }

@@ -161,6 +161,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdRotateWindow(args, currentSession)
 	case "break-pane":
 		return rt.cmdBreakPane(args, currentSession)
+	case "join-pane", "move-pane":
+		return rt.cmdJoinPane(args, currentSession)
 	case "kill-pane":
 		pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
 		if pane == nil {
@@ -526,6 +528,37 @@ func (rt *Runtime) cmdBreakPane(args []string, currentSession string) protocol.M
 		text = formatString(template, formatContext{session: session, window: window, pane: pane})
 	}
 	return ok(text)
+}
+
+func (rt *Runtime) cmdJoinPane(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	source := rt.targetPane(optionValue(args, "-s", ""), currentSession)
+	if source == nil {
+		return fail("can't find pane")
+	}
+	target := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if target == nil {
+		return fail("can't find pane")
+	}
+	sourceWindowPanes := rt.state.WindowPanesContainingPane(source.ID)
+	orientation := "vertical"
+	if hasAny(args, "-h") {
+		orientation = "horizontal"
+	}
+	_, _, pane, err := rt.state.JoinPaneByID(source.ID, target.ID, orientation, hasAny(args, "-d"))
+	if err != nil {
+		return fail(err.Error())
+	}
+	for _, oldPane := range sourceWindowPanes {
+		if oldPane.ID != pane.ID {
+			rt.resizePanes(rt.state.WindowPanesContainingPane(oldPane.ID))
+			break
+		}
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	return ok("")
 }
 
 func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
@@ -989,6 +1022,10 @@ func normalizeCommandName(name string) string {
 		return "rotate-window"
 	case "breakp":
 		return "break-pane"
+	case "joinp":
+		return "join-pane"
+	case "movep":
+		return "move-pane"
 	case "capturep":
 		return "capture-pane"
 	case "clearhist":
@@ -1038,7 +1075,7 @@ func normalizeCommandName(name string) string {
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
-		"swap-pane", "rotate-window", "break-pane",
+		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
 		return name

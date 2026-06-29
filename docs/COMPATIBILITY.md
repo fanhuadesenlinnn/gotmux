@@ -23,7 +23,7 @@ manual verification note.
 | Basic options | Implemented for string-backed `set-option`, `set-window-option`, and `show-options` |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
-| Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, targeted `resize-pane -t`, targeted `select-layout -t` built-in layouts, basic next/previous layout cycling, basic same-window `swap-pane`, basic `rotate-window`, and basic `break-pane` in the tested subset |
+| Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, targeted `resize-pane -t`, targeted `select-layout -t` built-in layouts, basic next/previous layout cycling, basic same-window `swap-pane`, basic `rotate-window`, basic `break-pane`, and basic `join-pane`/`move-pane` in the tested subset |
 | Basic terminal screen grid | Implemented for common printable output, cursor movement, clear line/screen, insertion/deletion, scrolling, and alternate-screen escape sequences |
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |
 | Basic `capture-pane` | Implemented for `-p`, visible screen lines, simple `-S`/`-E` ranges, simple pane targets in the probe subset, basic `-N`/`-T` whitespace handling, basic `-J` wrapped-line joining, visible-line `-F`/`-L` prefixes, and basic `-C` visible text escaping |

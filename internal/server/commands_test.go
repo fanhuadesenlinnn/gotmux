@@ -718,6 +718,34 @@ func TestBreakPaneCommand(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "breakcmd"}, "breakcmd", 80, 24)
 }
 
+func TestJoinPaneCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, firstWindow, _, err := rt.state.NewSession("joincmd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, _, err := rt.state.NewWindow(session.Name, "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	firstWindow.Width = 80
+	firstWindow.Height = 24
+
+	msg := rt.execute([]string{"join-pane", "-s", "joincmd:1.0", "-t", "joincmd:0.0", "-h"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("join-pane failed: %s", msg.Text)
+	}
+	windows := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_name}:#{window_active}:#{window_panes}")
+	if windows != "0:first:1:2" {
+		t.Fatalf("windows after join-pane = %q", windows)
+	}
+	panes := listPanesFormat(rt.state, session.Name, "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_width}:#{pane_active}")
+	if panes != "0:%0:0:40:0\n1:%1:41:39:1" {
+		t.Fatalf("panes after join-pane = %q", panes)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "joincmd"}, "joincmd", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})

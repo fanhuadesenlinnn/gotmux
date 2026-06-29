@@ -435,6 +435,38 @@ func TestBreakPaneByIDDetachedKeepsActiveWindow(t *testing.T) {
 	}
 }
 
+func TestJoinPaneByIDMovesPaneIntoTargetWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, firstPane, err := state.NewSession("join", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	_, secondPane, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstWindow.Width = 80
+	firstWindow.Height = 24
+
+	if _, joinedWindow, moved, err := state.JoinPaneByID(secondPane.ID, firstPane.ID, "horizontal", false); err != nil {
+		t.Fatal(err)
+	} else if joinedWindow.ID != firstWindow.ID || moved.ID != secondPane.ID {
+		t.Fatalf("joined window/pane = %d/%d, want %d/%d", joinedWindow.ID, moved.ID, firstWindow.ID, secondPane.ID)
+	}
+	if len(session.Windows) != 1 || session.Active != 0 {
+		t.Fatalf("windows after join = %d active %d, want 1 active 0", len(session.Windows), session.Active)
+	}
+	assertPaneIDs(t, firstWindow.Panes, []int{firstPane.ID, secondPane.ID})
+	if firstWindow.Active != 1 {
+		t.Fatalf("active pane after join = %d, want 1", firstWindow.Active)
+	}
+	assertPaneGeometries(t, firstWindow.Panes, []paneGeometry{
+		{0, 0, 40, 24},
+		{41, 0, 39, 24},
+	})
+}
+
 func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
 	t.Helper()
 	if len(got) != len(want) {
