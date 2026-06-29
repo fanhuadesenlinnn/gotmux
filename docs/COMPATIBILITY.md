@@ -15,7 +15,7 @@ manual verification note.
 | Attach/detach | Implemented |
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-pane -t`, `kill-pane -t`, `kill-window -t`, and `rename-window -t` |
 | Common `C-b` prefix bindings | Implemented |
-| Basic format expansion for `list-*` and `display-message` | Implemented for the fields covered by `scripts/compat_probe.sh` |
+| Basic format expansion for `list-*` and `display-message` | Implemented for the fields and basic `list-panes -t session:window` targets covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |

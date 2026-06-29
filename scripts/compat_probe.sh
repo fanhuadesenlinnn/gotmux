@@ -283,7 +283,7 @@ compare "rotate-window reverse panes" list-panes -t rotatew -F "#{pane_index}:#{
 "${gotmux_cmd[@]}" new-window -t joinp -n second /bin/sh >/dev/null
 compare "join-pane command" join-pane -s joinp:1.0 -t joinp:0.0 -h
 compare "join-pane windows" list-windows -t joinp -F "#{window_index}:#{window_name}:#{window_active}:#{window_panes}"
-compare "join-pane panes" list-panes -t joinp -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "join-pane panes" list-panes -t joinp:0 -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
 "${tmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t killp -h /bin/sh

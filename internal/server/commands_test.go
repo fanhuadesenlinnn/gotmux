@@ -743,6 +743,10 @@ func TestJoinPaneCommand(t *testing.T) {
 	if panes != "0:%0:0:40:0\n1:%1:41:39:1" {
 		t.Fatalf("panes after join-pane = %q", panes)
 	}
+	targeted := rt.execute([]string{"list-panes", "-t", "joincmd:0", "-F", "#{pane_index}:#{pane_id}"}, session.Name, 80, 24)
+	if targeted.Text != "0:%0\n1:%1" {
+		t.Fatalf("targeted list-panes = %q", targeted.Text)
+	}
 	_ = rt.execute([]string{"kill-session", "-t", "joincmd"}, "joincmd", 80, 24)
 }
 

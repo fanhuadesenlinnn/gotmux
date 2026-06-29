@@ -1268,11 +1268,27 @@ func listPanesFormat(state *model.Server, sessionName string, format string) str
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
 	}
+	targetSessionName, targetWindowIndex, _, hasWindow, _ := parsePaneTarget(sessionName)
+	if targetSessionName != "" || hasWindow {
+		sessionName = targetSessionName
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(state)
+	}
 	for _, session := range snapshotSessions(state) {
 		if session.Name != sessionName {
 			continue
 		}
 		window := session.ActiveWindow()
+		if hasWindow {
+			window = nil
+			for _, candidate := range session.Windows {
+				if candidate.Index == targetWindowIndex {
+					window = candidate
+					break
+				}
+			}
+		}
 		if window == nil {
 			return ""
 		}
