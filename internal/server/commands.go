@@ -306,27 +306,33 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 }
 
 func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, height int) protocol.Message {
-	if target := targetSession(args, currentSession); target != "" {
-		currentSession = target
-	}
-	if currentSession == "" {
-		currentSession = firstSessionName(rt.state)
+	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
 	}
 	cwd := optionValue(args, "-c", "")
 	command := trailingCommand(args, map[string]bool{"-c": true, "-t": true, "-l": true, "-p": true})
-	rt.state.SetActiveWindowSize(currentSession, width, height)
+	if !hasWindow {
+		rt.state.SetActiveWindowSize(sessionName, width, height)
+	}
 	orientation := "vertical"
 	if hasAny(args, "-h") {
 		orientation = "horizontal"
 	}
-	pane, err := rt.state.SplitPaneWithLayout(currentSession, cwd, command, orientation)
+	var pane *model.Pane
+	var err error
+	if hasWindow {
+		pane, err = rt.state.SplitPaneWithLayoutByIndex(sessionName, windowIndex, cwd, command, orientation)
+	} else {
+		pane, err = rt.state.SplitPaneWithLayout(sessionName, cwd, command, orientation)
+	}
 	if err != nil {
 		return fail(err.Error())
 	}
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
-	rt.resizeSessionPanes(currentSession)
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
 	return ok(fmt.Sprintf("pane %d", pane.Index))
 }
 
@@ -374,10 +380,22 @@ func (rt *Runtime) cmdSelectLayout(args []string, currentSession string) protoco
 	}
 	switch layout {
 	case "even-horizontal", "even-vertical":
-		if err := rt.state.SelectEvenLayout(currentSession, layout); err != nil {
+		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+		if !found {
+			return fail("can't find window")
+		}
+		var err error
+		if hasWindow {
+			err = rt.state.SelectEvenLayoutByIndex(sessionName, windowIndex, layout)
+		} else {
+			err = rt.state.SelectEvenLayout(sessionName, layout)
+		}
+		if err != nil {
 			return fail(err.Error())
 		}
-		rt.resizeSessionPanes(currentSession)
+		if len(paneIDs) > 0 {
+			rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
+		}
 		return ok("")
 	default:
 		return fail(fmt.Sprintf("unsupported layout: %s", layout))

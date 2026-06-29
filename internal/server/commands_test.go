@@ -123,6 +123,25 @@ func TestNewWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestSplitWindowHonorsTargetWindow(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "split", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "split", "-n", "second", "/bin/sh"}, "split", 80, 24); !msg.OK {
+		t.Fatalf("new-window failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"split-window", "-t", "split:0", "-h", "/bin/sh"}, "split", 80, 24)
+	if !msg.OK {
+		t.Fatalf("split-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "split", "-F", "#{window_index}:#{window_active}:#{window_panes}"}, "split", 80, 24)
+	if windows.Text != "0:0:2\n1:1:1" {
+		t.Fatalf("windows after targeted split = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "split"}, "split", 80, 24)
+}
+
 func TestRenameWindowHonorsTargetWindow(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "ren", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
@@ -499,6 +518,36 @@ func TestResizePaneTargetsPane(t *testing.T) {
 		t.Fatalf("screen for resized pane width = %d, want 45", len(lines[0]))
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "resize"}, "resize", 80, 24)
+}
+
+func TestSelectLayoutTargetsWindow(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("layoutt", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := rt.state.NewWindow(session.Name, "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"select-layout", "-t", "layoutt:0", "even-vertical"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-layout failed: %s", msg.Text)
+	}
+	windows := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_active}")
+	if windows != "0:0\n1:1" {
+		t.Fatalf("windows after targeted layout = %q", windows)
+	}
+	sessions := snapshotSessions(rt.state)
+	firstWindow := sessions[0].Windows[0]
+	if firstWindow.Panes[0].Height != 12 || firstWindow.Panes[1].Top != 13 || firstWindow.Panes[1].Height != 11 {
+		t.Fatalf("target layout pane geometry = %d,%d,%d",
+			firstWindow.Panes[0].Height, firstWindow.Panes[1].Top, firstWindow.Panes[1].Height)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "layoutt"}, "layoutt", 80, 24)
 }
 
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {

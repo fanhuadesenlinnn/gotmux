@@ -207,6 +207,19 @@ compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane
 "${gotmux_cmd[@]}" select-layout -t layselect even-horizontal >/dev/null
 compare "select-layout even-horizontal geometry" list-panes -t layselect -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s layselecttarget -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layselecttarget:0 -h /bin/sh
+"${tmux_cmd[@]}" new-window -t layselecttarget -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s layselecttarget -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layselecttarget:0 -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t layselecttarget -n second /bin/sh >/dev/null
+compare "split-window target windows" list-windows -t layselecttarget -F "#{window_index}:#{window_active}:#{window_panes}"
+compare "select-layout target command" select-layout -t layselecttarget:0 even-vertical
+compare "select-layout target keeps active window" list-windows -t layselecttarget -F "#{window_index}:#{window_active}"
+"${tmux_cmd[@]}" select-window -t layselecttarget:0
+"${gotmux_cmd[@]}" select-window -t layselecttarget:0 >/dev/null
+compare "select-layout target geometry" list-panes -t layselecttarget -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s selp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t selp -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s selp -x 80 -y 24 -n first /bin/sh >/dev/null

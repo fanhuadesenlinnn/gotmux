@@ -259,6 +259,26 @@ func (s *Server) SplitPaneWithLayout(sessionName, cwd string, command []string, 
 	if window == nil {
 		return nil, fmt.Errorf("session has no windows: %s", sessionName)
 	}
+	return s.splitPaneInWindowLocked(session, window, cwd, command, orientation), nil
+}
+
+func (s *Server) SplitPaneWithLayoutByIndex(sessionName string, windowIndex int, cwd string, command []string, orientation string) (*Pane, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil, fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			return s.splitPaneInWindowLocked(session, window, cwd, command, orientation), nil
+		}
+	}
+	return nil, fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func (s *Server) splitPaneInWindowLocked(session *Session, window *Window, cwd string, command []string, orientation string) *Pane {
 	if cwd == "" {
 		cwd = session.CWD
 	}
@@ -271,7 +291,7 @@ func (s *Server) SplitPaneWithLayout(sessionName, cwd string, command []string, 
 	window.recalculateLayout()
 	window.Activity = time.Now()
 	session.Activity = time.Now()
-	return pane, nil
+	return pane
 }
 
 func (s *Server) KillSession(name string) error {
@@ -645,13 +665,35 @@ func (s *Server) SelectEvenLayout(sessionName, layout string) error {
 	if window == nil {
 		return fmt.Errorf("session has no active window")
 	}
+	applyEvenLayout(window, layout)
+	return nil
+}
+
+func (s *Server) SelectEvenLayoutByIndex(sessionName string, windowIndex int, layout string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			applyEvenLayout(window, layout)
+			return nil
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func applyEvenLayout(window *Window, layout string) {
 	if len(window.Panes) == 0 {
-		return nil
+		return
 	}
 	if len(window.Panes) == 1 {
 		window.Layout = &LayoutNode{PaneID: window.Panes[0].ID}
 		window.recalculateLayout()
-		return nil
+		return
 	}
 	orientation := "horizontal"
 	if layout == "even-vertical" {
@@ -663,7 +705,6 @@ func (s *Server) SelectEvenLayout(sessionName, layout string) error {
 	}
 	window.Layout = root
 	window.recalculateLayout()
-	return nil
 }
 
 func (s *Server) AttachClient(sessionName string, width, height int) (*Client, *Session, error) {

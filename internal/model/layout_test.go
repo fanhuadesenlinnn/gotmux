@@ -129,3 +129,57 @@ func TestKillWindowRemovesTargetWindow(t *testing.T) {
 		t.Fatalf("active window after kill = %d, want 0", session.Active)
 	}
 }
+
+func TestSelectEvenLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, _, err := state.NewSession("layouts", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 1 {
+		t.Fatalf("active window before layout = %d, want 1", session.Active)
+	}
+	if err := state.SelectEvenLayoutByIndex(session.Name, 0, "even-vertical"); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 1 {
+		t.Fatalf("active window after layout = %d, want 1", session.Active)
+	}
+	first := session.Windows[0].Panes
+	if first[0].Height != 12 || first[1].Top != 13 || first[1].Height != 11 {
+		t.Fatalf("target window vertical geometry = pane0 %dx%d at %d,%d pane1 %dx%d at %d,%d",
+			first[0].Width, first[0].Height, first[0].Left, first[0].Top,
+			first[1].Width, first[1].Height, first[1].Left, first[1].Top)
+	}
+}
+
+func TestSplitPaneWithLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("splits", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 1 {
+		t.Fatalf("active window before split = %d, want 1", session.Active)
+	}
+	pane, err := state.SplitPaneWithLayoutByIndex(session.Name, firstWindow.Index, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 1 {
+		t.Fatalf("active window after split = %d, want 1", session.Active)
+	}
+	if len(firstWindow.Panes) != 2 || firstWindow.Active != pane.Index {
+		t.Fatalf("target window panes = %d active %d, want new pane active", len(firstWindow.Panes), firstWindow.Active)
+	}
+}
