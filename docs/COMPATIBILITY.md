@@ -13,7 +13,7 @@ manual verification note.
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
 | Attach/detach | Implemented |
-| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -l`, `last-window`, `select-pane -t`, `kill-pane -t`, `kill-window -t`, `rename-window -t`, explicit-target `swap-window`, and basic `move-window`/renumber |
+| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -l`, `last-window`, `select-pane -t`, `kill-pane -t`, `kill-window -t`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, and basic `move-window`/renumber |
 | Common `C-b` prefix bindings | Implemented |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-panes -t session:window`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |

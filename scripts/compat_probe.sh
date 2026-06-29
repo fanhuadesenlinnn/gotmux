@@ -336,6 +336,19 @@ compare "rename-window target windows" list-windows -t renamew -F "#{window_inde
 compare "select-window target command" select-window -t selectw:0
 compare "select-window target windows" list-windows -t selectw -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s newwd -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s newwd -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "new-window detached command" new-window -d -t newwd -n second /bin/sh
+compare "new-window detached windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
+compare "new-window print command" new-window -P -F "#{window_index}:#{window_name}" -t newwd -n third /bin/sh
+compare "new-window print windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s splitd -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s splitd -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "split-window detached command" split-window -d -h -t splitd /bin/sh
+compare "split-window detached panes" list-panes -t splitd -F "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_active}"
+compare "split-window print command" split-window -P -F "#{pane_index}:#{pane_active}" -t splitd /bin/sh
+
 "${tmux_cmd[@]}" new-session -d -s lastw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t lastw -n second /bin/sh
 "${tmux_cmd[@]}" new-window -t lastw -n third /bin/sh

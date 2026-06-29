@@ -202,6 +202,49 @@ func TestSelectWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestNewWindowDetachedAndPrint(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "newwd", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"new-window", "-d", "-t", "newwd", "-n", "second", "/bin/sh"}, "newwd", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("new-window -d = %#v, want empty success", msg)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "newwd", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "newwd", 80, 24)
+	if windows.Text != "0:first:1\n1:second:0" {
+		t.Fatalf("windows after new-window -d = %q", windows.Text)
+	}
+	if msg := rt.execute([]string{"last-window", "-t", "newwd"}, "newwd", 80, 24); msg.OK {
+		t.Fatal("last-window unexpectedly succeeded after detached new-window")
+	}
+	msg = rt.execute([]string{"new-window", "-P", "-F", "#{window_index}:#{window_name}", "-t", "newwd", "-n", "third", "/bin/sh"}, "newwd", 80, 24)
+	if !msg.OK || msg.Text != "2:third" {
+		t.Fatalf("new-window -P output = %#v, want 2:third", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "newwd"}, "newwd", 80, 24)
+}
+
+func TestSplitWindowDetachedAndPrint(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "splitd", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"split-window", "-d", "-h", "-t", "splitd", "/bin/sh"}, "splitd", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("split-window -d = %#v, want empty success", msg)
+	}
+	panes := rt.execute([]string{"list-panes", "-t", "splitd", "-F", "#{pane_index}:#{pane_left}:#{pane_width}:#{pane_active}"}, "splitd", 80, 24)
+	if panes.Text != "0:0:40:1\n1:41:39:0" {
+		t.Fatalf("panes after split-window -d = %q", panes.Text)
+	}
+	msg = rt.execute([]string{"split-window", "-P", "-F", "#{pane_index}:#{pane_active}", "-t", "splitd", "/bin/sh"}, "splitd", 80, 24)
+	if !msg.OK || msg.Text != "1:1" {
+		t.Fatalf("split-window -P output = %#v, want 1:1", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "splitd"}, "splitd", 80, 24)
+}
+
 func TestLastWindowCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "lastw", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

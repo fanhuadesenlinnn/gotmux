@@ -334,8 +334,8 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 	}
 	name := optionValue(args, "-n", "")
 	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-n": true, "-c": true, "-t": true})
-	window, pane, err := rt.state.NewWindow(currentSession, name, cwd, command)
+	command := trailingCommand(args, map[string]bool{"-n": true, "-c": true, "-F": true, "-t": true})
+	_, pane, err := rt.state.NewWindowDetached(currentSession, name, cwd, command, hasAny(args, "-d"))
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -343,7 +343,11 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
-	return ok(fmt.Sprintf("%d:%s", window.Index, window.Name))
+	if hasAny(args, "-P") {
+		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
+	}
+	return ok("")
 }
 
 func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, height int) protocol.Message {
@@ -352,7 +356,7 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 		return fail("can't find window")
 	}
 	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-c": true, "-t": true, "-l": true, "-p": true})
+	command := trailingCommand(args, map[string]bool{"-c": true, "-F": true, "-t": true, "-l": true, "-p": true})
 	if !hasWindow {
 		rt.state.SetActiveWindowSize(sessionName, width, height)
 	}
@@ -363,9 +367,9 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 	var pane *model.Pane
 	var err error
 	if hasWindow {
-		pane, err = rt.state.SplitPaneWithLayoutByIndex(sessionName, windowIndex, cwd, command, orientation)
+		pane, err = rt.state.SplitPaneWithLayoutByIndexDetached(sessionName, windowIndex, cwd, command, orientation, hasAny(args, "-d"))
 	} else {
-		pane, err = rt.state.SplitPaneWithLayout(sessionName, cwd, command, orientation)
+		pane, err = rt.state.SplitPaneWithLayoutDetached(sessionName, cwd, command, orientation, hasAny(args, "-d"))
 	}
 	if err != nil {
 		return fail(err.Error())
@@ -374,7 +378,11 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
-	return ok(fmt.Sprintf("pane %d", pane.Index))
+	if hasAny(args, "-P") {
+		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
+	}
+	return ok("")
 }
 
 func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.Message {
@@ -1343,7 +1351,8 @@ func listWindowsFormat(state *model.Server, sessionName string, format string) s
 				lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: window.ActivePane()}))
 			} else {
 				mark := ""
-				if window.Index == session.Active {
+				active := session.ActiveWindow()
+				if active != nil && active.ID == window.ID {
 					mark = "*"
 				}
 				lines = append(lines, fmt.Sprintf("%d: %s%s (%d panes)", window.Index, window.Name, mark, len(window.Panes)))

@@ -194,6 +194,65 @@ func TestMoveWindowToSparseIndexAndRenumber(t *testing.T) {
 	}
 }
 
+func TestNewWindowDetachedDoesNotSelectOrSetLastWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("newwd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindowDetached(session.Name, "second", "", []string{"/bin/sh"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.ActiveWindow().ID != firstWindow.ID {
+		t.Fatalf("active window after detached new-window = %d, want %d", session.ActiveWindow().ID, firstWindow.ID)
+	}
+	if session.LastWindowID != -1 {
+		t.Fatalf("last window after detached new-window = %d, want unset", session.LastWindowID)
+	}
+	if secondWindow.Index != 1 {
+		t.Fatalf("detached window index = %d, want 1", secondWindow.Index)
+	}
+	if err := state.SelectLastWindow(session.Name); err == nil {
+		t.Fatal("SelectLastWindow unexpectedly succeeded after detached new-window")
+	}
+}
+
+func TestSplitPaneDetachedKeepsActivePane(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, window, firstPane, err := state.NewSession("splitd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	secondPane, err := state.SplitPaneWithLayoutDetached(session.Name, "", []string{"/bin/sh"}, "horizontal", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if window.ActivePane().ID != firstPane.ID {
+		t.Fatalf("active pane after detached split = %d, want %d", window.ActivePane().ID, firstPane.ID)
+	}
+	if secondPane.Index != 1 {
+		t.Fatalf("detached pane index = %d, want 1", secondPane.Index)
+	}
+	got := state.ActiveWindowPanes(session.Name)
+	if got[0].Width != 40 || got[1].Left != 41 || got[1].Width != 39 {
+		t.Fatalf("detached split geometry = pane0 %dx%d at %d,%d pane1 %dx%d at %d,%d",
+			got[0].Width, got[0].Height, got[0].Left, got[0].Top,
+			got[1].Width, got[1].Height, got[1].Left, got[1].Top)
+	}
+	thirdPane, err := state.SplitPaneWithLayoutDetached(session.Name, "", []string{"/bin/sh"}, "vertical", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thirdPane.Index != 1 || secondPane.Index != 2 {
+		t.Fatalf("pane indexes after split active pane = new %d old %d, want new 1 old 2", thirdPane.Index, secondPane.Index)
+	}
+	if window.ActivePane().ID != thirdPane.ID {
+		t.Fatalf("active pane after non-detached split = %d, want %d", window.ActivePane().ID, thirdPane.ID)
+	}
+}
+
 func TestSelectLastWindowTogglesPreviousWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, firstWindow, _, err := state.NewSession("lastw", "", "first", []string{"/bin/sh"})

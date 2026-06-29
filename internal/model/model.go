@@ -236,6 +236,10 @@ func (s *Server) NewSession(name, cwd string, windowName string, command []strin
 }
 
 func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Window, *Pane, error) {
+	return s.NewWindowDetached(sessionName, name, cwd, command, false)
+}
+
+func (s *Server) NewWindowDetached(sessionName, name, cwd string, command []string, detached bool) (*Window, *Pane, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -246,12 +250,14 @@ func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Wi
 	if cwd == "" {
 		cwd = session.CWD
 	}
-	if active := session.ActiveWindow(); active != nil {
+	if active := session.ActiveWindow(); active != nil && !detached {
 		session.LastWindowID = active.ID
 	}
 	window := s.newWindowLocked(session, defaultWindowName(name, command))
 	pane := s.newPaneLocked(session, window, cwd, command)
-	session.Active = len(session.Windows) - 1
+	if !detached || session.ActiveWindow() == nil {
+		session.Active = len(session.Windows) - 1
+	}
 	session.Activity = time.Now()
 	return window, pane, nil
 }
@@ -261,6 +267,10 @@ func (s *Server) SplitPane(sessionName, cwd string, command []string) (*Pane, er
 }
 
 func (s *Server) SplitPaneWithLayout(sessionName, cwd string, command []string, orientation string) (*Pane, error) {
+	return s.SplitPaneWithLayoutDetached(sessionName, cwd, command, orientation, false)
+}
+
+func (s *Server) SplitPaneWithLayoutDetached(sessionName, cwd string, command []string, orientation string, detached bool) (*Pane, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -272,10 +282,14 @@ func (s *Server) SplitPaneWithLayout(sessionName, cwd string, command []string, 
 	if window == nil {
 		return nil, fmt.Errorf("session has no windows: %s", sessionName)
 	}
-	return s.splitPaneInWindowLocked(session, window, cwd, command, orientation), nil
+	return s.splitPaneInWindowLocked(session, window, cwd, command, orientation, detached), nil
 }
 
 func (s *Server) SplitPaneWithLayoutByIndex(sessionName string, windowIndex int, cwd string, command []string, orientation string) (*Pane, error) {
+	return s.SplitPaneWithLayoutByIndexDetached(sessionName, windowIndex, cwd, command, orientation, false)
+}
+
+func (s *Server) SplitPaneWithLayoutByIndexDetached(sessionName string, windowIndex int, cwd string, command []string, orientation string, detached bool) (*Pane, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -285,22 +299,37 @@ func (s *Server) SplitPaneWithLayoutByIndex(sessionName string, windowIndex int,
 	}
 	for _, window := range session.Windows {
 		if window.Index == windowIndex {
-			return s.splitPaneInWindowLocked(session, window, cwd, command, orientation), nil
+			return s.splitPaneInWindowLocked(session, window, cwd, command, orientation, detached), nil
 		}
 	}
 	return nil, fmt.Errorf("can't find window: %d", windowIndex)
 }
 
-func (s *Server) splitPaneInWindowLocked(session *Session, window *Window, cwd string, command []string, orientation string) *Pane {
+func (s *Server) splitPaneInWindowLocked(session *Session, window *Window, cwd string, command []string, orientation string, detached bool) *Pane {
 	if cwd == "" {
 		cwd = session.CWD
 	}
 	active := window.ActivePane()
+	activeID := -1
+	activeIndex := window.Active
+	if active != nil {
+		activeID = active.ID
+	}
 	pane := s.newPaneLocked(session, window, cwd, command)
+	if active != nil && activeIndex >= 0 && activeIndex < len(window.Panes)-1 {
+		last := len(window.Panes) - 1
+		copy(window.Panes[activeIndex+2:], window.Panes[activeIndex+1:last])
+		window.Panes[activeIndex+1] = pane
+		reindexPanes(window)
+	}
 	if active != nil && active.ID != pane.ID {
 		window.splitLeaf(active.ID, pane.ID, orientation)
 	}
-	window.Active = len(window.Panes) - 1
+	if detached && activeID != -1 {
+		setActivePaneByID(window, activeID)
+	} else {
+		setActivePaneByID(window, pane.ID)
+	}
 	window.recalculateLayout()
 	window.Activity = time.Now()
 	session.Activity = time.Now()
