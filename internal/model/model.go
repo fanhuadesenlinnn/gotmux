@@ -47,17 +47,18 @@ type Session struct {
 }
 
 type Window struct {
-	ID        int
-	Index     int
-	Name      string
-	CreatedAt time.Time
-	Activity  time.Time
-	Panes     []*Pane
-	Active    int
-	Width     int
-	Height    int
-	Layout    *LayoutNode
-	Options   map[string]string
+	ID         int
+	Index      int
+	Name       string
+	CreatedAt  time.Time
+	Activity   time.Time
+	Panes      []*Pane
+	Active     int
+	Width      int
+	Height     int
+	Layout     *LayoutNode
+	LastLayout string
+	Options    map[string]string
 }
 
 type Pane struct {
@@ -701,6 +702,90 @@ func (s *Server) SelectLayoutByIndex(sessionName string, windowIndex int, layout
 	return fmt.Errorf("can't find window: %d", windowIndex)
 }
 
+func (s *Server) SelectLastLayout(sessionName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return fmt.Errorf("session has no active window")
+	}
+	if window.LastLayout == "" {
+		return nil
+	}
+	return s.applyBuiltinLayoutLocked(window, window.LastLayout)
+}
+
+func (s *Server) SelectLastLayoutByIndex(sessionName string, windowIndex int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			if window.LastLayout == "" {
+				return nil
+			}
+			return s.applyBuiltinLayoutLocked(window, window.LastLayout)
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func (s *Server) SelectNextLayout(sessionName string) error {
+	return s.selectRelativeLayout(sessionName, 1)
+}
+
+func (s *Server) SelectPreviousLayout(sessionName string) error {
+	return s.selectRelativeLayout(sessionName, -1)
+}
+
+func (s *Server) SelectNextLayoutByIndex(sessionName string, windowIndex int) error {
+	return s.selectRelativeLayoutByIndex(sessionName, windowIndex, 1)
+}
+
+func (s *Server) SelectPreviousLayoutByIndex(sessionName string, windowIndex int) error {
+	return s.selectRelativeLayoutByIndex(sessionName, windowIndex, -1)
+}
+
+func (s *Server) selectRelativeLayout(sessionName string, delta int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if window == nil {
+		return fmt.Errorf("session has no active window")
+	}
+	return s.applyBuiltinLayoutLocked(window, relativeLayoutName(window.LastLayout, delta))
+}
+
+func (s *Server) selectRelativeLayoutByIndex(sessionName string, windowIndex int, delta int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	for _, window := range session.Windows {
+		if window.Index == windowIndex {
+			return s.applyBuiltinLayoutLocked(window, relativeLayoutName(window.LastLayout, delta))
+		}
+	}
+	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
 var builtinLayouts = []string{
 	"even-horizontal",
 	"even-vertical",
@@ -727,6 +812,33 @@ func ResolveLayoutName(name string) (string, bool) {
 		}
 	}
 	return matched, matched != ""
+}
+
+func builtinLayoutIndex(name string) int {
+	for i, layout := range builtinLayouts {
+		if name == layout {
+			return i
+		}
+	}
+	return -1
+}
+
+func relativeLayoutName(current string, delta int) string {
+	index := builtinLayoutIndex(current)
+	if index == -1 {
+		if delta < 0 {
+			return builtinLayouts[len(builtinLayouts)-1]
+		}
+		return builtinLayouts[0]
+	}
+	index += delta
+	if index < 0 {
+		index = len(builtinLayouts) - 1
+	}
+	if index >= len(builtinLayouts) {
+		index = 0
+	}
+	return builtinLayouts[index]
 }
 
 func (s *Server) applyBuiltinLayoutLocked(window *Window, layout string) error {
@@ -758,6 +870,7 @@ func (s *Server) applyBuiltinLayoutLocked(window *Window, layout string) error {
 	case "tiled":
 		applyTiledLayout(window, option)
 	}
+	window.LastLayout = layout
 	return nil
 }
 

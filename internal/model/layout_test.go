@@ -241,6 +241,45 @@ func TestSelectBuiltinLayoutsMatchTmuxGeometry(t *testing.T) {
 	}
 }
 
+func TestSelectRelativeLayoutsMatchTmuxOrder(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, _, err := state.NewSession("layout-cycle", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := state.SelectPreviousLayout(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), []paneGeometry{
+		{0, 0, 80, 11},
+		{0, 12, 80, 12},
+	})
+
+	if err := state.SelectNextLayout(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), []paneGeometry{
+		{0, 0, 40, 24},
+		{41, 0, 39, 24},
+	})
+
+	if err := state.SelectLayout(session.Name, "main-horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SelectNextLayout(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), []paneGeometry{
+		{0, 2, 80, 22},
+		{0, 0, 80, 1},
+	})
+}
+
 func TestSplitPaneWithLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, firstWindow, _, err := state.NewSession("splits", "", "first", []string{"/bin/sh"})

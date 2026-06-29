@@ -578,6 +578,49 @@ func TestSelectLayoutSupportsBuiltinPrefix(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "layoutprefix"}, "layoutprefix", 80, 24)
 }
 
+func TestLayoutCycleCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("layoutcycle", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := rt.execute([]string{"select-layout"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-layout no-arg failed: %s", msg.Text)
+	}
+	assertPanesFormat(t, rt, session.Name, "0:0:0:40:24\n1:41:0:39:24")
+
+	msg = rt.execute([]string{"previous-layout", "-t", session.Name}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("previous-layout failed: %s", msg.Text)
+	}
+	assertPanesFormat(t, rt, session.Name, "0:0:0:80:11\n1:0:12:80:12")
+
+	msg = rt.execute([]string{"next-layout", "-t", session.Name}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("next-layout failed: %s", msg.Text)
+	}
+	assertPanesFormat(t, rt, session.Name, "0:0:0:40:24\n1:41:0:39:24")
+
+	msg = rt.execute([]string{"select-layout", "-p"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-layout -p failed: %s", msg.Text)
+	}
+	assertPanesFormat(t, rt, session.Name, "0:0:0:80:11\n1:0:12:80:12")
+
+	msg = rt.execute([]string{"select-layout", "-n"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-layout -n failed: %s", msg.Text)
+	}
+	assertPanesFormat(t, rt, session.Name, "0:0:0:40:24\n1:41:0:39:24")
+	_ = rt.execute([]string{"kill-session", "-t", "layoutcycle"}, "layoutcycle", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})
@@ -606,4 +649,12 @@ func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 		t.Fatalf("screen for remaining pane %d was removed", firstPane.ID)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "killw"}, "killw", 80, 24)
+}
+
+func assertPanesFormat(t *testing.T, rt *Runtime, sessionName string, want string) {
+	t.Helper()
+	got := listPanesFormat(rt.state, sessionName, "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}")
+	if got != want {
+		t.Fatalf("pane geometry = %q, want %q", got, want)
+	}
 }

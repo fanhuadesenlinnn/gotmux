@@ -220,6 +220,21 @@ for layout in main-horizontal main-horizontal-mirrored main-vertical main-vertic
   compare "select-layout ${layout} geometry" list-panes -t "${session}" -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 done
 
+"${tmux_cmd[@]}" new-session -d -s laycycle -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t laycycle -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s laycycle -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t laycycle -h /bin/sh >/dev/null
+compare "select-layout no-arg command" select-layout -t laycycle
+compare "select-layout no-arg geometry" list-panes -t laycycle -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "previous-layout command" previous-layout -t laycycle
+compare "previous-layout geometry" list-panes -t laycycle -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "next-layout command" next-layout -t laycycle
+compare "next-layout geometry" list-panes -t laycycle -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "select-layout previous flag command" select-layout -t laycycle -p
+compare "select-layout previous flag geometry" list-panes -t laycycle -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "select-layout next flag command" select-layout -t laycycle -n
+compare "select-layout next flag geometry" list-panes -t laycycle -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s layselecttarget -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layselecttarget:0 -h /bin/sh
 "${tmux_cmd[@]}" new-window -t layselecttarget -n second /bin/sh

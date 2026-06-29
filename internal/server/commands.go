@@ -149,6 +149,10 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok("")
 	case "resize-pane":
 		return rt.cmdResizePane(args, currentSession)
+	case "next-layout":
+		return rt.cmdApplyLayout(args, currentSession, "", "next")
+	case "previous-layout":
+		return rt.cmdApplyLayout(args, currentSession, "", "previous")
 	case "select-layout":
 		return rt.cmdSelectLayout(args, currentSession)
 	case "kill-pane":
@@ -370,37 +374,68 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 }
 
 func (rt *Runtime) cmdSelectLayout(args []string, currentSession string) protocol.Message {
+	mode := "last"
+	values := optionOperands(args)
+	layout := ""
+	if len(values) > 0 {
+		mode = "named"
+		layout = values[len(values)-1]
+	}
+	if hasAny(args, "-n") {
+		mode = "next"
+	}
+	if hasAny(args, "-p") {
+		mode = "previous"
+	}
+	resolvedLayout, supportedLayout := model.ResolveLayoutName(layout)
+	if mode == "named" && !supportedLayout {
+		return fail(fmt.Sprintf("unsupported layout: %s", layout))
+	}
+	return rt.cmdApplyLayout(args, currentSession, resolvedLayout, mode)
+}
+
+func (rt *Runtime) cmdApplyLayout(args []string, currentSession string, layout string, mode string) protocol.Message {
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
-	layout := "even-horizontal"
-	values := optionOperands(args)
-	if len(values) > 0 {
-		layout = values[len(values)-1]
+	sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
 	}
-	resolvedLayout, supportedLayout := model.ResolveLayoutName(layout)
-	switch {
-	case supportedLayout:
-		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
-		if !found {
-			return fail("can't find window")
-		}
-		var err error
+	var err error
+	switch mode {
+	case "named":
 		if hasWindow {
-			err = rt.state.SelectLayoutByIndex(sessionName, windowIndex, resolvedLayout)
+			err = rt.state.SelectLayoutByIndex(sessionName, windowIndex, layout)
 		} else {
-			err = rt.state.SelectLayout(sessionName, resolvedLayout)
+			err = rt.state.SelectLayout(sessionName, layout)
 		}
-		if err != nil {
-			return fail(err.Error())
+	case "next":
+		if hasWindow {
+			err = rt.state.SelectNextLayoutByIndex(sessionName, windowIndex)
+		} else {
+			err = rt.state.SelectNextLayout(sessionName)
 		}
-		if len(paneIDs) > 0 {
-			rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
+	case "previous":
+		if hasWindow {
+			err = rt.state.SelectPreviousLayoutByIndex(sessionName, windowIndex)
+		} else {
+			err = rt.state.SelectPreviousLayout(sessionName)
 		}
-		return ok("")
 	default:
-		return fail(fmt.Sprintf("unsupported layout: %s", layout))
+		if hasWindow {
+			err = rt.state.SelectLastLayoutByIndex(sessionName, windowIndex)
+		} else {
+			err = rt.state.SelectLastLayout(sessionName)
+		}
 	}
+	if err != nil {
+		return fail(err.Error())
+	}
+	if len(paneIDs) > 0 {
+		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
+	}
+	return ok("")
 }
 
 func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
@@ -854,6 +889,10 @@ func normalizeCommandName(name string) string {
 		return "previous-window"
 	case "selectp":
 		return "select-pane"
+	case "nextl":
+		return "next-layout"
+	case "prevl":
+		return "previous-layout"
 	case "capturep":
 		return "capture-pane"
 	case "clearhist":
@@ -902,7 +941,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "select-layout",
+		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
 		return name
