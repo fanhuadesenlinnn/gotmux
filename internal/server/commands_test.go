@@ -75,6 +75,21 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	}
 }
 
+func TestDisplayMessageTargetsPane(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayt", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"split-window", "-t", "displayt", "-h", "/bin/sh"}, "displayt", 80, 24); !msg.OK {
+		t.Fatalf("split-window failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"display-message", "-p", "-t", "displayt:.0", "-F", "#{pane_index}:#{pane_active}"}, "displayt", 80, 24)
+	if msg.Text != "0:0" {
+		t.Fatalf("targeted display-message = %q", msg.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "displayt"}, "displayt", 80, 24)
+}
+
 func TestSourceFile(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "src", "-n", "first", "/bin/sh"}, "", 80, 24)

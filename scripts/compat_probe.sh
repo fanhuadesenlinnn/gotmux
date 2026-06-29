@@ -99,6 +99,7 @@ compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_wind
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
+compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"
 
 "${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh >/dev/null

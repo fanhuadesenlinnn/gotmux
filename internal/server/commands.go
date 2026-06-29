@@ -572,7 +572,15 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 	if template == "" {
 		template = "#{session_name}: #{window_index}:#{window_name}, current pane #{pane_index}"
 	}
-	return ok(formatString(template, activeFormatContext(rt.state, currentSession)))
+	ctx := activeFormatContext(rt.state, currentSession)
+	if target := optionValue(args, "-t", ""); target != "" {
+		pane := rt.targetPane(target, currentSession)
+		if pane == nil {
+			return fail("can't find pane")
+		}
+		ctx = formatContextForPaneID(rt.state, pane.ID)
+	}
+	return ok(formatString(template, ctx))
 }
 
 func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {
@@ -1352,6 +1360,19 @@ func activeFormatContext(state *model.Server, sessionName string) formatContext 
 			pane = window.ActivePane()
 		}
 		return formatContext{session: session, window: window, pane: pane}
+	}
+	return formatContext{}
+}
+
+func formatContextForPaneID(state *model.Server, paneID int) formatContext {
+	for _, session := range snapshotSessions(state) {
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				if pane.ID == paneID {
+					return formatContext{session: session, window: window, pane: pane}
+				}
+			}
+		}
 	}
 	return formatContext{}
 }
