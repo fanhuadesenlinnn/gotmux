@@ -94,6 +94,9 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSetOption(args, currentSession, "window")
 	case "show-options":
 		return rt.cmdShowOptions(args, currentSession)
+	case "show-window-options":
+		windowArgs := append([]string{"-w"}, args...)
+		return rt.cmdShowOptions(windowArgs, currentSession)
 	case "bind-key":
 		return rt.cmdBindKey(args)
 	case "unbind-key":
@@ -1281,6 +1284,8 @@ func normalizeCommandName(name string) string {
 		return "set-window-option"
 	case "show":
 		return "show-options"
+	case "showw":
+		return "show-window-options"
 	case "bind":
 		return "bind-key"
 	case "unbind":
@@ -1301,7 +1306,7 @@ func normalizeCommandName(name string) string {
 		return "select-layout"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
-		"source-file", "set-option", "set-window-option", "show-options",
+		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",

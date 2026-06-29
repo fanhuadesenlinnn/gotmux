@@ -454,6 +454,8 @@ compare "show global option value" show -gqv status
 "${tmux_cmd[@]}" setw -g mode-keys vi
 "${gotmux_cmd[@]}" setw -g mode-keys vi >/dev/null
 compare "show global window option" show -gw mode-keys
+compare "show-window-options command" show-window-options -gv mode-keys
+compare "show-window-options alias" showw -gv mode-keys
 
 "${tmux_cmd[@]}" bind-key C-a send-prefix
 "${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null

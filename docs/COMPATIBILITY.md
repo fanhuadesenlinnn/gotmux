@@ -22,7 +22,7 @@ manual verification note.
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
-| Basic options | Implemented for string-backed `set-option`, `set-window-option`, and `show-options` |
+| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw` |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
 | Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, targeted `resize-pane -t`, targeted `select-layout -t` built-in layouts, basic next/previous layout cycling, basic same-window `swap-pane`, basic `rotate-window`, basic `break-pane`, and basic `join-pane`/`move-pane` in the tested subset |

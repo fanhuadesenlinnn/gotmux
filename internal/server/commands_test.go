@@ -109,6 +109,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "80" {
 		t.Fatalf("show main-pane-width = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"showw", "-gv", "mode-keys"}, "", 80, 24)
+	if msg.Text != "emacs" {
+		t.Fatalf("showw mode-keys = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"bind-key", "C-a", "send-prefix"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("bind failed: %s", msg.Text)
