@@ -355,6 +355,48 @@ func (s *Server) KillPaneByID(paneID int) error {
 	return fmt.Errorf("can't find pane: %d", paneID)
 }
 
+func (s *Server) BreakPaneByID(paneID int, name string, detached bool) (*Session, *Window, *Pane, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("can't find pane: %d", paneID)
+	}
+	if len(location.window.Panes) <= 1 {
+		return nil, nil, nil, fmt.Errorf("can't break pane from a single-pane window")
+	}
+
+	pane := location.pane
+	sourceWindow := location.window
+	sourceActiveID := -1
+	if active := sourceWindow.ActivePane(); active != nil {
+		sourceActiveID = active.ID
+	}
+	sourceWindow.Panes = append(sourceWindow.Panes[:location.paneIndex], sourceWindow.Panes[location.paneIndex+1:]...)
+	sourceWindow.removePaneFromLayout(pane.ID)
+	reindexPanes(sourceWindow)
+	if !setActivePaneByID(sourceWindow, sourceActiveID) {
+		sourceWindow.Active = clampedPaneIndex(sourceWindow, sourceWindow.Active)
+	}
+	sourceWindow.Activity = time.Now()
+
+	window := s.newWindowLocked(location.session, defaultWindowName(name, pane.Command))
+	window.Width = sourceWindow.Width
+	window.Height = sourceWindow.Height
+	pane.Index = 0
+	window.Panes = []*Pane{pane}
+	window.Active = 0
+	window.Layout = &LayoutNode{PaneID: pane.ID}
+	window.recalculateLayout()
+	window.Activity = time.Now()
+	if !detached {
+		location.session.Active = len(location.session.Windows) - 1
+	}
+	location.session.Activity = time.Now()
+	return location.session, window, pane, nil
+}
+
 func (s *Server) killPaneAtLocked(session *Session, window *Window, paneIndex int) {
 	pane := window.Panes[paneIndex]
 	killPane(pane)

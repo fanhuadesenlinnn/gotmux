@@ -689,6 +689,35 @@ func TestRotateWindowCommand(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "rotatecmd"}, "rotatecmd", 80, 24)
 }
 
+func TestBreakPaneCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("breakcmd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := rt.execute([]string{"break-pane", "-s", "breakcmd:.1", "-n", "broken", "-P", "-F", "#{session_name}:#{window_index}.#{pane_index}:#{pane_id}:#{window_name}"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("break-pane failed: %s", msg.Text)
+	}
+	if msg.Text != "breakcmd:1.0:%1:broken" {
+		t.Fatalf("break-pane output = %q", msg.Text)
+	}
+	windows := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_name}:#{window_active}:#{window_panes}")
+	if windows != "0:first:0:1\n1:broken:1:1" {
+		t.Fatalf("windows after break-pane = %q", windows)
+	}
+	panes := listPanesFormat(rt.state, session.Name, "#{pane_index}:#{pane_id}:#{pane_width}:#{pane_active}")
+	if panes != "0:%1:80:1" {
+		t.Fatalf("active panes after break-pane = %q", panes)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "breakcmd"}, "breakcmd", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})

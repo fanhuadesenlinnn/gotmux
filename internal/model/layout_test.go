@@ -380,6 +380,61 @@ func TestRotateWindowMovesPaneObjectsAndActivePane(t *testing.T) {
 	}
 }
 
+func TestBreakPaneByIDMovesPaneToNewWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, first, err := state.NewSession("break", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, newWindow, moved, err := state.BreakPaneByID(second.ID, "broken", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.ID != second.ID {
+		t.Fatalf("moved pane id = %d, want %d", moved.ID, second.ID)
+	}
+	if len(session.Windows) != 2 || session.Active != 1 {
+		t.Fatalf("windows after break = %d active %d, want 2 active 1", len(session.Windows), session.Active)
+	}
+	if newWindow.Name != "broken" || len(newWindow.Panes) != 1 || newWindow.Panes[0].ID != second.ID {
+		t.Fatalf("new window = %#v", newWindow)
+	}
+	if len(firstWindow.Panes) != 1 || firstWindow.Panes[0].ID != first.ID {
+		t.Fatalf("source panes after break = %#v", firstWindow.Panes)
+	}
+	if firstWindow.Panes[0].Width != 80 || firstWindow.Panes[0].Height != 24 {
+		t.Fatalf("source pane geometry = %dx%d", firstWindow.Panes[0].Width, firstWindow.Panes[0].Height)
+	}
+	if newWindow.Panes[0].Width != 80 || newWindow.Panes[0].Height != 24 {
+		t.Fatalf("new pane geometry = %dx%d", newWindow.Panes[0].Width, newWindow.Panes[0].Height)
+	}
+}
+
+func TestBreakPaneByIDDetachedKeepsActiveWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, _, err := state.NewSession("breakd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := state.BreakPaneByID(second.ID, "", true); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 0 {
+		t.Fatalf("active window after detached break = %d, want 0", session.Active)
+	}
+}
+
 func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
 	t.Helper()
 	if len(got) != len(want) {

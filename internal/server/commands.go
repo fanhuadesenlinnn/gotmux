@@ -159,6 +159,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSwapPane(args, currentSession)
 	case "rotate-window":
 		return rt.cmdRotateWindow(args, currentSession)
+	case "break-pane":
+		return rt.cmdBreakPane(args, currentSession)
 	case "kill-pane":
 		pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
 		if pane == nil {
@@ -496,6 +498,34 @@ func (rt *Runtime) cmdRotateWindow(args []string, currentSession string) protoco
 		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
 	}
 	return ok("")
+}
+
+func (rt *Runtime) cmdBreakPane(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	source := rt.targetPane(optionValue(args, "-s", currentSession), currentSession)
+	if source == nil {
+		return fail("can't find pane")
+	}
+	sourceWindowPanes := rt.state.WindowPanesContainingPane(source.ID)
+	session, window, pane, err := rt.state.BreakPaneByID(source.ID, optionValue(args, "-n", ""), hasAny(args, "-d"))
+	if err != nil {
+		return fail(err.Error())
+	}
+	for _, oldPane := range sourceWindowPanes {
+		if oldPane.ID != pane.ID {
+			rt.resizePanes(rt.state.WindowPanesContainingPane(oldPane.ID))
+			break
+		}
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	text := ""
+	if hasAny(args, "-P") {
+		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+		text = formatString(template, formatContext{session: session, window: window, pane: pane})
+	}
+	return ok(text)
 }
 
 func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
@@ -957,6 +987,8 @@ func normalizeCommandName(name string) string {
 		return "swap-pane"
 	case "rotatew":
 		return "rotate-window"
+	case "breakp":
+		return "break-pane"
 	case "capturep":
 		return "capture-pane"
 	case "clearhist":
@@ -1006,7 +1038,7 @@ func normalizeCommandName(name string) string {
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
-		"swap-pane", "rotate-window",
+		"swap-pane", "rotate-window", "break-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
 		return name
