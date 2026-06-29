@@ -568,6 +568,77 @@ func (s *Server) SwapWindows(sourceSessionName string, sourceWindowIndex int, ta
 	return nil
 }
 
+func (s *Server) MoveWindow(sourceSessionName string, sourceWindowIndex int, targetSessionName string, targetWindowIndex int, detached bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sourceSession := s.Sessions[sourceSessionName]
+	if sourceSession == nil {
+		return fmt.Errorf("can't find session: %s", sourceSessionName)
+	}
+	targetSession := s.Sessions[targetSessionName]
+	if targetSession == nil {
+		return fmt.Errorf("can't find session: %s", targetSessionName)
+	}
+	sourceIndex := windowSliceIndex(sourceSession, sourceWindowIndex)
+	if sourceIndex == -1 {
+		return fmt.Errorf("can't find window: %d", sourceWindowIndex)
+	}
+	if targetIndex := windowSliceIndex(targetSession, targetWindowIndex); targetIndex != -1 {
+		if sourceSession.Windows[sourceIndex].ID == targetSession.Windows[targetIndex].ID {
+			return nil
+		}
+		return fmt.Errorf("index in use: %d", targetWindowIndex)
+	}
+
+	sourceActiveID := activeWindowID(sourceSession)
+	targetActiveID := activeWindowID(targetSession)
+	window := sourceSession.Windows[sourceIndex]
+	sourceSession.Windows = append(sourceSession.Windows[:sourceIndex], sourceSession.Windows[sourceIndex+1:]...)
+	window.Index = targetWindowIndex
+	targetSession.Windows = append(targetSession.Windows, window)
+	sort.Slice(targetSession.Windows, func(i, j int) bool {
+		return targetSession.Windows[i].Index < targetSession.Windows[j].Index
+	})
+
+	if detached {
+		if !setActiveWindowByID(sourceSession, sourceActiveID) {
+			sourceSession.Active = clampedWindowIndex(sourceSession, sourceSession.Active)
+		}
+		if sourceSession != targetSession && !setActiveWindowByID(targetSession, targetActiveID) {
+			targetSession.Active = clampedWindowIndex(targetSession, targetSession.Active)
+		}
+	} else {
+		setActiveWindowByID(targetSession, window.ID)
+		if sourceSession != targetSession && !setActiveWindowByID(sourceSession, sourceActiveID) {
+			sourceSession.Active = clampedWindowIndex(sourceSession, sourceSession.Active)
+		}
+	}
+	sourceSession.Activity = time.Now()
+	targetSession.Activity = time.Now()
+	return nil
+}
+
+func (s *Server) RenumberWindows(sessionName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	activeID := activeWindowID(session)
+	sort.Slice(session.Windows, func(i, j int) bool {
+		return session.Windows[i].Index < session.Windows[j].Index
+	})
+	reindexWindows(session)
+	if !setActiveWindowByID(session, activeID) {
+		session.Active = clampedWindowIndex(session, session.Active)
+	}
+	session.Activity = time.Now()
+	return nil
+}
+
 func (s *Server) killWindowAtLocked(session *Session, windowIndex int) {
 	window := session.Windows[windowIndex]
 	for _, pane := range window.Panes {
@@ -1825,6 +1896,13 @@ func setActiveWindowByID(session *Session, windowID int) bool {
 		}
 	}
 	return false
+}
+
+func activeWindowID(session *Session) int {
+	if window := session.ActiveWindow(); window != nil {
+		return window.ID
+	}
+	return -1
 }
 
 func windowSliceIndex(session *Session, windowIndex int) int {

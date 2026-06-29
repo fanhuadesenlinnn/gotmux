@@ -199,6 +199,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok("")
 	case "swap-window":
 		return rt.cmdSwapWindow(args, currentSession)
+	case "move-window":
+		return rt.cmdMoveWindow(args, currentSession)
 	case "kill-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
 		if target == "" {
@@ -576,6 +578,39 @@ func (rt *Runtime) cmdSwapWindow(args []string, currentSession string) protocol.
 		return fail("can't find window")
 	}
 	if err := rt.state.SwapWindows(sourceSession, sourceWindow, targetSession, targetWindow, hasAny(args, "-d")); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdMoveWindow(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	if hasAny(args, "-r") {
+		targetSessionName := cleanSessionTarget(optionValue(args, "-t", currentSession))
+		if targetSessionName == "" {
+			targetSessionName = firstSessionName(rt.state)
+		}
+		if strings.Contains(targetSessionName, ":") {
+			targetSessionName, _, _, _, _ = parsePaneTarget(targetSessionName)
+		}
+		if err := rt.state.RenumberWindows(targetSessionName); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+
+	sourceSession, sourceWindow, _, _, sourceFound := rt.targetWindowInfo(optionValue(args, "-s", currentSession), currentSession)
+	if !sourceFound {
+		return fail("can't find window")
+	}
+	target := optionValue(args, "-t", "")
+	targetSession, targetWindow, hasWindow := moveWindowTarget(target, currentSession)
+	if !hasWindow {
+		return fail("bad window target")
+	}
+	if err := rt.state.MoveWindow(sourceSession, sourceWindow, targetSession, targetWindow, hasAny(args, "-d")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1078,6 +1113,8 @@ func normalizeCommandName(name string) string {
 		return "kill-window"
 	case "swapw":
 		return "swap-window"
+	case "movew":
+		return "move-window"
 	case "source":
 		return "source-file"
 	case "set":
@@ -1100,7 +1137,7 @@ func normalizeCommandName(name string) string {
 		return "resize-pane"
 	case "selectl":
 		return "select-layout"
-	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window",
+	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
@@ -1792,6 +1829,14 @@ func selectWindowTarget(target string, currentSession string) (string, int, bool
 	}
 	index, ok := parseWindowTarget(cleaned)
 	return currentSession, index, ok
+}
+
+func moveWindowTarget(target string, currentSession string) (string, int, bool) {
+	sessionName, windowIndex, _, hasWindow, _ := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	return sessionName, windowIndex, hasWindow
 }
 
 func parseWindowTarget(s string) (int, bool) {

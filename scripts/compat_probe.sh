@@ -311,6 +311,17 @@ compare "swap-window windows" list-windows -t swapw -F "#{window_index}:#{window
 compare "swap-window detached command" swapw -d -s swapw:0 -t swapw:2
 compare "swap-window detached windows" list-windows -t swapw -F "#{window_index}:#{window_name}:#{window_id}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s movew -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t movew -n second /bin/sh
+"${tmux_cmd[@]}" new-window -t movew -n third /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s movew -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t movew -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t movew -n third /bin/sh >/dev/null
+compare "move-window command" move-window -s movew:0 -t movew:5
+compare "move-window windows" list-windows -t movew -F "#{window_index}:#{window_name}:#{window_active}"
+compare "move-window renumber command" movew -r -t movew
+compare "move-window renumber windows" list-windows -t movew -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t renamew -n second /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s renamew -x 80 -y 24 -n first /bin/sh >/dev/null

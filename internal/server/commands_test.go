@@ -232,6 +232,36 @@ func TestSwapWindowCommand(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "swapw"}, "swapw", 80, 24)
 }
 
+func TestMoveWindowCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "movew", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "movew", "-n", "second", "/bin/sh"}, "movew", 80, 24); !msg.OK {
+		t.Fatalf("new-window second failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "movew", "-n", "third", "/bin/sh"}, "movew", 80, 24); !msg.OK {
+		t.Fatalf("new-window third failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"move-window", "-s", "movew:0", "-t", "movew:5"}, "movew", 80, 24)
+	if !msg.OK {
+		t.Fatalf("move-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "movew", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "movew", 80, 24)
+	if windows.Text != "1:second:0\n2:third:0\n5:first:1" {
+		t.Fatalf("windows after move-window = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"movew", "-r", "-t", "movew"}, "movew", 80, 24)
+	if !msg.OK {
+		t.Fatalf("movew -r failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "movew", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "movew", 80, 24)
+	if windows.Text != "0:second:0\n1:third:0\n2:first:1" {
+		t.Fatalf("windows after movew -r = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "movew"}, "movew", 80, 24)
+}
+
 func TestEnvironmentCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "env", "/bin/sh"}, "", 80, 24)

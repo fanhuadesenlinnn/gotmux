@@ -164,6 +164,36 @@ func TestSwapWindowsPreservesOrSelectsActiveIndex(t *testing.T) {
 	}
 }
 
+func TestMoveWindowToSparseIndexAndRenumber(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("movew", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thirdWindow, _, err := state.NewWindow(session.Name, "third", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := state.MoveWindow(session.Name, firstWindow.Index, session.Name, 5, false); err != nil {
+		t.Fatal(err)
+	}
+	assertWindowOrder(t, session.Windows, []int{secondWindow.ID, thirdWindow.ID, firstWindow.ID}, []int{1, 2, 5})
+	if session.Active != 2 {
+		t.Fatalf("active window after move = %d, want 2", session.Active)
+	}
+	if err := state.RenumberWindows(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	assertWindowOrder(t, session.Windows, []int{secondWindow.ID, thirdWindow.ID, firstWindow.ID}, []int{0, 1, 2})
+	if session.Active != 2 {
+		t.Fatalf("active window after renumber = %d, want 2", session.Active)
+	}
+}
+
 func TestSelectEvenLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, _, _, err := state.NewSession("layouts", "", "first", []string{"/bin/sh"})
@@ -532,6 +562,19 @@ func assertWindowIDs(t *testing.T, got []*Window, want []int) {
 	for i := range want {
 		if got[i].ID != want[i] || got[i].Index != i {
 			t.Fatalf("window %d = id %d index %d, want id %d index %d", i, got[i].ID, got[i].Index, want[i], i)
+		}
+	}
+}
+
+func assertWindowOrder(t *testing.T, got []*Window, wantIDs []int, wantIndexes []int) {
+	t.Helper()
+	if len(got) != len(wantIDs) || len(got) != len(wantIndexes) {
+		t.Fatalf("windows = %d, want ids %d indexes %d", len(got), len(wantIDs), len(wantIndexes))
+	}
+	for i := range wantIDs {
+		if got[i].ID != wantIDs[i] || got[i].Index != wantIndexes[i] {
+			t.Fatalf("window %d = id %d index %d, want id %d index %d",
+				i, got[i].ID, got[i].Index, wantIDs[i], wantIndexes[i])
 		}
 	}
 }

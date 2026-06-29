@@ -8,7 +8,7 @@ import (
 
 func TestFormatSessionWindowPaneFields(t *testing.T) {
 	session := &model.Session{ID: 2, Name: "work", Active: 0, Attached: 1}
-	window := &model.Window{ID: 3, Index: 4, Name: "build", Active: 5}
+	window := &model.Window{ID: 3, Index: 4, Name: "build", Active: 0}
 	pane := &model.Pane{ID: 6, Index: 5, Width: 80, Height: 23, Command: []string{"/bin/sh"}}
 	session.Windows = []*model.Window{window}
 	window.Panes = []*model.Pane{pane}
@@ -18,7 +18,7 @@ func TestFormatSessionWindowPaneFields(t *testing.T) {
 		window:  window,
 		pane:    pane,
 	})
-	want := "work:$2:1:1:@3:4:build:1:0:%6:5:1:sh"
+	want := "work:$2:1:1:@3:4:build:1:1:%6:5:1:sh"
 	if got != want {
 		t.Fatalf("formatString() = %q, want %q", got, want)
 	}
