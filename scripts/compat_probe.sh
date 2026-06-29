@@ -99,6 +99,7 @@ compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_wind
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
+compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"
 
 "${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
@@ -377,6 +378,12 @@ compare "move-window renumber windows" list-windows -t movew -F "#{window_index}
 "${gotmux_cmd[@]}" new-window -t renamew -n second /bin/sh >/dev/null
 compare "rename-window target command" rename-window -t renamew:0 primary
 compare "rename-window target windows" list-windows -t renamew -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s aliascmd -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s aliascmd -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "rename-session alias command" rename -t aliascmd aliasrenamed
+compare "rename-window alias command" renamew -t aliasrenamed:0 primary
+compare "rename aliases windows" list-windows -t aliasrenamed -F "#{window_index}:#{window_name}:#{window_active}"
 
 "${tmux_cmd[@]}" new-session -d -s selectw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t selectw -n second /bin/sh

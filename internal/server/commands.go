@@ -1188,6 +1188,8 @@ func normalizeCommandName(name string) string {
 		return "new-session"
 	case "attach", "at":
 		return "attach-session"
+	case "detach":
+		return "detach-client"
 	case "has":
 		return "has-session"
 	case "ls":
@@ -1202,6 +1204,8 @@ func normalizeCommandName(name string) string {
 		return "split-window"
 	case "selectw":
 		return "select-window"
+	case "display":
+		return "display-message"
 	case "last":
 		return "last-window"
 	case "next":
@@ -1248,6 +1252,10 @@ func normalizeCommandName(name string) string {
 		return "kill-pane"
 	case "killw":
 		return "kill-window"
+	case "rename":
+		return "rename-session"
+	case "renamew":
+		return "rename-window"
 	case "swapw":
 		return "swap-window"
 	case "movew":
@@ -1270,6 +1278,8 @@ func normalizeCommandName(name string) string {
 		return "set-environment"
 	case "showenv":
 		return "show-environment"
+	case "send":
+		return "send-keys"
 	case "resizep":
 		return "resize-pane"
 	case "resizew":

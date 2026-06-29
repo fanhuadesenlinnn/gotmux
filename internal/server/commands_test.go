@@ -90,6 +90,28 @@ func TestDisplayMessageTargetsPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "displayt"}, "displayt", 80, 24)
 }
 
+func TestCommonTmuxCommandAliases(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "aliases", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"display", "-p", "-F", "#{session_name}"}, "aliases", 80, 24)
+	if !msg.OK || msg.Text != "aliases" {
+		t.Fatalf("display alias = %#v, want aliases", msg)
+	}
+	if msg := rt.execute([]string{"rename", "-t", "aliases", "renamed"}, "aliases", 80, 24); !msg.OK {
+		t.Fatalf("rename alias failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"renamew", "-t", "renamed:0", "primary"}, "renamed", 80, 24); !msg.OK {
+		t.Fatalf("renamew alias failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-windows", "-t", "renamed", "-F", "#{window_index}:#{window_name}"}, "renamed", 80, 24)
+	if got.Text != "0:primary" {
+		t.Fatalf("windows after aliases = %q", got.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "renamed"}, "renamed", 80, 24)
+}
+
 func TestSourceFile(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "src", "-n", "first", "/bin/sh"}, "", 80, 24)
