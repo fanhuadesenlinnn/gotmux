@@ -55,6 +55,7 @@ type Window struct {
 	Activity   time.Time
 	Panes      []*Pane
 	Active     int
+	LastPaneID int
 	Width      int
 	Height     int
 	Layout     *LayoutNode
@@ -164,6 +165,7 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "C-b", "send-prefix")
 	add("prefix", `"`, "split-window")
 	add("prefix", "%", "split-window", "-h")
+	add("prefix", ";", "last-pane")
 	add("prefix", "c", "new-window")
 	add("prefix", "d", "detach-client")
 	add("prefix", "l", "last-window")
@@ -328,7 +330,7 @@ func (s *Server) splitPaneInWindowLocked(session *Session, window *Window, cwd s
 	if detached && activeID != -1 {
 		setActivePaneByID(window, activeID)
 	} else {
-		setActivePaneByID(window, pane.ID)
+		selectPaneByID(window, pane.ID)
 	}
 	window.recalculateLayout()
 	window.Activity = time.Now()
@@ -813,7 +815,7 @@ func (s *Server) SelectRelativePane(sessionName string, delta int) error {
 	if window == nil || len(window.Panes) == 0 {
 		return fmt.Errorf("window has no panes")
 	}
-	window.Active = (window.Active + delta + len(window.Panes)) % len(window.Panes)
+	selectPaneIndex(window, (window.Active+delta+len(window.Panes))%len(window.Panes))
 	window.Activity = time.Now()
 	session.Activity = time.Now()
 	return nil
@@ -823,20 +825,76 @@ func (s *Server) SelectPaneByID(paneID int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, session := range s.Sessions {
-		for windowIndex, window := range session.Windows {
-			for paneIndex, pane := range window.Panes {
-				if pane.ID == paneID {
-					session.Active = windowIndex
-					window.Active = paneIndex
-					window.Activity = time.Now()
-					session.Activity = time.Now()
-					return nil
-				}
-			}
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return fmt.Errorf("can't find pane: %d", paneID)
+	}
+	selectWindowSliceIndex(location.session, location.windowIndex)
+	selectPaneIndex(location.window, location.paneIndex)
+	location.window.Activity = time.Now()
+	location.session.Activity = time.Now()
+	return nil
+}
+
+func (s *Server) SelectPaneDirectionFrom(paneID int, direction string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return fmt.Errorf("can't find pane: %d", paneID)
+	}
+	target := directionalPane(location.window, location.pane, direction)
+	if target == nil {
+		return nil
+	}
+	for paneIndex, pane := range location.window.Panes {
+		if pane.ID == target.ID {
+			selectWindowSliceIndex(location.session, location.windowIndex)
+			selectPaneIndex(location.window, paneIndex)
+			location.window.Activity = time.Now()
+			location.session.Activity = time.Now()
+			return nil
 		}
 	}
-	return fmt.Errorf("can't find pane: %d", paneID)
+	return nil
+}
+
+func (s *Server) SelectLastPaneByIndex(sessionName string, windowIndex int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	windowSlice := windowSliceIndex(session, windowIndex)
+	if windowSlice == -1 {
+		return fmt.Errorf("can't find window: %d", windowIndex)
+	}
+	window := session.Windows[windowSlice]
+	targetIndex := -1
+	for index, pane := range window.Panes {
+		if pane.ID == window.LastPaneID {
+			targetIndex = index
+			break
+		}
+	}
+	if targetIndex == -1 && len(window.Panes) == 2 {
+		if window.Active == 0 {
+			targetIndex = 1
+		} else {
+			targetIndex = 0
+		}
+	}
+	if targetIndex == -1 {
+		return fmt.Errorf("no last pane")
+	}
+	selectWindowSliceIndex(session, windowSlice)
+	selectPaneIndex(window, targetIndex)
+	window.Activity = time.Now()
+	session.Activity = time.Now()
+	return nil
 }
 
 func (s *Server) SetActiveWindowSize(sessionName string, width, height int) {
@@ -1903,18 +1961,19 @@ func (w *Window) ActivePane() *Pane {
 }
 
 type paneLocation struct {
-	session   *Session
-	window    *Window
-	pane      *Pane
-	paneIndex int
+	session     *Session
+	window      *Window
+	windowIndex int
+	pane        *Pane
+	paneIndex   int
 }
 
 func (s *Server) paneLocationLocked(paneID int) (paneLocation, bool) {
 	for _, session := range s.Sessions {
-		for _, window := range session.Windows {
+		for windowIndex, window := range session.Windows {
 			for paneIndex, pane := range window.Panes {
 				if pane.ID == paneID {
-					return paneLocation{session: session, window: window, pane: pane, paneIndex: paneIndex}, true
+					return paneLocation{session: session, window: window, windowIndex: windowIndex, pane: pane, paneIndex: paneIndex}, true
 				}
 			}
 		}
@@ -1930,6 +1989,125 @@ func setActivePaneByID(window *Window, paneID int) bool {
 		}
 	}
 	return false
+}
+
+func selectPaneByID(window *Window, paneID int) bool {
+	for index, pane := range window.Panes {
+		if pane.ID == paneID {
+			selectPaneIndex(window, index)
+			return true
+		}
+	}
+	return false
+}
+
+func selectPaneIndex(window *Window, index int) {
+	if index < 0 || index >= len(window.Panes) {
+		return
+	}
+	if active := window.ActivePane(); active != nil && active.ID != window.Panes[index].ID {
+		window.LastPaneID = active.ID
+	}
+	window.Active = index
+}
+
+func directionalPane(window *Window, active *Pane, direction string) *Pane {
+	if window == nil || active == nil {
+		return nil
+	}
+	bestPrimary := int(^uint(0) >> 1)
+	bestSecondary := int(^uint(0) >> 1)
+	var best *Pane
+	for _, pane := range window.Panes {
+		if pane.ID == active.ID {
+			continue
+		}
+		primary, secondary, ok := paneDirectionScore(active, pane, direction)
+		if !ok {
+			continue
+		}
+		if primary < bestPrimary || (primary == bestPrimary && secondary < bestSecondary) ||
+			(primary == bestPrimary && secondary == bestSecondary && (best == nil || pane.Index < best.Index)) {
+			bestPrimary = primary
+			bestSecondary = secondary
+			best = pane
+		}
+	}
+	return best
+}
+
+func paneDirectionScore(active *Pane, candidate *Pane, direction string) (int, int, bool) {
+	switch direction {
+	case "L":
+		if candidate.Left+candidate.Width > active.Left {
+			return 0, 0, false
+		}
+		overlap := intervalOverlap(active.Top, active.Top+active.Height, candidate.Top, candidate.Top+candidate.Height)
+		if overlap <= 0 {
+			return 0, 0, false
+		}
+		return active.Left - (candidate.Left + candidate.Width), absInt(paneCenterY(active) - paneCenterY(candidate)), true
+	case "R":
+		if candidate.Left < active.Left+active.Width {
+			return 0, 0, false
+		}
+		overlap := intervalOverlap(active.Top, active.Top+active.Height, candidate.Top, candidate.Top+candidate.Height)
+		if overlap <= 0 {
+			return 0, 0, false
+		}
+		return candidate.Left - (active.Left + active.Width), absInt(paneCenterY(active) - paneCenterY(candidate)), true
+	case "U":
+		if candidate.Top+candidate.Height > active.Top {
+			return 0, 0, false
+		}
+		overlap := intervalOverlap(active.Left, active.Left+active.Width, candidate.Left, candidate.Left+candidate.Width)
+		if overlap <= 0 {
+			return 0, 0, false
+		}
+		return active.Top - (candidate.Top + candidate.Height), absInt(paneCenterX(active) - paneCenterX(candidate)), true
+	case "D":
+		if candidate.Top < active.Top+active.Height {
+			return 0, 0, false
+		}
+		overlap := intervalOverlap(active.Left, active.Left+active.Width, candidate.Left, candidate.Left+candidate.Width)
+		if overlap <= 0 {
+			return 0, 0, false
+		}
+		return candidate.Top - (active.Top + active.Height), absInt(paneCenterX(active) - paneCenterX(candidate)), true
+	default:
+		return 0, 0, false
+	}
+}
+
+func paneCenterX(pane *Pane) int {
+	return pane.Left + pane.Width/2
+}
+
+func paneCenterY(pane *Pane) int {
+	return pane.Top + pane.Height/2
+}
+
+func intervalOverlap(a0, a1, b0, b1 int) int {
+	start := maxInt(a0, b0)
+	end := minInt(a1, b1)
+	if end <= start {
+		return 0
+	}
+	return end - start
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func clampedPaneIndex(window *Window, index int) int {
@@ -2060,13 +2238,14 @@ func (s *Server) newWindowLocked(session *Session, name string) *Window {
 		name = DefaultShellName()
 	}
 	window := &Window{
-		ID:        s.NextWindowID,
-		Index:     len(session.Windows),
-		Name:      name,
-		Width:     80,
-		Height:    24,
-		CreatedAt: time.Now(),
-		Activity:  time.Now(),
+		ID:         s.NextWindowID,
+		Index:      len(session.Windows),
+		Name:       name,
+		LastPaneID: -1,
+		Width:      80,
+		Height:     24,
+		CreatedAt:  time.Now(),
+		Activity:   time.Now(),
 	}
 	s.NextWindowID++
 	session.Windows = append(session.Windows, window)

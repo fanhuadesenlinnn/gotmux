@@ -152,6 +152,19 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		}
 		return ok("")
 	case "select-pane":
+		if hasAny(args, "-l") {
+			return rt.cmdLastPane(args, currentSession)
+		}
+		if direction := selectPaneDirection(args); direction != "" {
+			pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+			if pane == nil {
+				return fail("can't find pane")
+			}
+			if err := rt.state.SelectPaneDirectionFrom(pane.ID, direction); err != nil {
+				return fail(err.Error())
+			}
+			return ok("")
+		}
 		delta := 1
 		target := optionValue(args, "-t", "")
 		if target != "" && !strings.Contains(target, ".+") && !strings.Contains(target, ".-") &&
@@ -172,6 +185,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 			return fail(err.Error())
 		}
 		return ok("")
+	case "last-pane":
+		return rt.cmdLastPane(args, currentSession)
 	case "resize-pane":
 		return rt.cmdResizePane(args, currentSession)
 	case "next-layout":
@@ -415,6 +430,20 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	return ok("")
+}
+
+func (rt *Runtime) cmdLastPane(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	sessionName, windowIndex, _, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	if err := rt.state.SelectLastPaneByIndex(sessionName, windowIndex); err != nil {
+		return fail(err.Error())
+	}
 	return ok("")
 }
 
@@ -1110,6 +1139,8 @@ func normalizeCommandName(name string) string {
 		return "previous-window"
 	case "selectp":
 		return "select-pane"
+	case "lastp":
+		return "last-pane"
 	case "nextl":
 		return "next-layout"
 	case "prevl":
@@ -1176,7 +1207,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "last-window", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "send-prefix", "resize-pane", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
@@ -1237,6 +1268,21 @@ func hasAny(args []string, names ...string) bool {
 		}
 	}
 	return false
+}
+
+func selectPaneDirection(args []string) string {
+	switch {
+	case hasAny(args, "-L"):
+		return "L"
+	case hasAny(args, "-R"):
+		return "R"
+	case hasAny(args, "-U"):
+		return "U"
+	case hasAny(args, "-D"):
+		return "D"
+	default:
+		return ""
+	}
 }
 
 func nonOptionArgs(args []string) []string {

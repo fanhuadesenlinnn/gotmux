@@ -253,6 +253,62 @@ func TestSplitPaneDetachedKeepsActivePane(t *testing.T) {
 	}
 }
 
+func TestSelectPaneDirectionAndLastPane(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, firstPane, err := state.NewSession("selpdir", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	secondPane, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	window := session.ActiveWindow()
+	if window.ActivePane().ID != secondPane.ID {
+		t.Fatalf("active pane after split = %d, want %d", window.ActivePane().ID, secondPane.ID)
+	}
+	if err := state.SelectPaneDirectionFrom(secondPane.ID, "L"); err != nil {
+		t.Fatal(err)
+	}
+	if window.ActivePane().ID != firstPane.ID || window.LastPaneID != secondPane.ID {
+		t.Fatalf("select left active=%d last=%d, want active %d last %d", window.ActivePane().ID, window.LastPaneID, firstPane.ID, secondPane.ID)
+	}
+	if err := state.SelectLastPaneByIndex(session.Name, window.Index); err != nil {
+		t.Fatal(err)
+	}
+	if window.ActivePane().ID != secondPane.ID || window.LastPaneID != firstPane.ID {
+		t.Fatalf("last-pane active=%d last=%d, want active %d last %d", window.ActivePane().ID, window.LastPaneID, secondPane.ID, firstPane.ID)
+	}
+	if err := state.SelectLastPaneByIndex(session.Name, window.Index); err != nil {
+		t.Fatal(err)
+	}
+	if window.ActivePane().ID != firstPane.ID || window.LastPaneID != secondPane.ID {
+		t.Fatalf("second last-pane active=%d last=%d, want active %d last %d", window.ActivePane().ID, window.LastPaneID, firstPane.ID, secondPane.ID)
+	}
+}
+
+func TestSelectLastPaneFallsBackForTwoPanesAfterDetachedSplit(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, window, firstPane, err := state.NewSession("lastp", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondPane, err := state.SplitPaneWithLayoutDetached(session.Name, "", []string{"/bin/sh"}, "horizontal", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if window.LastPaneID != -1 || window.ActivePane().ID != firstPane.ID {
+		t.Fatalf("detached split active=%d last=%d, want active %d last unset", window.ActivePane().ID, window.LastPaneID, firstPane.ID)
+	}
+	if err := state.SelectLastPaneByIndex(session.Name, window.Index); err != nil {
+		t.Fatal(err)
+	}
+	if window.ActivePane().ID != secondPane.ID || window.LastPaneID != firstPane.ID {
+		t.Fatalf("fallback last-pane active=%d last=%d, want active %d last %d", window.ActivePane().ID, window.LastPaneID, secondPane.ID, firstPane.ID)
+	}
+}
+
 func TestSelectLastWindowTogglesPreviousWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, firstWindow, _, err := state.NewSession("lastw", "", "first", []string{"/bin/sh"})

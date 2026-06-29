@@ -256,6 +256,26 @@ compare "select-layout target geometry" list-panes -t layselecttarget -F "#{pane
 compare "select-pane target command" select-pane -t selp:.0
 compare "select-pane target panes" list-panes -t selp -F "#{pane_index}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s selpdir -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t selpdir -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s selpdir -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t selpdir -h /bin/sh >/dev/null
+compare "select-pane left command" select-pane -L -t selpdir
+compare "select-pane left panes" list-panes -t selpdir -F "#{pane_index}:#{pane_active}"
+compare "select-pane last flag command" select-pane -l -t selpdir
+compare "select-pane last flag panes" list-panes -t selpdir -F "#{pane_index}:#{pane_active}"
+compare "last-pane command" last-pane -t selpdir
+compare "last-pane panes" list-panes -t selpdir -F "#{pane_index}:#{pane_active}"
+compare "last-pane alias command" lastp -t selpdir
+compare "last-pane alias panes" list-panes -t selpdir -F "#{pane_index}:#{pane_active}"
+
+"${tmux_cmd[@]}" new-session -d -s selpup -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t selpup /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s selpup -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t selpup /bin/sh >/dev/null
+compare "select-pane up command" select-pane -U -t selpup
+compare "select-pane up panes" list-panes -t selpup -F "#{pane_index}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s swapp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t swapp -h /bin/sh
 "${tmux_cmd[@]}" split-window -t swapp -h /bin/sh

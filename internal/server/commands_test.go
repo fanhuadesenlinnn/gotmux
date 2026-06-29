@@ -650,6 +650,48 @@ func TestSelectPaneTargetsPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "selp"}, "selp", 80, 24)
 }
 
+func TestSelectPaneDirectionsAndLastPane(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("selpdir", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"select-pane", "-L"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("select-pane -L failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-panes", "-t", "selpdir", "-F", "#{pane_index}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:1\n1:0" {
+		t.Fatalf("panes after select-pane -L = %q", got.Text)
+	}
+	if msg := rt.execute([]string{"select-pane", "-l"}, session.Name, 80, 24); !msg.OK {
+		t.Fatalf("select-pane -l failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "selpdir", "-F", "#{pane_index}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:0\n1:1" {
+		t.Fatalf("panes after select-pane -l = %q", got.Text)
+	}
+	if msg := rt.execute([]string{"last-pane"}, session.Name, 80, 24); !msg.OK {
+		t.Fatalf("last-pane failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "selpdir", "-F", "#{pane_index}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:1\n1:0" {
+		t.Fatalf("panes after last-pane = %q", got.Text)
+	}
+	if msg := rt.execute([]string{"lastp"}, session.Name, 80, 24); !msg.OK {
+		t.Fatalf("lastp failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "selpdir", "-F", "#{pane_index}:#{pane_active}"}, session.Name, 80, 24)
+	if got.Text != "0:0\n1:1" {
+		t.Fatalf("panes after lastp = %q", got.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "selpdir"}, "selpdir", 80, 24)
+}
+
 func TestResizePaneTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, first, err := rt.state.NewSession("resize", "", "first", []string{"/bin/sh"})
