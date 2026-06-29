@@ -621,6 +621,40 @@ func TestLayoutCycleCommands(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "layoutcycle"}, "layoutcycle", 80, 24)
 }
 
+func TestSwapPaneCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("swapcmd", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 80, 24)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := rt.execute([]string{"swap-pane", "-U", "-t", session.Name}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("swap-pane -U failed: %s", msg.Text)
+	}
+	got := listPanesFormat(rt.state, session.Name, "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_active}")
+	if got != "0:%0:0:0\n1:%2:41:1\n2:%1:61:0" {
+		t.Fatalf("panes after swap-pane -U = %q", got)
+	}
+
+	msg = rt.execute([]string{"swap-pane", "-d", "-s", "swapcmd:.0", "-t", "swapcmd:.1"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("swap-pane -d failed: %s", msg.Text)
+	}
+	got = listPanesFormat(rt.state, session.Name, "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_active}")
+	if got != "0:%2:0:0\n1:%0:41:1\n2:%1:61:0" {
+		t.Fatalf("panes after swap-pane -d = %q", got)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "swapcmd"}, "swapcmd", 80, 24)
+}
+
 func TestKillWindowTargetsWindowAndDropsScreens(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, firstPane, err := rt.state.NewSession("killw", "", "first", []string{"/bin/sh"})

@@ -48,13 +48,14 @@ terminal capability negotiation remain.
 
 Status: in progress. Basic split geometry, nested split geometry, targeted
 `resize-pane -t`, targeted `select-layout -t` for tmux built-in layouts, basic
-next/previous layout cycling, and screen-backed multi-pane redraw with simple
-borders are implemented. Basic targeted `select-window -t`, `select-pane -t`,
-`kill-pane -t`, and `kill-window -t` operate on explicit targets, drop related
-screen snapshots where needed, and collapse pane layout leaves; targeted
-`rename-window -t` renames non-active target windows. Geometry is compared with
-tmux through `scripts/compat_probe.sh`; custom layout strings, old-layout
-restore, tmux-style border rendering, zoom, and pane movement commands remain.
+next/previous layout cycling, basic same-window `swap-pane`, and screen-backed
+multi-pane redraw with simple borders are implemented. Basic targeted
+`select-window -t`, `select-pane -t`, `kill-pane -t`, and `kill-window -t`
+operate on explicit targets, drop related screen snapshots where needed, and
+collapse pane layout leaves; targeted `rename-window -t` renames non-active
+target windows. Geometry is compared with tmux through `scripts/compat_probe.sh`;
+custom layout strings, old-layout restore, marked pane defaults, tmux-style
+border rendering, zoom, and pane movement commands remain.
 
 ## Phase 5: Modes, Buffers, and Input
 

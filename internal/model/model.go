@@ -642,6 +642,59 @@ func (s *Server) ResizePaneByID(paneID int, direction string, amount int) error 
 	return fmt.Errorf("can't find pane: %d", paneID)
 }
 
+func (s *Server) SwapPanesByID(sourceID int, targetID int, detached bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	source, ok := s.paneLocationLocked(sourceID)
+	if !ok {
+		return fmt.Errorf("can't find pane: %d", sourceID)
+	}
+	target, ok := s.paneLocationLocked(targetID)
+	if !ok {
+		return fmt.Errorf("can't find pane: %d", targetID)
+	}
+	if source.pane.ID == target.pane.ID {
+		return nil
+	}
+
+	sameWindow := source.window == target.window
+	sourceActiveIndex := source.window.Active
+	targetActiveIndex := target.window.Active
+
+	source.window.Panes[source.paneIndex], target.window.Panes[target.paneIndex] = target.pane, source.pane
+	swapLayoutPaneIDs(source.window.Layout, sourceID, targetID)
+	if !sameWindow {
+		swapLayoutPaneIDs(target.window.Layout, sourceID, targetID)
+	}
+	renumberWindowPanes(source.window)
+	if !sameWindow {
+		renumberWindowPanes(target.window)
+	}
+
+	if detached {
+		source.window.Active = clampedPaneIndex(source.window, sourceActiveIndex)
+		if !sameWindow {
+			target.window.Active = clampedPaneIndex(target.window, targetActiveIndex)
+		}
+	} else if sameWindow {
+		setActivePaneByID(source.window, targetID)
+	} else {
+		setActivePaneByID(source.window, targetID)
+		setActivePaneByID(target.window, sourceID)
+	}
+
+	source.window.recalculateLayout()
+	source.window.Activity = time.Now()
+	source.session.Activity = time.Now()
+	if !sameWindow {
+		target.window.recalculateLayout()
+		target.window.Activity = time.Now()
+		target.session.Activity = time.Now()
+	}
+	return nil
+}
+
 func (s *Server) WindowPanesContainingPane(paneID int) []*Pane {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1530,6 +1583,65 @@ func (w *Window) ActivePane() *Pane {
 	return w.Panes[w.Active]
 }
 
+type paneLocation struct {
+	session   *Session
+	window    *Window
+	pane      *Pane
+	paneIndex int
+}
+
+func (s *Server) paneLocationLocked(paneID int) (paneLocation, bool) {
+	for _, session := range s.Sessions {
+		for _, window := range session.Windows {
+			for paneIndex, pane := range window.Panes {
+				if pane.ID == paneID {
+					return paneLocation{session: session, window: window, pane: pane, paneIndex: paneIndex}, true
+				}
+			}
+		}
+	}
+	return paneLocation{}, false
+}
+
+func setActivePaneByID(window *Window, paneID int) bool {
+	for index, pane := range window.Panes {
+		if pane.ID == paneID {
+			window.Active = index
+			return true
+		}
+	}
+	return false
+}
+
+func clampedPaneIndex(window *Window, index int) int {
+	if len(window.Panes) == 0 {
+		return 0
+	}
+	if index < 0 {
+		return 0
+	}
+	if index >= len(window.Panes) {
+		return len(window.Panes) - 1
+	}
+	return index
+}
+
+func renumberWindowPanes(window *Window) {
+	for index, pane := range window.Panes {
+		pane.Index = index
+	}
+	if len(window.Panes) == 0 {
+		window.Active = 0
+		return
+	}
+	if window.Active < 0 {
+		window.Active = 0
+	}
+	if window.Active >= len(window.Panes) {
+		window.Active = len(window.Panes) - 1
+	}
+}
+
 func (s *Server) newWindowLocked(session *Session, name string) *Window {
 	if name == "" {
 		name = DefaultShellName()
@@ -1657,6 +1769,24 @@ func removeLayoutPane(node *LayoutNode, paneID int) *LayoutNode {
 	}
 	node.Children = children
 	return node
+}
+
+func swapLayoutPaneIDs(node *LayoutNode, sourceID int, targetID int) {
+	if node == nil {
+		return
+	}
+	if node.isLeaf() {
+		switch node.PaneID {
+		case sourceID:
+			node.PaneID = targetID
+		case targetID:
+			node.PaneID = sourceID
+		}
+		return
+	}
+	for _, child := range node.Children {
+		swapLayoutPaneIDs(child, sourceID, targetID)
+	}
 }
 
 func (w *Window) recalculateLayout() {

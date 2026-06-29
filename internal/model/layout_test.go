@@ -304,6 +304,44 @@ func TestSplitPaneWithLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	}
 }
 
+func TestSwapPanesByIDMovesPaneObjectsAndActivePane(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, window, first, err := state.NewSession("swap", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := state.SwapPanesByID(first.ID, third.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneIDs(t, window.Panes, []int{third.ID, second.ID, first.ID})
+	if window.Active != 0 {
+		t.Fatalf("active pane after swap = %d, want 0", window.Active)
+	}
+	assertPaneGeometries(t, state.ActiveWindowPanes(session.Name), []paneGeometry{
+		{0, 0, 40, 24},
+		{41, 0, 19, 24},
+		{61, 0, 19, 24},
+	})
+
+	if err := state.SwapPanesByID(third.ID, second.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	assertPaneIDs(t, window.Panes, []int{second.ID, third.ID, first.ID})
+	if window.Active != 0 {
+		t.Fatalf("active pane after detached swap = %d, want 0", window.Active)
+	}
+}
+
 func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
 	t.Helper()
 	if len(got) != len(want) {
@@ -315,6 +353,18 @@ func assertPaneGeometries(t *testing.T, got []*Pane, want []paneGeometry) {
 			t.Fatalf("pane %d geometry = %d,%d %dx%d, want %d,%d %dx%d",
 				i, got[i].Left, got[i].Top, got[i].Width, got[i].Height,
 				want[i].left, want[i].top, want[i].width, want[i].height)
+		}
+	}
+}
+
+func assertPaneIDs(t *testing.T, got []*Pane, want []int) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("panes = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].ID != want[i] || got[i].Index != i {
+			t.Fatalf("pane %d = id %d index %d, want id %d index %d", i, got[i].ID, got[i].Index, want[i], i)
 		}
 	}
 }

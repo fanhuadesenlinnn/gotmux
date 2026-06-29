@@ -255,6 +255,17 @@ compare "select-layout target geometry" list-panes -t layselecttarget -F "#{pane
 compare "select-pane target command" select-pane -t selp:.0
 compare "select-pane target panes" list-panes -t selp -F "#{pane_index}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s swapp -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t swapp -h /bin/sh
+"${tmux_cmd[@]}" split-window -t swapp -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s swapp -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t swapp -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t swapp -h /bin/sh >/dev/null
+compare "swap-pane up command" swap-pane -U -t swapp
+compare "swap-pane up panes" list-panes -t swapp -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "swap-pane detached command" swap-pane -d -s swapp:.0 -t swapp:.1
+compare "swap-pane detached panes" list-panes -t swapp -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t killp -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s killp -x 80 -y 24 -n first /bin/sh >/dev/null

@@ -155,6 +155,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdApplyLayout(args, currentSession, "", "previous")
 	case "select-layout":
 		return rt.cmdSelectLayout(args, currentSession)
+	case "swap-pane":
+		return rt.cmdSwapPane(args, currentSession)
 	case "kill-pane":
 		pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
 		if pane == nil {
@@ -434,6 +436,39 @@ func (rt *Runtime) cmdApplyLayout(args []string, currentSession string, layout s
 	}
 	if len(paneIDs) > 0 {
 		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdSwapPane(args []string, currentSession string) protocol.Message {
+	target := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if target == nil {
+		return fail("can't find pane")
+	}
+	source := (*model.Pane)(nil)
+	switch {
+	case hasAny(args, "-U"):
+		source = rt.adjacentPane(target.ID, -1)
+	case hasAny(args, "-D"):
+		source = rt.adjacentPane(target.ID, 1)
+	default:
+		sourceTarget := optionValue(args, "-s", "")
+		if sourceTarget == "" {
+			return fail("can't find pane")
+		}
+		source = rt.targetPane(sourceTarget, currentSession)
+	}
+	if source == nil {
+		return fail("can't find pane")
+	}
+	sourceID := source.ID
+	targetID := target.ID
+	if err := rt.state.SwapPanesByID(sourceID, targetID, hasAny(args, "-d")); err != nil {
+		return fail(err.Error())
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(sourceID))
+	if sourceID != targetID {
+		rt.resizePanes(rt.state.WindowPanesContainingPane(targetID))
 	}
 	return ok("")
 }
@@ -893,6 +928,8 @@ func normalizeCommandName(name string) string {
 		return "next-layout"
 	case "prevl":
 		return "previous-layout"
+	case "swapp":
+		return "swap-pane"
 	case "capturep":
 		return "capture-pane"
 	case "clearhist":
@@ -942,6 +979,7 @@ func normalizeCommandName(name string) string {
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
+		"swap-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
 		return name
@@ -1326,6 +1364,24 @@ func (rt *Runtime) targetPane(target string, currentSession string) *model.Pane 
 			return nil
 		}
 		return window.ActivePane()
+	}
+	return nil
+}
+
+func (rt *Runtime) adjacentPane(paneID int, delta int) *model.Pane {
+	for _, session := range snapshotSessions(rt.state) {
+		for _, window := range session.Windows {
+			for index, pane := range window.Panes {
+				if pane.ID != paneID {
+					continue
+				}
+				if len(window.Panes) == 0 {
+					return nil
+				}
+				next := (index + delta + len(window.Panes)) % len(window.Panes)
+				return window.Panes[next]
+			}
+		}
 	}
 	return nil
 }
