@@ -143,6 +143,36 @@ func TestKillPaneByIDRemovesTargetPaneAndLayoutLeaf(t *testing.T) {
 	}
 }
 
+func TestKillOtherPanesByIDKeepsTargetPane(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, _, err := state.NewSession("killpa", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SetActiveWindowSize(session.Name, 80, 24)
+	second, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	killed, err := state.KillOtherPanesByID(second.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(killed) != 2 {
+		t.Fatalf("killed panes = %v, want 2 panes", killed)
+	}
+	got := state.ActiveWindowPanes(session.Name)
+	if len(got) != 1 || got[0].ID != second.ID {
+		t.Fatalf("panes after kill others = %#v, want only pane %d", got, second.ID)
+	}
+	if got[0].Left != 0 || got[0].Top != 0 || got[0].Width != 80 || got[0].Height != 24 {
+		t.Fatalf("kept pane geometry = %d,%d %dx%d", got[0].Left, got[0].Top, got[0].Width, got[0].Height)
+	}
+}
+
 func TestKillWindowRemovesTargetWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, firstWindow, _, err := state.NewSession("windows", "", "first", []string{"/bin/sh"})
@@ -161,6 +191,34 @@ func TestKillWindowRemovesTargetWindow(t *testing.T) {
 	}
 	if session.Active != 0 {
 		t.Fatalf("active window after kill = %d, want 0", session.Active)
+	}
+}
+
+func TestKillOtherWindowsKeepsTargetWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, _, _, err := state.NewSession("killwa", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := state.NewWindow(session.Name, "third", "", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	killed, err := state.KillOtherWindows(session.Name, secondWindow.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(killed) != 2 {
+		t.Fatalf("killed panes = %v, want panes from two removed windows", killed)
+	}
+	if len(session.Windows) != 1 || session.Windows[0].ID != secondWindow.ID {
+		t.Fatalf("windows after kill others = %#v, want only window %d", session.Windows, secondWindow.ID)
+	}
+	if session.Active != 0 || session.Windows[0].Index != 1 {
+		t.Fatalf("active/index after kill others = active %d index %d, want active 0 index 1", session.Active, session.Windows[0].Index)
 	}
 }
 

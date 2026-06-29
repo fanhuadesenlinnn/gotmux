@@ -392,6 +392,30 @@ func (s *Server) KillPaneByID(paneID int) error {
 	return fmt.Errorf("can't find pane: %d", paneID)
 }
 
+func (s *Server) KillOtherPanesByID(paneID int) ([]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return nil, fmt.Errorf("can't find pane: %d", paneID)
+	}
+	killed := make([]int, 0, len(location.window.Panes)-1)
+	for index := len(location.window.Panes) - 1; index >= 0; index-- {
+		pane := location.window.Panes[index]
+		if pane.ID == paneID {
+			continue
+		}
+		killed = append(killed, pane.ID)
+		s.killPaneAtLocked(location.session, location.window, index)
+	}
+	setActivePaneByID(location.window, paneID)
+	location.window.recalculateLayout()
+	location.window.Activity = time.Now()
+	location.session.Activity = time.Now()
+	return killed, nil
+}
+
 func (s *Server) BreakPaneByID(paneID int, name string, detached bool) (*Session, *Window, *Pane, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -554,6 +578,37 @@ func (s *Server) KillWindow(sessionName string, windowIndex int) error {
 		}
 	}
 	return fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func (s *Server) KillOtherWindows(sessionName string, windowIndex int) ([]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil, fmt.Errorf("can't find session: %s", sessionName)
+	}
+	keepIndex := windowSliceIndex(session, windowIndex)
+	if keepIndex == -1 {
+		return nil, fmt.Errorf("can't find window: %d", windowIndex)
+	}
+	keepID := session.Windows[keepIndex].ID
+	killed := make([]int, 0)
+	kept := make([]*Window, 0, 1)
+	for _, window := range session.Windows {
+		if window.ID == keepID {
+			kept = append(kept, window)
+		} else {
+			for _, pane := range window.Panes {
+				killed = append(killed, pane.ID)
+				killPane(pane)
+			}
+		}
+	}
+	session.Windows = kept
+	session.Active = 0
+	session.Activity = time.Now()
+	return killed, nil
 }
 
 func (s *Server) SwapWindows(sourceSessionName string, sourceWindowIndex int, targetSessionName string, targetWindowIndex int, detached bool) error {

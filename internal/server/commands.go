@@ -210,6 +210,19 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		if pane == nil {
 			return fail("can't find pane")
 		}
+		if hasAny(args, "-a") {
+			killed, err := rt.state.KillOtherPanesByID(pane.ID)
+			if err != nil {
+				return fail(err.Error())
+			}
+			rt.screensMu.Lock()
+			for _, paneID := range killed {
+				delete(rt.screens, paneID)
+			}
+			rt.screensMu.Unlock()
+			rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+			return ok("")
+		}
 		if err := rt.state.KillPaneByID(pane.ID); err != nil {
 			return fail(err.Error())
 		}
@@ -222,6 +235,19 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
 		if !found {
 			return fail("can't find window")
+		}
+		if hasAny(args, "-a") {
+			killed, err := rt.state.KillOtherWindows(sessionName, windowIndex)
+			if err != nil {
+				return fail(err.Error())
+			}
+			rt.screensMu.Lock()
+			for _, paneID := range killed {
+				delete(rt.screens, paneID)
+			}
+			rt.screensMu.Unlock()
+			rt.resizeSessionPanes(currentSession)
+			return ok("")
 		}
 		var err error
 		if hasWindow {

@@ -324,12 +324,30 @@ compare "join-pane panes" list-panes -t joinp:0 -F "#{pane_index}:#{pane_id}:#{p
 compare "kill-pane target command" kill-pane -t killp:.0
 compare "kill-pane target panes" list-panes -t killp -F "#{pane_index}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s killpa -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t killpa -h /bin/sh
+"${tmux_cmd[@]}" split-window -t killpa -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s killpa -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t killpa -h /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t killpa -h /bin/sh >/dev/null
+compare "kill-pane all command" kill-pane -a -t killpa:.1
+compare "kill-pane all panes" list-panes -t killpa -F "#{pane_index}:#{pane_id}:#{pane_left}:#{pane_width}:#{pane_active}"
+
 "${tmux_cmd[@]}" new-session -d -s killw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t killw -n second /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s killw -x 80 -y 24 -n first /bin/sh >/dev/null
 "${gotmux_cmd[@]}" new-window -t killw -n second /bin/sh >/dev/null
 compare "kill-window target command" kill-window -t killw:1
 compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s killwa -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t killwa -n second /bin/sh
+"${tmux_cmd[@]}" new-window -t killwa -n third /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s killwa -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t killwa -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t killwa -n third /bin/sh >/dev/null
+compare "kill-window all command" kill-window -a -t killwa:1
+compare "kill-window all windows" list-windows -t killwa -F "#{window_index}:#{window_name}:#{window_active}"
 
 "${tmux_cmd[@]}" new-session -d -s swapw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t swapw -n second /bin/sh
