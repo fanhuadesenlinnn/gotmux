@@ -194,6 +194,43 @@ func TestMoveWindowToSparseIndexAndRenumber(t *testing.T) {
 	}
 }
 
+func TestSelectLastWindowTogglesPreviousWindow(t *testing.T) {
+	state := NewServer("/tmp/gotmux-layout-test.sock")
+	session, firstWindow, _, err := state.NewSession("lastw", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondWindow, _, err := state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thirdWindow, _, err := state.NewWindow(session.Name, "third", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 2 || session.LastWindowID != secondWindow.ID {
+		t.Fatalf("new windows active=%d last=%d, want active third and last second", session.Active, session.LastWindowID)
+	}
+	if err := state.SelectWindow(session.Name, firstWindow.Index); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 0 || session.LastWindowID != thirdWindow.ID {
+		t.Fatalf("select first active=%d last=%d, want active first and last third", session.Active, session.LastWindowID)
+	}
+	if err := state.SelectLastWindow(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 2 || session.LastWindowID != firstWindow.ID {
+		t.Fatalf("last-window active=%d last=%d, want active third and last first", session.Active, session.LastWindowID)
+	}
+	if err := state.SelectLastWindow(session.Name); err != nil {
+		t.Fatal(err)
+	}
+	if session.Active != 0 || session.LastWindowID != thirdWindow.ID {
+		t.Fatalf("second last-window active=%d last=%d, want active first and last third", session.Active, session.LastWindowID)
+	}
+}
+
 func TestSelectEvenLayoutByIndexDoesNotChangeActiveWindow(t *testing.T) {
 	state := NewServer("/tmp/gotmux-layout-test.sock")
 	session, _, _, err := state.NewSession("layouts", "", "first", []string{"/bin/sh"})

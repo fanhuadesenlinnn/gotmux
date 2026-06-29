@@ -202,6 +202,41 @@ func TestSelectWindowHonorsTargetSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "src"}, "src", 80, 24)
 }
 
+func TestLastWindowCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lastw", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "lastw", "-n", "second", "/bin/sh"}, "lastw", 80, 24); !msg.OK {
+		t.Fatalf("new-window second failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-window", "-t", "lastw", "-n", "third", "/bin/sh"}, "lastw", 80, 24); !msg.OK {
+		t.Fatalf("new-window third failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"last-window", "-t", "lastw"}, "lastw", 80, 24); !msg.OK {
+		t.Fatalf("last-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-t", "lastw", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "lastw", 80, 24)
+	if windows.Text != "0:first:0\n1:second:1\n2:third:0" {
+		t.Fatalf("windows after last-window = %q", windows.Text)
+	}
+	if msg := rt.execute([]string{"select-window", "-l", "-t", "lastw"}, "lastw", 80, 24); !msg.OK {
+		t.Fatalf("select-window -l failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "lastw", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "lastw", 80, 24)
+	if windows.Text != "0:first:0\n1:second:0\n2:third:1" {
+		t.Fatalf("windows after select-window -l = %q", windows.Text)
+	}
+	if msg := rt.execute([]string{"last", "-t", "lastw"}, "lastw", 80, 24); !msg.OK {
+		t.Fatalf("last alias failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "lastw", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "lastw", 80, 24)
+	if windows.Text != "0:first:0\n1:second:1\n2:third:0" {
+		t.Fatalf("windows after last alias = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "lastw"}, "lastw", 80, 24)
+}
+
 func TestSwapWindowCommand(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "swapw", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

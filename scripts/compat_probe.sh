@@ -336,6 +336,17 @@ compare "rename-window target windows" list-windows -t renamew -F "#{window_inde
 compare "select-window target command" select-window -t selectw:0
 compare "select-window target windows" list-windows -t selectw -F "#{window_index}:#{window_name}:#{window_active}"
 
+"${tmux_cmd[@]}" new-session -d -s lastw -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t lastw -n second /bin/sh
+"${tmux_cmd[@]}" new-window -t lastw -n third /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s lastw -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t lastw -n second /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t lastw -n third /bin/sh >/dev/null
+compare "last-window command" last-window -t lastw
+compare "last-window windows" list-windows -t lastw -F "#{window_index}:#{window_name}:#{window_active}"
+compare "select-window last flag command" select-window -l -t lastw
+compare "select-window last flag windows" list-windows -t lastw -F "#{window_index}:#{window_name}:#{window_active}"
+
 "${tmux_cmd[@]}" set -g status off
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status

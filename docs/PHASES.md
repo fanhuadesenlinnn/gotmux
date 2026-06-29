@@ -56,7 +56,8 @@ implemented. Basic targeted
 operate on explicit targets, drop related screen snapshots where needed, and
 collapse pane layout leaves; targeted `rename-window -t` renames non-active
 target windows, explicit-target `swap-window` swaps window positions, and basic
-`move-window` moves and renumbers windows.
+`move-window` moves and renumbers windows. `last-window` and `select-window -l`
+track and switch back to the previous window in the probe subset.
 Geometry is compared with tmux through `scripts/compat_probe.sh`;
 custom layout strings, old-layout restore, marked pane defaults, floating panes,
 target-index pane moves, join/move size and placement flags, tmux-style border

@@ -34,16 +34,17 @@ type Server struct {
 }
 
 type Session struct {
-	ID          int
-	Name        string
-	CWD         string
-	CreatedAt   time.Time
-	Activity    time.Time
-	Windows     []*Window
-	Active      int
-	Attached    int
-	Options     map[string]string
-	Environment map[string]string
+	ID           int
+	Name         string
+	CWD          string
+	CreatedAt    time.Time
+	Activity     time.Time
+	Windows      []*Window
+	Active       int
+	LastWindowID int
+	Attached     int
+	Options      map[string]string
+	Environment  map[string]string
 }
 
 type Window struct {
@@ -165,6 +166,7 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "%", "split-window", "-h")
 	add("prefix", "c", "new-window")
 	add("prefix", "d", "detach-client")
+	add("prefix", "l", "last-window")
 	add("prefix", "n", "next-window")
 	add("prefix", "p", "previous-window")
 	add("prefix", "o", "select-pane", "-t", ":.+")
@@ -218,11 +220,12 @@ func (s *Server) NewSession(name, cwd string, windowName string, command []strin
 	}
 
 	session := &Session{
-		ID:        s.NextSessionID,
-		Name:      name,
-		CWD:       cwd,
-		CreatedAt: time.Now(),
-		Activity:  time.Now(),
+		ID:           s.NextSessionID,
+		Name:         name,
+		CWD:          cwd,
+		CreatedAt:    time.Now(),
+		Activity:     time.Now(),
+		LastWindowID: -1,
 	}
 	s.NextSessionID++
 	s.Sessions[name] = session
@@ -242,6 +245,9 @@ func (s *Server) NewWindow(sessionName, name, cwd string, command []string) (*Wi
 	}
 	if cwd == "" {
 		cwd = session.CWD
+	}
+	if active := session.ActiveWindow(); active != nil {
+		session.LastWindowID = active.ID
 	}
 	window := s.newWindowLocked(session, defaultWindowName(name, command))
 	pane := s.newPaneLocked(session, window, cwd, command)
@@ -720,10 +726,11 @@ func (s *Server) SelectWindow(sessionName string, index int) error {
 	if session == nil {
 		return fmt.Errorf("can't find session: %s", sessionName)
 	}
-	if index < 0 || index >= len(session.Windows) {
+	sliceIndex := windowSliceIndex(session, index)
+	if sliceIndex == -1 {
 		return fmt.Errorf("can't find window: %d", index)
 	}
-	session.Active = index
+	selectWindowSliceIndex(session, sliceIndex)
 	session.Activity = time.Now()
 	return nil
 }
@@ -739,9 +746,30 @@ func (s *Server) SelectRelativeWindow(sessionName string, delta int) error {
 	if len(session.Windows) == 0 {
 		return fmt.Errorf("session has no windows")
 	}
-	session.Active = (session.Active + delta + len(session.Windows)) % len(session.Windows)
+	selectWindowSliceIndex(session, (session.Active+delta+len(session.Windows))%len(session.Windows))
 	session.Activity = time.Now()
 	return nil
+}
+
+func (s *Server) SelectLastWindow(sessionName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	if session.LastWindowID < 0 {
+		return fmt.Errorf("no last window")
+	}
+	for index, window := range session.Windows {
+		if window.ID == session.LastWindowID {
+			selectWindowSliceIndex(session, index)
+			session.Activity = time.Now()
+			return nil
+		}
+	}
+	return fmt.Errorf("no last window")
 }
 
 func (s *Server) SelectRelativePane(sessionName string, delta int) error {
@@ -1903,6 +1931,16 @@ func activeWindowID(session *Session) int {
 		return window.ID
 	}
 	return -1
+}
+
+func selectWindowSliceIndex(session *Session, index int) {
+	if index < 0 || index >= len(session.Windows) {
+		return
+	}
+	if active := session.ActiveWindow(); active != nil && active.ID != session.Windows[index].ID {
+		session.LastWindowID = active.ID
+	}
+	session.Active = index
 }
 
 func windowSliceIndex(session *Session, windowIndex int) int {

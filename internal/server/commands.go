@@ -107,12 +107,37 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "send-prefix":
 		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
+		if hasAny(args, "-l") {
+			target := cleanSessionTarget(optionValue(args, "-t", currentSession))
+			if target == "" {
+				target = firstSessionName(rt.state)
+			}
+			if strings.Contains(target, ":") {
+				target, _, _, _, _ = parsePaneTarget(target)
+			}
+			if err := rt.state.SelectLastWindow(target); err != nil {
+				return fail(err.Error())
+			}
+			return ok("")
+		}
 		target := optionValue(args, "-t", "")
 		sessionName, index, parsed := selectWindowTarget(target, currentSession)
 		if !parsed {
 			return fail("bad window target")
 		}
 		if err := rt.state.SelectWindow(sessionName, index); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	case "last-window":
+		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
+		if target == "" {
+			target = firstSessionName(rt.state)
+		}
+		if strings.Contains(target, ":") {
+			target, _, _, _, _ = parsePaneTarget(target)
+		}
+		if err := rt.state.SelectLastWindow(target); err != nil {
 			return fail(err.Error())
 		}
 		return ok("")
@@ -1069,6 +1094,8 @@ func normalizeCommandName(name string) string {
 		return "split-window"
 	case "selectw":
 		return "select-window"
+	case "last":
+		return "last-window"
 	case "next":
 		return "next-window"
 	case "prev":
@@ -1141,7 +1168,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "send-prefix", "resize-pane", "last-window", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer":
