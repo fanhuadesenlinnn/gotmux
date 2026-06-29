@@ -35,6 +35,20 @@ func TestCommandRejectsDuplicateSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "work"}, "work", 80, 24)
 }
 
+func TestNewSessionPrintFlag(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "newsout", "-n", "first", "/bin/sh"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" || msg.Session != "newsout" {
+		t.Fatalf("new-session default output = %#v, want empty text and session newsout", msg)
+	}
+	msg = rt.execute([]string{"new-session", "-d", "-P", "-F", "#{session_name}:#{window_index}.#{pane_index}", "-s", "newsp", "-n", "first", "/bin/sh"}, "", 80, 24)
+	if !msg.OK || msg.Text != "newsp:0.0" || msg.Session != "newsp" {
+		t.Fatalf("new-session -P output = %#v, want newsp:0.0", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "newsout"}, "newsout", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "newsp"}, "newsp", 80, 24)
+}
+
 func TestCommandSequence(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.executeCommands([][]string{

@@ -12,6 +12,7 @@ manual verification note.
 | Server-owned PTYs | Implemented |
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
+| `new-session` output | Implemented for tmux-style quiet default and basic `-P`/`-F` print output |
 | Attach/detach | Implemented |
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, basic `resize-window`, and basic `move-window`/renumber |
 | Common `C-b` prefix bindings | Implemented |

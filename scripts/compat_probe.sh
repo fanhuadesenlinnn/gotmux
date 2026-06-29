@@ -95,6 +95,9 @@ compare_key_line() {
   printf 'ok %s\n' "${name}"
 }
 
+compare "new-session detached output" new-session -d -s newsout -n first /bin/sh
+compare "new-session print output" new-session -d -P -F "#{session_name}:#{window_index}.#{pane_index}" -s newsp -n first /bin/sh
+
 compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_windows}:#{session_attached}"
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"

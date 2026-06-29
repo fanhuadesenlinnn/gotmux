@@ -357,10 +357,14 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	windowName := optionValue(args, "-n", "")
 	cwd := optionValue(args, "-c", "")
 	command := trailingCommand(args, map[string]bool{
-		"-s": true, "-n": true, "-c": true, "-t": true, "-x": true, "-y": true,
+		"-s": true, "-n": true, "-c": true, "-F": true, "-t": true, "-x": true, "-y": true,
 	})
 	if hasAny(args, "-A") && name != "" && sessionExists(rt.state, name) {
-		return ok(name)
+		text := ""
+		if hasAny(args, "-P") {
+			text = formatString(optionValue(args, "-F", "#{session_name}:"), activeFormatContext(rt.state, name))
+		}
+		return protocol.Message{Type: protocol.TypeResult, OK: true, Text: text, Session: name}
 	}
 	session, _, pane, err := rt.state.NewSession(name, cwd, windowName, command)
 	if err != nil {
@@ -370,7 +374,11 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
-	return protocol.Message{Type: protocol.TypeResult, OK: true, Text: session.Name, Session: session.Name}
+	text := ""
+	if hasAny(args, "-P") {
+		text = formatString(optionValue(args, "-F", "#{session_name}:"), activeFormatContext(rt.state, session.Name))
+	}
+	return protocol.Message{Type: protocol.TypeResult, OK: true, Text: text, Session: session.Name}
 }
 
 func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, height int) protocol.Message {
