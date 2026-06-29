@@ -117,6 +117,18 @@ compare "list-windows all sessions" list-windows -a -F "#{session_name}:#{window
 compare "list-panes session scope" list-panes -s -t lsta -F "#{session_name}:#{window_index}:#{pane_index}"
 compare "list-panes all sessions" list-panes -a -F "#{session_name}:#{window_index}:#{pane_index}"
 
+"${tmux_cmd[@]}" new-session -d -s sendt -x 20 -y 4 /bin/sh
+"${tmux_cmd[@]}" split-window -t sendt -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s sendt -x 20 -y 4 /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t sendt -h /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t sendt:.0 "printf '\\033[H\\033[2Jleft\\n'" Enter
+"${tmux_cmd[@]}" send-keys -t sendt:.1 "printf '\\033[H\\033[2Jright\\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t sendt:.0 "printf '\\033[H\\033[2Jleft\\n'" Enter >/dev/null
+"${gotmux_cmd[@]}" send-keys -t sendt:.1 "printf '\\033[H\\033[2Jright\\n'" Enter >/dev/null
+sleep 0.4
+compare "send-keys target left pane" capture-pane -p -t sendt:.0 -S 0 -E 0
+compare "send-keys target right pane" capture-pane -p -t sendt:.1 -S 0 -E 0
+
 "${tmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s cap -x 20 -y 5 /bin/sh >/dev/null
 "${tmux_cmd[@]}" send-keys -t cap "printf '\\033[H\\033[2Jone  \\ntwo\\nthree\\n'" Enter

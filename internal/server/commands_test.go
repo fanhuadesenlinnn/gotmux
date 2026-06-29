@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -136,6 +137,44 @@ func TestDisplayMessageTargetsPane(t *testing.T) {
 		t.Fatalf("targeted display-message = %q", msg.Text)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "displayt"}, "displayt", 80, 24)
+}
+
+func TestSendKeysTargetsPaneAndRepeats(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, first, err := rt.state.NewSession("sendt", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstRead, firstWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondRead, secondWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.PTY = firstWrite
+	second.PTY = secondWrite
+	msg := rt.execute([]string{"send-keys", "-N", "2", "-t", "sendt:.0", "A", "Enter"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("send-keys failed: %s", msg.Text)
+	}
+	_ = firstWrite.Close()
+	_ = secondWrite.Close()
+	firstData, _ := io.ReadAll(firstRead)
+	secondData, _ := io.ReadAll(secondRead)
+	if string(firstData) != "A\rA\r" {
+		t.Fatalf("target pane data = %q, want repeated A enter", firstData)
+	}
+	if string(secondData) != "" {
+		t.Fatalf("non-target pane data = %q, want empty", secondData)
+	}
+	_ = firstRead.Close()
+	_ = secondRead.Close()
 }
 
 func TestCommonTmuxCommandAliases(t *testing.T) {

@@ -1669,6 +1669,38 @@ func (s *Server) ActivePane(sessionName string) *Pane {
 	return window.ActivePane()
 }
 
+func (s *Server) TargetPane(sessionName string, windowIndex int, hasWindow bool, paneIndex int, hasPane bool) *Pane {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil
+	}
+	window := session.ActiveWindow()
+	if hasWindow {
+		window = nil
+		for _, candidate := range session.Windows {
+			if candidate.Index == windowIndex {
+				window = candidate
+				break
+			}
+		}
+	}
+	if window == nil {
+		return nil
+	}
+	if hasPane {
+		for _, pane := range window.Panes {
+			if pane.Index == paneIndex {
+				return pane
+			}
+		}
+		return nil
+	}
+	return window.ActivePane()
+}
+
 func (s *Server) ActiveSessionName(clientID int64) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

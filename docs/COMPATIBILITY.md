@@ -25,6 +25,7 @@ manual verification note.
 | Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw` |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
+| Basic key sending | Implemented for targeted `send-keys -t` and simple `-N` repeats in the probe subset |
 | Basic pane geometry | Implemented for simple horizontal/vertical splits, nested splits, targeted `resize-pane -t`, targeted `select-layout -t` built-in layouts, basic next/previous layout cycling, basic same-window `swap-pane`, basic `rotate-window`, basic `break-pane`, and basic `join-pane`/`move-pane` in the tested subset |
 | Basic terminal screen grid | Implemented for common printable output, cursor movement, clear line/screen, insertion/deletion, scrolling, and alternate-screen escape sequences |
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |

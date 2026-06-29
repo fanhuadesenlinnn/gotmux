@@ -322,9 +322,7 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		}
 		return ok("")
 	case "send-keys":
-		keys := nonOptionArgs(args)
-		rt.sendKeys(currentSession, keys)
-		return ok("")
+		return rt.cmdSendKeys(args, currentSession)
 	case "display-message":
 		return rt.cmdDisplayMessage(args, currentSession)
 	case "capture-pane":
@@ -862,7 +860,7 @@ func (rt *Runtime) cmdPasteBuffer(args []string, currentSession string) protocol
 	if err != nil {
 		return fail(err.Error())
 	}
-	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	pane := rt.targetLivePane(optionValue(args, "-t", currentSession), currentSession)
 	if pane == nil || pane.PTY == nil {
 		return ok("")
 	}
@@ -1156,7 +1154,7 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 }
 
 func (rt *Runtime) cmdSendPrefix(args []string, currentSession string) protocol.Message {
-	pane := rt.state.ActivePane(currentSession)
+	pane := rt.targetLivePane(optionValue(args, "-t", currentSession), currentSession)
 	if pane == nil || pane.PTY == nil {
 		return ok("")
 	}
@@ -1164,14 +1162,34 @@ func (rt *Runtime) cmdSendPrefix(args []string, currentSession string) protocol.
 	return ok("")
 }
 
-func (rt *Runtime) sendKeys(session string, keys []string) {
-	pane := rt.state.ActivePane(session)
+func (rt *Runtime) cmdSendKeys(args []string, currentSession string) protocol.Message {
+	pane := rt.targetLivePane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	repeat := 1
+	if value := optionValue(args, "-N", ""); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 {
+			return fail("repeat count invalid")
+		}
+		repeat = parsed
+	}
+	keys := nonOptionArgs(args)
+	for i := 0; i < repeat; i++ {
+		sendKeysToPane(pane, keys, hasAny(args, "-l"))
+	}
+	return ok("")
+}
+
+func sendKeysToPane(pane *model.Pane, keys []string, literal bool) {
 	if pane == nil || pane.PTY == nil {
 		return
 	}
-	for i, key := range keys {
-		if i > 0 {
-			_, _ = pane.PTY.Write([]byte(" "))
+	for _, key := range keys {
+		if literal {
+			_, _ = pane.PTY.Write([]byte(key))
+			continue
 		}
 		switch key {
 		case "Enter", "C-m":
@@ -1839,6 +1857,17 @@ func (rt *Runtime) targetPane(target string, currentSession string) *model.Pane 
 		return window.ActivePane()
 	}
 	return nil
+}
+
+func (rt *Runtime) targetLivePane(target string, currentSession string) *model.Pane {
+	sessionName, windowIndex, paneIndex, hasWindow, hasPane := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(rt.state)
+	}
+	return rt.state.TargetPane(sessionName, windowIndex, hasWindow, paneIndex, hasPane)
 }
 
 func (rt *Runtime) adjacentPane(paneID int, delta int) *model.Pane {
