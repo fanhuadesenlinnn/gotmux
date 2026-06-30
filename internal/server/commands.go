@@ -31,6 +31,7 @@ var commandInfos = []commandInfo{
 	{Name: "detach-client", Alias: "detach", Usage: "[-aP] [-E shell-command] [-s target-session] [-t target-client]"},
 	{Name: "display-message", Alias: "display", Usage: "[-aCIlNpv] [-c target-client] [-d delay] [-F format] [-t target-pane] [message]"},
 	{Name: "has-session", Alias: "has", Usage: "[-t target-session]"},
+	{Name: "if-shell", Alias: "if", Usage: "[-bF] [-t target-pane] shell-command command [command]"},
 	{Name: "join-pane", Alias: "joinp", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
 	{Name: "kill-pane", Alias: "killp", Usage: "[-a] [-t target-pane]"},
 	{Name: "kill-server"},
@@ -178,6 +179,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSetEnvironment(args, currentSession)
 	case "show-environment":
 		return rt.cmdShowEnvironment(args, currentSession)
+	case "if-shell":
+		return rt.cmdIfShell(args, currentSession, width, height)
 	case "send-prefix":
 		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
@@ -1194,6 +1197,51 @@ func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdIfShell(args []string, currentSession string, width, height int) protocol.Message {
+	values := ifShellOperands(args)
+	if len(values) < 2 {
+		return fail("not enough arguments")
+	}
+	shellCommand := values[0]
+	ifCommand := values[1]
+	elseCommand := ""
+	if len(values) > 2 {
+		elseCommand = values[2]
+	}
+	runSelected := func(selected string) protocol.Message {
+		if selected == "" {
+			return ok("")
+		}
+		commands, err := command.ParseArgv([]string{selected})
+		if err != nil {
+			return fail(err.Error())
+		}
+		return rt.executeCommands(commands, currentSession, width, height)
+	}
+	if hasAny(args, "-F") {
+		if shellCommand != "" && shellCommand != "0" {
+			return runSelected(ifCommand)
+		}
+		return runSelected(elseCommand)
+	}
+	if hasAny(args, "-b") {
+		go func() {
+			_, code, err := runShellCommand(shellCommand, "", false)
+			if err == nil && code == 0 {
+				_ = runSelected(ifCommand)
+				return
+			}
+			_ = runSelected(elseCommand)
+		}()
+		return ok("")
+	}
+	_, code, err := runShellCommand(shellCommand, "", false)
+	if err == nil && code == 0 {
+		return runSelected(ifCommand)
+	}
+	return runSelected(elseCommand)
+}
+
 func (rt *Runtime) cmdRunShell(args []string, currentSession string, width, height int) protocol.Message {
 	delay, err := runShellDelay(args)
 	if err != nil {
@@ -1403,6 +1451,25 @@ func runShellOperands(args []string) []string {
 	return out
 }
 
+func ifShellOperands(args []string) []string {
+	var out []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			if arg == "-t" && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
 func runShellCommand(shellCommand string, cwd string, showStderr bool) (string, int, error) {
 	cmd := exec.Command("sh", "-c", shellCommand)
 	if cwd != "" {
@@ -1445,6 +1512,8 @@ func normalizeCommandName(name string) string {
 		return "detach-client"
 	case "has":
 		return "has-session"
+	case "if":
+		return "if-shell"
 	case "ls":
 		return "list-sessions"
 	case "lsp":
@@ -1551,7 +1620,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer", "list-commands", "start-server":

@@ -179,6 +179,30 @@ func TestRunShell(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "runsc"}, "runsc", 80, 24)
 }
 
+func TestIfShell(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"if-shell", "true", "display-message -p -F yes", "display-message -p -F no"}, "", 80, 24)
+	if !msg.OK || msg.Text != "yes" {
+		t.Fatalf("if-shell true branch = %#v", msg)
+	}
+	msg = rt.execute([]string{"if-shell", "false", "display-message -p -F yes", "display-message -p -F no"}, "", 80, 24)
+	if !msg.OK || msg.Text != "no" {
+		t.Fatalf("if-shell false branch = %#v", msg)
+	}
+	msg = rt.execute([]string{"if", "-F", "1", "display-message -p -F fmt-yes", "display-message -p -F fmt-no"}, "", 80, 24)
+	if !msg.OK || msg.Text != "fmt-yes" {
+		t.Fatalf("if -F true branch = %#v", msg)
+	}
+	msg = rt.execute([]string{"if-shell", "-F", "0", "display-message -p -F fmt-yes", "display-message -p -F fmt-no"}, "", 80, 24)
+	if !msg.OK || msg.Text != "fmt-no" {
+		t.Fatalf("if-shell -F false branch = %#v", msg)
+	}
+	msg = rt.execute([]string{"if-shell", "false", "display-message -p -F yes"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("if-shell false without else = %#v", msg)
+	}
+}
+
 func TestDisplayMessageTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayt", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
