@@ -101,6 +101,10 @@ compare "new-session print output" new-session -d -P -F "#{session_name}:#{windo
 compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_windows}:#{session_attached}"
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
+compare "list-commands new-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" new-session
+compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
+compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
+compare "start-server command" start-server
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"

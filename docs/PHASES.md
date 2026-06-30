@@ -22,9 +22,10 @@ Status: complete for the current probe subset.
   `show-environment`, `bind-key`, `unbind-key`, and `list-keys`.
 
 Status: in progress. Basic command sequences, explicit `-f`, default
-`$HOME/.tmux.conf` discovery, `source-file`, string-backed options, basic
-environment commands, prefix/root key bindings, and `send-prefix` are
-implemented and covered by `scripts/compat_probe.sh`. Full tmux syntax,
+`$HOME/.tmux.conf` discovery, `source-file`, basic `list-commands` metadata for
+currently supported commands, string-backed options, basic environment commands,
+prefix/root key bindings, and `send-prefix` are implemented and covered by
+`scripts/compat_probe.sh`. Full tmux syntax,
 environment edge cases, and complete option/key semantics remain.
 
 ## Phase 3: Terminal Screen Model

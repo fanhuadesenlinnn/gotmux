@@ -13,6 +13,72 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 )
 
+type commandInfo struct {
+	Name  string
+	Alias string
+	Usage string
+}
+
+var commandInfos = []commandInfo{
+	{Name: "attach-session", Alias: "attach", Usage: "[-dErx] [-c working-directory] [-f flags] [-t target-session]"},
+	{Name: "bind-key", Alias: "bind", Usage: "[-nr] [-N note] [-T key-table] key [command [arguments]]"},
+	{Name: "break-pane", Alias: "breakp", Usage: "[-abdP] [-F format] [-n window-name] [-s src-pane] [-t dst-window]"},
+	{Name: "capture-pane", Alias: "capturep", Usage: "[-aCeJNpPqT] [-b buffer-name] [-E end-line] [-S start-line] [-t target-pane]"},
+	{Name: "clear-history", Alias: "clearhist", Usage: "[-H] [-t target-pane]"},
+	{Name: "delete-buffer", Alias: "deleteb", Usage: "[-b buffer-name]"},
+	{Name: "detach-client", Alias: "detach", Usage: "[-aP] [-E shell-command] [-s target-session] [-t target-client]"},
+	{Name: "display-message", Alias: "display", Usage: "[-aCIlNpv] [-c target-client] [-d delay] [-F format] [-t target-pane] [message]"},
+	{Name: "has-session", Alias: "has", Usage: "[-t target-session]"},
+	{Name: "join-pane", Alias: "joinp", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
+	{Name: "kill-pane", Alias: "killp", Usage: "[-a] [-t target-pane]"},
+	{Name: "kill-server"},
+	{Name: "kill-session", Usage: "[-aC] [-t target-session]"},
+	{Name: "kill-window", Alias: "killw", Usage: "[-a] [-t target-window]"},
+	{Name: "last-pane", Alias: "lastp", Usage: "[-deZ] [-t target-window]"},
+	{Name: "last-window", Alias: "last", Usage: "[-t target-session]"},
+	{Name: "list-buffers", Alias: "lsb", Usage: "[-F format]"},
+	{Name: "list-commands", Alias: "lscm", Usage: "[-F format] [command]"},
+	{Name: "list-keys", Alias: "lsk", Usage: "[-1aN] [-F format] [-P prefix-string] [-T key-table] [key]"},
+	{Name: "list-panes", Alias: "lsp", Usage: "[-as] [-F format] [-f filter] [-t target]"},
+	{Name: "list-sessions", Alias: "ls", Usage: "[-F format] [-f filter]"},
+	{Name: "list-windows", Alias: "lsw", Usage: "[-ar] [-F format] [-f filter] [-O order][-t target-session]"},
+	{Name: "load-buffer", Alias: "loadb", Usage: "[-b buffer-name] path"},
+	{Name: "move-pane", Alias: "movep", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
+	{Name: "move-window", Alias: "movew", Usage: "[-abdk] [-s src-window] [-t dst-window]"},
+	{Name: "new-session", Alias: "new", Usage: "[-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]"},
+	{Name: "new-window", Alias: "neww", Usage: "[-abdkPS] [-c start-directory] [-e environment] [-F format] [-n window-name] [-t target-window] [shell-command [argument ...]]"},
+	{Name: "next-layout", Alias: "nextl", Usage: "[-t target-window]"},
+	{Name: "next-window", Alias: "next", Usage: "[-a] [-t target-session]"},
+	{Name: "paste-buffer", Alias: "pasteb", Usage: "[-dpr] [-b buffer-name] [-s separator] [-t target-pane]"},
+	{Name: "previous-layout", Alias: "prevl", Usage: "[-t target-window]"},
+	{Name: "previous-window", Alias: "prev", Usage: "[-a] [-t target-session]"},
+	{Name: "rename-session", Alias: "rename", Usage: "[-t target-session] new-name"},
+	{Name: "rename-window", Alias: "renamew", Usage: "[-t target-window] new-name"},
+	{Name: "resize-pane", Alias: "resizep", Usage: "[-DLMRTUZ] [-x width] [-y height] [-t target-pane] [adjustment]"},
+	{Name: "resize-window", Alias: "resizew", Usage: "[-aADLRU] [-x width] [-y height] [-t target-window] [adjustment]"},
+	{Name: "rotate-window", Alias: "rotatew", Usage: "[-DUZ] [-t target-window]"},
+	{Name: "save-buffer", Alias: "saveb", Usage: "[-a] [-b buffer-name] path"},
+	{Name: "select-layout", Alias: "selectl", Usage: "[-Enop] [-t target-window] [layout-name]"},
+	{Name: "select-pane", Alias: "selectp", Usage: "[-DdeLlMmRUZ] [-T title] [-t target-pane]"},
+	{Name: "select-window", Alias: "selectw", Usage: "[-lnpT] [-t target-window]"},
+	{Name: "send-keys", Alias: "send", Usage: "[-FHKlMRX] [-N repeat-count] [-t target-pane] key ..."},
+	{Name: "send-prefix", Usage: "[-2] [-t target-pane]"},
+	{Name: "set-buffer", Alias: "setb", Usage: "[-aw] [-b buffer-name] [-n new-buffer-name] [-t target-client] [data]"},
+	{Name: "set-environment", Alias: "setenv", Usage: "[-Fhgru] [-t target-session] name [value]"},
+	{Name: "set-option", Alias: "set", Usage: "[-aFgopqsuUw] [-t target-pane] option [value]"},
+	{Name: "set-window-option", Alias: "setw", Usage: "[-aFgoqu] [-t target-window] option [value]"},
+	{Name: "show-buffer", Alias: "showb", Usage: "[-b buffer-name]"},
+	{Name: "show-environment", Alias: "showenv", Usage: "[-hgs] [-t target-session] [name]"},
+	{Name: "show-options", Alias: "show", Usage: "[-AgHpqsvw] [-t target-pane] [option]"},
+	{Name: "show-window-options", Alias: "showw", Usage: "[-gv] [-t target-window] [option]"},
+	{Name: "source-file", Alias: "source", Usage: "[-Fnqv] path ..."},
+	{Name: "split-window", Alias: "splitw", Usage: "[-bdfhIvPZ] [-c start-directory] [-e environment] [-F format] [-l size] [-t target-pane] [shell-command [argument ...]]"},
+	{Name: "start-server", Alias: "start"},
+	{Name: "swap-pane", Alias: "swapp", Usage: "[-dDUZ] [-s src-pane] [-t dst-pane]"},
+	{Name: "swap-window", Alias: "swapw", Usage: "[-d] [-s src-window] [-t dst-window]"},
+	{Name: "unbind-key", Alias: "unbind", Usage: "[-anq] [-T key-table] key"},
+}
+
 func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
 	commands := msg.Commands
 	var err error
@@ -82,6 +148,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok(listWindowsCommand(rt.state, args, currentSession))
 	case "list-panes":
 		return ok(listPanesCommand(rt.state, args, currentSession))
+	case "list-commands":
+		return rt.cmdListCommands(args)
 	case "new-window":
 		return rt.cmdNewWindow(args, currentSession, width, height)
 	case "split-window":
@@ -285,6 +353,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		if err := rt.state.KillSession(target); err != nil {
 			return fail(err.Error())
 		}
+		return ok("")
+	case "start-server":
 		return ok("")
 	case "kill-server":
 		go func() {
@@ -1090,6 +1160,35 @@ func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
+	format := optionValue(args, "-F", "")
+	values := optionOperands(args)
+	commands := commandInfos
+	if len(values) > 0 {
+		info, err := findCommandInfo(values[0])
+		if err != nil {
+			return fail(err.Error())
+		}
+		commands = []commandInfo{info}
+	}
+	lines := make([]string, 0, len(commands))
+	for _, info := range commands {
+		if format != "" {
+			lines = append(lines, formatCommand(format, info))
+			continue
+		}
+		line := info.Name
+		if info.Alias != "" {
+			line += " (" + info.Alias + ")"
+		}
+		if info.Usage != "" {
+			line += " " + info.Usage
+		}
+		lines = append(lines, line)
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
 func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) protocol.Message {
 	values := optionOperands(args)
 	if len(values) == 0 {
@@ -1238,6 +1337,8 @@ func normalizeCommandName(name string) string {
 		return "list-panes"
 	case "lsw":
 		return "list-windows"
+	case "lscm":
+		return "list-commands"
 	case "neww":
 		return "new-window"
 	case "splitw":
@@ -1328,6 +1429,8 @@ func normalizeCommandName(name string) string {
 		return "resize-window"
 	case "selectl":
 		return "select-layout"
+	case "start":
+		return "start-server"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
@@ -1335,11 +1438,37 @@ func normalizeCommandName(name string) string {
 		"show-environment", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer":
+		"paste-buffer", "load-buffer", "save-buffer", "list-commands", "start-server":
 		return name
 	default:
 		return name
 	}
+}
+
+func findCommandInfo(query string) (commandInfo, error) {
+	normalized := normalizeCommandName(query)
+	for _, info := range commandInfos {
+		if info.Name == normalized || info.Alias == query {
+			return info, nil
+		}
+	}
+	var matches []commandInfo
+	for _, info := range commandInfos {
+		if strings.HasPrefix(info.Name, query) {
+			matches = append(matches, info)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if len(matches) == 0 {
+		return commandInfo{}, fmt.Errorf("unknown command: %s", query)
+	}
+	names := make([]string, 0, len(matches))
+	for _, info := range matches {
+		names = append(names, info.Name)
+	}
+	return commandInfo{}, fmt.Errorf("ambiguous command: %s, could be: %s", query, strings.Join(names, ", "))
 }
 
 func ok(text string) protocol.Message {
@@ -1768,6 +1897,19 @@ func formatKeyBinding(template string, binding model.KeyBinding) string {
 		"#{key}":       binding.Key,
 		"#{command}":   strings.Join(binding.Command, " "),
 		"#{note}":      binding.Note,
+	}
+	for old, newValue := range replacements {
+		out = strings.ReplaceAll(out, old, newValue)
+	}
+	return out
+}
+
+func formatCommand(template string, info commandInfo) string {
+	out := template
+	replacements := map[string]string{
+		"#{command_list_name}":  info.Name,
+		"#{command_list_alias}": info.Alias,
+		"#{command_list_usage}": info.Usage,
 	}
 	for old, newValue := range replacements {
 		out = strings.ReplaceAll(out, old, newValue)

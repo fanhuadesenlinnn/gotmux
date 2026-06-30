@@ -19,6 +19,7 @@ manual verification note.
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
+| Basic command metadata | Implemented for `list-commands`/`lscm` over currently supported commands plus `start-server`; the probe covers formatted command-list fields and alias lookup |
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |

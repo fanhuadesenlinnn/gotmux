@@ -124,6 +124,33 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	}
 }
 
+func TestListCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	format := "#{command_list_name}:#{command_list_alias}:#{command_list_usage}"
+	msg := rt.execute([]string{"list-commands", "-F", format, "new-session"}, "", 80, 24)
+	want := "new-session:new:[-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]"
+	if msg.Text != want {
+		t.Fatalf("list-commands new-session = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"lscm", "-F", format, "display"}, "", 80, 24)
+	want = "display-message:display:[-aCIlNpv] [-c target-client] [-d delay] [-F format] [-t target-pane] [message]"
+	if msg.Text != want {
+		t.Fatalf("lscm display = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-commands", "new-sess"}, "", 80, 24)
+	if msg.Text != "new-session (new) [-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]" {
+		t.Fatalf("list-commands prefix = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-commands", "list"}, "", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "ambiguous command: list") {
+		t.Fatalf("list-commands ambiguous = %#v", msg)
+	}
+	msg = rt.execute([]string{"start-server"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("start-server = %#v", msg)
+	}
+}
+
 func TestDisplayMessageTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayt", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
