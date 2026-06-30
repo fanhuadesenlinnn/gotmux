@@ -1982,6 +1982,26 @@ func (s *Server) DeleteBuffer(name string) error {
 	return nil
 }
 
+func (s *Server) RenameBuffer(name string, newName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if newName == "" {
+		return fmt.Errorf("empty buffer name")
+	}
+	buffer := s.bufferLocked(name)
+	if buffer == nil {
+		return noBufferError(name)
+	}
+	if _, exists := s.Buffers[newName]; exists {
+		return fmt.Errorf("buffer already exists: %s", newName)
+	}
+	delete(s.Buffers, buffer.Name)
+	buffer.Name = newName
+	s.Buffers[newName] = buffer
+	return nil
+}
+
 func (s *Server) ListBuffers() []Buffer {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

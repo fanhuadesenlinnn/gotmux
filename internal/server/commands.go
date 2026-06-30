@@ -818,6 +818,12 @@ func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protoco
 }
 
 func (rt *Runtime) cmdSetBuffer(args []string) protocol.Message {
+	if newName := optionValue(args, "-n", ""); newName != "" {
+		if err := rt.state.RenameBuffer(optionValue(args, "-b", ""), newName); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
 	values := optionOperands(args)
 	if len(values) == 0 {
 		return fail("missing buffer data")

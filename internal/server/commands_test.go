@@ -575,20 +575,32 @@ func TestBufferCommands(t *testing.T) {
 	if msg.Text != "named:11:hello world" {
 		t.Fatalf("list-buffers named = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"set-buffer", "-b", "named", "-n", "renamed"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("rename buffer failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-buffer", "-b", "renamed"}, "", 80, 24)
+	if msg.Text != "hello world" {
+		t.Fatalf("show renamed buffer = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show-buffer", "-b", "named"}, "", 80, 24)
+	if msg.OK || msg.Text != "no buffer named" {
+		t.Fatalf("show old buffer name = %#v", msg)
+	}
 	msg = rt.execute([]string{"set-buffer", "plain"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("set-buffer auto failed: %s", msg.Text)
 	}
 	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, "", 80, 24)
-	if !strings.Contains(msg.Text, "buffer0:5:plain") || !strings.Contains(msg.Text, "named:11:hello world") {
+	if !strings.Contains(msg.Text, "buffer0:5:plain") || !strings.Contains(msg.Text, "renamed:11:hello world") {
 		t.Fatalf("list-buffers auto = %q", msg.Text)
 	}
-	msg = rt.execute([]string{"delete-buffer", "-b", "named"}, "", 80, 24)
+	msg = rt.execute([]string{"delete-buffer", "-b", "renamed"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("delete-buffer failed: %s", msg.Text)
 	}
-	msg = rt.execute([]string{"show-buffer", "-b", "named"}, "", 80, 24)
-	if msg.OK || msg.Text != "no buffer named" {
+	msg = rt.execute([]string{"show-buffer", "-b", "renamed"}, "", 80, 24)
+	if msg.OK || msg.Text != "no buffer renamed" {
 		t.Fatalf("show deleted buffer = %#v", msg)
 	}
 }

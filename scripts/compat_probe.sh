@@ -166,9 +166,11 @@ compare "clear history alias" clearhist -t cap
 "${gotmux_cmd[@]}" set-buffer -b named "hello world" >/dev/null
 compare "show named buffer" show-buffer -b named
 compare "list buffers format" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
-"${tmux_cmd[@]}" delete-buffer -b named
-"${gotmux_cmd[@]}" delete-buffer -b named >/dev/null
-compare "delete named buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
+compare "rename named buffer" set-buffer -b named -n renamed
+compare "show renamed buffer" show-buffer -b renamed
+"${tmux_cmd[@]}" delete-buffer -b renamed
+"${gotmux_cmd[@]}" delete-buffer -b renamed >/dev/null
+compare "delete renamed buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
 
 buffer_file="$(mktemp)"
 tmux_saved_file="$(mktemp)"
