@@ -844,7 +844,7 @@ func (rt *Runtime) cmdMoveWindow(args []string, currentSession string) protocol.
 func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) protocol.Message {
 	template := optionValue(args, "-F", "")
 	if template == "" {
-		values := nonOptionArgs(args)
+		values := displayMessageOperands(args)
 		if len(values) > 0 {
 			template = strings.Join(values, " ")
 		}
@@ -1461,6 +1461,31 @@ func ifShellOperands(args []string) []string {
 		}
 		if strings.HasPrefix(arg, "-") && arg != "-" {
 			if arg == "-t" && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
+func displayMessageOperands(args []string) []string {
+	valueFlags := map[string]bool{
+		"-c": true,
+		"-d": true,
+		"-F": true,
+		"-t": true,
+	}
+	var out []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			if valueFlags[arg] && i+1 < len(args) {
 				i++
 			}
 			continue

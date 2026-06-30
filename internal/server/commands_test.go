@@ -181,23 +181,23 @@ func TestRunShell(t *testing.T) {
 
 func TestIfShell(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
-	msg := rt.execute([]string{"if-shell", "true", "display-message -p -F yes", "display-message -p -F no"}, "", 80, 24)
+	msg := rt.execute([]string{"if-shell", "true", "display-message -p yes", "display-message -p no"}, "", 80, 24)
 	if !msg.OK || msg.Text != "yes" {
 		t.Fatalf("if-shell true branch = %#v", msg)
 	}
-	msg = rt.execute([]string{"if-shell", "false", "display-message -p -F yes", "display-message -p -F no"}, "", 80, 24)
+	msg = rt.execute([]string{"if-shell", "false", "display-message -p yes", "display-message -p no"}, "", 80, 24)
 	if !msg.OK || msg.Text != "no" {
 		t.Fatalf("if-shell false branch = %#v", msg)
 	}
-	msg = rt.execute([]string{"if", "-F", "1", "display-message -p -F fmt-yes", "display-message -p -F fmt-no"}, "", 80, 24)
+	msg = rt.execute([]string{"if", "-F", "1", "display-message -p fmt-yes", "display-message -p fmt-no"}, "", 80, 24)
 	if !msg.OK || msg.Text != "fmt-yes" {
 		t.Fatalf("if -F true branch = %#v", msg)
 	}
-	msg = rt.execute([]string{"if-shell", "-F", "0", "display-message -p -F fmt-yes", "display-message -p -F fmt-no"}, "", 80, 24)
+	msg = rt.execute([]string{"if-shell", "-F", "0", "display-message -p fmt-yes", "display-message -p fmt-no"}, "", 80, 24)
 	if !msg.OK || msg.Text != "fmt-no" {
 		t.Fatalf("if-shell -F false branch = %#v", msg)
 	}
-	msg = rt.execute([]string{"if-shell", "false", "display-message -p -F yes"}, "", 80, 24)
+	msg = rt.execute([]string{"if-shell", "false", "display-message -p yes"}, "", 80, 24)
 	if !msg.OK || msg.Text != "" {
 		t.Fatalf("if-shell false without else = %#v", msg)
 	}
@@ -211,7 +211,11 @@ func TestDisplayMessageTargetsPane(t *testing.T) {
 	if msg := rt.execute([]string{"split-window", "-t", "displayt", "-h", "/bin/sh"}, "displayt", 80, 24); !msg.OK {
 		t.Fatalf("split-window failed: %s", msg.Text)
 	}
-	msg := rt.execute([]string{"display-message", "-p", "-t", "displayt:.0", "-F", "#{pane_index}:#{pane_active}"}, "displayt", 80, 24)
+	msg := rt.execute([]string{"display-message", "-p", "hello #{session_name}"}, "displayt", 80, 24)
+	if msg.Text != "hello displayt" {
+		t.Fatalf("display-message message = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"display-message", "-p", "-t", "displayt:.0", "-F", "#{pane_index}:#{pane_active}"}, "displayt", 80, 24)
 	if msg.Text != "0:0" {
 		t.Fatalf("targeted display-message = %q", msg.Text)
 	}

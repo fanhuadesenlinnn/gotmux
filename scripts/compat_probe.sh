@@ -130,12 +130,13 @@ compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"
 compare_status "run-shell exit status" run-shell "exit 7"
-compare "if-shell true branch" if-shell "true" "display-message -p -F yes" "display-message -p -F no"
-compare "if-shell false branch" if-shell "false" "display-message -p -F yes" "display-message -p -F no"
-compare "if-shell format branch" if -F "1" "display-message -p -F fmt-yes" "display-message -p -F fmt-no"
+compare "if-shell true branch" if-shell "true" "display-message -p yes" "display-message -p no"
+compare "if-shell false branch" if-shell "false" "display-message -p yes" "display-message -p no"
+compare "if-shell format branch" if -F "1" "display-message -p fmt-yes" "display-message -p fmt-no"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"
+compare "display-message message" display-message -p -t compat "hello #{session_name}"
 
 "${tmux_cmd[@]}" new-session -d -s lsta -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t lsta -n second /bin/sh
