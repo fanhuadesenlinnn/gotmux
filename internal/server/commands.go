@@ -2,7 +2,9 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,6 +59,7 @@ var commandInfos = []commandInfo{
 	{Name: "resize-pane", Alias: "resizep", Usage: "[-DLMRTUZ] [-x width] [-y height] [-t target-pane] [adjustment]"},
 	{Name: "resize-window", Alias: "resizew", Usage: "[-aADLRU] [-x width] [-y height] [-t target-window] [adjustment]"},
 	{Name: "rotate-window", Alias: "rotatew", Usage: "[-DUZ] [-t target-window]"},
+	{Name: "run-shell", Alias: "run", Usage: "[-bCE] [-c start-directory] [-d delay] [-t target-pane] [shell-command [argument ...]]"},
 	{Name: "save-buffer", Alias: "saveb", Usage: "[-a] [-b buffer-name] path"},
 	{Name: "select-layout", Alias: "selectl", Usage: "[-Enop] [-t target-window] [layout-name]"},
 	{Name: "select-pane", Alias: "selectp", Usage: "[-DdeLlMmRUZ] [-T title] [-t target-pane]"},
@@ -277,6 +280,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdSwapPane(args, currentSession)
 	case "rotate-window":
 		return rt.cmdRotateWindow(args, currentSession)
+	case "run-shell":
+		return rt.cmdRunShell(args, currentSession, width, height)
 	case "break-pane":
 		return rt.cmdBreakPane(args, currentSession)
 	case "join-pane", "move-pane":
@@ -1189,6 +1194,47 @@ func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdRunShell(args []string, currentSession string, width, height int) protocol.Message {
+	delay, err := runShellDelay(args)
+	if err != nil {
+		return fail(err.Error())
+	}
+	values := runShellOperands(args)
+	if len(values) == 0 {
+		return ok("")
+	}
+	shellCommand := strings.Join(values, " ")
+	if hasAny(args, "-C") {
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		commands, err := command.ParseArgv([]string{shellCommand})
+		if err != nil {
+			return fail(err.Error())
+		}
+		return rt.executeCommands(commands, currentSession, width, height)
+	}
+	cwd := expandPath(optionValue(args, "-c", ""))
+	showStderr := hasAny(args, "-E")
+	if hasAny(args, "-b") {
+		go func() {
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+			_, _, _ = runShellCommand(shellCommand, cwd, showStderr)
+		}()
+		return ok("")
+	}
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	text, code, err := runShellCommand(shellCommand, cwd, showStderr)
+	if err != nil {
+		return protocol.Message{Type: protocol.TypeResult, OK: false, Text: text, Code: code}
+	}
+	return ok(text)
+}
+
 func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) protocol.Message {
 	values := optionOperands(args)
 	if len(values) == 0 {
@@ -1321,6 +1367,74 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
+func runShellDelay(args []string) (time.Duration, error) {
+	value := optionValue(args, "-d", "")
+	if value == "" {
+		return 0, nil
+	}
+	seconds, err := strconv.ParseFloat(value, 64)
+	if err != nil || seconds < 0 {
+		return 0, fmt.Errorf("invalid delay time: %s", value)
+	}
+	return time.Duration(seconds * float64(time.Second)), nil
+}
+
+func runShellOperands(args []string) []string {
+	valueFlags := map[string]bool{
+		"-c": true,
+		"-d": true,
+		"-t": true,
+	}
+	var out []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			if valueFlags[arg] && i+1 < len(args) {
+				i++
+			}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
+func runShellCommand(shellCommand string, cwd string, showStderr bool) (string, int, error) {
+	cmd := exec.Command("sh", "-c", shellCommand)
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+	var output []byte
+	var err error
+	if showStderr {
+		output, err = cmd.CombinedOutput()
+	} else {
+		cmd.Stderr = io.Discard
+		output, err = cmd.Output()
+	}
+	text := strings.TrimRight(string(output), "\n")
+	if err == nil {
+		return text, 0, nil
+	}
+	code := 1
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		code = exitErr.ExitCode()
+	}
+	if code != 0 {
+		line := fmt.Sprintf("'%s' returned %d", shellCommand, code)
+		if text == "" {
+			text = line
+		} else {
+			text += "\n" + line
+		}
+	}
+	return text, code, err
+}
+
 func normalizeCommandName(name string) string {
 	switch name {
 	case "new":
@@ -1429,6 +1543,8 @@ func normalizeCommandName(name string) string {
 		return "resize-window"
 	case "selectl":
 		return "select-layout"
+	case "run":
+		return "run-shell"
 	case "start":
 		return "start-server"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
@@ -1436,7 +1552,7 @@ func normalizeCommandName(name string) string {
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
-		"swap-pane", "rotate-window", "break-pane", "join-pane", "move-pane",
+		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer", "list-commands", "start-server":
 		return name

@@ -20,6 +20,7 @@ manual verification note.
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | Basic command metadata | Implemented for `list-commands`/`lscm` over currently supported commands plus `start-server`; the probe covers formatted command-list fields and alias lookup |
+| Basic shell commands | Implemented for `run-shell`/`run` synchronous output, `-b`, `-E`, simple `-C`, `-c`, and `-d`; the probe covers stdout, stderr opt-in, background mode, and shell exit status |
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
@@ -52,7 +53,7 @@ manual verification note.
 | Full environment semantics | Hidden variables, remove markers, update-environment integration, and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
 | Status format language | Only a simple status line is implemented. |
-| Hooks | Not implemented. |
+| Hooks and jobs | Hooks are not implemented; jobs are limited to the basic `run-shell` subset. |
 | Control mode | Not implemented. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |

@@ -61,6 +61,27 @@ compare() {
   printf 'ok %s\n' "${name}"
 }
 
+compare_status() {
+  local name="$1"
+  shift
+  local tmux_output gotmux_output tmux_status gotmux_status
+  set +e
+  tmux_output="$("${tmux_cmd[@]}" "$@" 2>&1)"
+  tmux_status=$?
+  gotmux_output="$("${gotmux_cmd[@]}" "$@" 2>&1)"
+  gotmux_status=$?
+  set -e
+  if [[ "${tmux_status}" != "${gotmux_status}" || "${tmux_output}" != "${gotmux_output}" ]]; then
+    echo "compat probe failed: ${name}" >&2
+    echo "--- tmux status ${tmux_status}" >&2
+    printf '%s\n' "${tmux_output}" >&2
+    echo "--- gotmux status ${gotmux_status}" >&2
+    printf '%s\n' "${gotmux_output}" >&2
+    exit 1
+  fi
+  printf 'ok %s\n' "${name}"
+}
+
 compare_normalized() {
   local name="$1"
   shift
@@ -105,6 +126,10 @@ compare "list-commands new-session format" list-commands -F "#{command_list_name
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
 compare "start-server command" start-server
+compare "run-shell stdout" run-shell "printf alpha"
+compare "run-shell alias stderr" run -E "printf err >&2"
+compare "run-shell background" run-shell -b "printf beta"
+compare_status "run-shell exit status" run-shell "exit 7"
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"

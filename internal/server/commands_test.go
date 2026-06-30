@@ -151,6 +151,34 @@ func TestListCommands(t *testing.T) {
 	}
 }
 
+func TestRunShell(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"run-shell", "printf alpha"}, "", 80, 24)
+	if !msg.OK || msg.Text != "alpha" {
+		t.Fatalf("run-shell stdout = %#v", msg)
+	}
+	msg = rt.execute([]string{"run", "-E", "printf err >&2"}, "", 80, 24)
+	if !msg.OK || msg.Text != "err" {
+		t.Fatalf("run alias stderr = %#v", msg)
+	}
+	msg = rt.execute([]string{"run-shell", "exit 7"}, "", 80, 24)
+	if msg.OK || msg.Code != 7 || msg.Text != "'exit 7' returned 7" {
+		t.Fatalf("run-shell exit status = %#v", msg)
+	}
+	msg = rt.execute([]string{"run-shell", "-b", "printf beta"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("run-shell background = %#v", msg)
+	}
+	if msg = rt.execute([]string{"new-session", "-d", "-s", "runsc", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"run-shell", "-C", "display-message -p -F '#{session_name}'"}, "runsc", 80, 24)
+	if !msg.OK || msg.Text != "runsc" {
+		t.Fatalf("run-shell -C = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "runsc"}, "runsc", 80, 24)
+}
+
 func TestDisplayMessageTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayt", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
