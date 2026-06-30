@@ -40,6 +40,7 @@ var commandInfos = []commandInfo{
 	{Name: "last-pane", Alias: "lastp", Usage: "[-deZ] [-t target-window]"},
 	{Name: "last-window", Alias: "last", Usage: "[-t target-session]"},
 	{Name: "list-buffers", Alias: "lsb", Usage: "[-F format]"},
+	{Name: "list-clients", Alias: "lsc", Usage: "[-F format] [-f filter] [-O order][-t target-session]"},
 	{Name: "list-commands", Alias: "lscm", Usage: "[-F format] [command]"},
 	{Name: "list-keys", Alias: "lsk", Usage: "[-1aN] [-F format] [-P prefix-string] [-T key-table] [key]"},
 	{Name: "list-panes", Alias: "lsp", Usage: "[-as] [-F format] [-f filter] [-t target]"},
@@ -152,6 +153,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok(listWindowsCommand(rt.state, args, currentSession))
 	case "list-panes":
 		return ok(listPanesCommand(rt.state, args, currentSession))
+	case "list-clients":
+		return rt.cmdListClients(args)
 	case "list-commands":
 		return rt.cmdListCommands(args)
 	case "new-window":
@@ -1197,6 +1200,25 @@ func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdListClients(args []string) protocol.Message {
+	format := optionValue(args, "-F", "")
+	target := cleanSessionTarget(optionValue(args, "-t", ""))
+	clients := rt.state.ListClients()
+	lines := make([]string, 0, len(clients))
+	for _, client := range clients {
+		if target != "" && client.SessionName != target {
+			continue
+		}
+		if format != "" {
+			lines = append(lines, formatClient(format, client))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s [%dx%d screen-256color]",
+			clientName(client), client.SessionName, client.Width, client.Height))
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
 func (rt *Runtime) cmdIfShell(args []string, currentSession string, width, height int) protocol.Message {
 	values := ifShellOperands(args)
 	if len(values) < 2 {
@@ -1541,6 +1563,8 @@ func normalizeCommandName(name string) string {
 		return "if-shell"
 	case "ls":
 		return "list-sessions"
+	case "lsc":
+		return "list-clients"
 	case "lsp":
 		return "list-panes"
 	case "lsw":
@@ -1648,7 +1672,7 @@ func normalizeCommandName(name string) string {
 		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer", "list-commands", "start-server":
+		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "start-server":
 		return name
 	default:
 		return name
@@ -2125,6 +2149,25 @@ func formatCommand(template string, info commandInfo) string {
 		out = strings.ReplaceAll(out, old, newValue)
 	}
 	return out
+}
+
+func formatClient(template string, client model.Client) string {
+	out := template
+	replacements := map[string]string{
+		"#{client_name}":     clientName(client),
+		"#{session_name}":    client.SessionName,
+		"#{client_width}":    strconv.Itoa(client.Width),
+		"#{client_height}":   strconv.Itoa(client.Height),
+		"#{client_termname}": "screen-256color",
+	}
+	for old, newValue := range replacements {
+		out = strings.ReplaceAll(out, old, newValue)
+	}
+	return out
+}
+
+func clientName(client model.Client) string {
+	return fmt.Sprintf("client-%d", client.ID)
 }
 
 func formatBuffer(template string, buffer model.Buffer) string {

@@ -1618,6 +1618,20 @@ func (s *Server) DetachClient(id int64) {
 	delete(s.Clients, id)
 }
 
+func (s *Server) ListClients() []Client {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	clients := make([]Client, 0, len(s.Clients))
+	for _, client := range s.Clients {
+		clients = append(clients, *client)
+	}
+	sort.Slice(clients, func(i, j int) bool {
+		return clients[i].ID < clients[j].ID
+	})
+	return clients
+}
+
 func (s *Server) SetClientSize(id int64, width, height int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

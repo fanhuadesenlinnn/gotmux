@@ -122,6 +122,7 @@ compare "new-session print output" new-session -d -P -F "#{session_name}:#{windo
 compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_windows}:#{session_attached}"
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
+compare "list-clients empty" list-clients -F "#{client_name}:#{session_name}:#{client_width}:#{client_height}"
 compare "list-commands new-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" new-session
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start

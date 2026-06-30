@@ -151,6 +151,32 @@ func TestListCommands(t *testing.T) {
 	}
 }
 
+func TestListClients(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	format := "#{client_name}:#{session_name}:#{client_width}:#{client_height}:#{client_termname}"
+	msg := rt.execute([]string{"list-clients", "-F", format}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("list-clients empty = %q", msg.Text)
+	}
+	if msg = rt.execute([]string{"new-session", "-d", "-s", "clients", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("clients", 100, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg = rt.execute([]string{"lsc", "-F", format, "-t", "clients"}, "", 80, 24)
+	if msg.Text != "client-0:clients:100:30:screen-256color" {
+		t.Fatalf("list-clients format = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-clients", "-F", format, "-t", "missing"}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("list-clients target filter = %q", msg.Text)
+	}
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "clients"}, "clients", 80, 24)
+}
+
 func TestRunShell(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"run-shell", "printf alpha"}, "", 80, 24)
