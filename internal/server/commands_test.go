@@ -1468,6 +1468,45 @@ func TestKillWindowAllKeepsTargetAndDropsOtherScreens(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "killwa"}, "killwa", 80, 24)
 }
 
+func TestUnlinkWindowRequiresKillFlagForSingleLinkAndDropsScreens(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	session, _, firstPane, err := rt.state.NewSession("unlinkw", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, secondPane, err := rt.state.NewWindow(session.Name, "second", "", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.screens[firstPane.ID] = terminal.NewScreen(8, 1)
+	rt.screens[secondPane.ID] = terminal.NewScreen(8, 1)
+
+	rejected := rt.execute([]string{"unlink-window", "-t", "unlinkw:1"}, session.Name, 80, 24)
+	if rejected.OK || rejected.Text != "window only linked to one session" {
+		t.Fatalf("unlink-window without -k = %#v", rejected)
+	}
+	before := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_name}:#{window_active}")
+	if before != "0:first:0\n1:second:1" {
+		t.Fatalf("windows after rejected unlink-window = %q", before)
+	}
+
+	msg := rt.execute([]string{"unlinkw", "-k", "-t", "unlinkw:1"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("unlink-window -k failed: %s", msg.Text)
+	}
+	windows := listWindowsFormat(rt.state, session.Name, "#{window_index}:#{window_name}:#{window_active}")
+	if windows != "0:first:1" {
+		t.Fatalf("windows after unlink-window -k = %q", windows)
+	}
+	if _, ok := rt.screens[secondPane.ID]; ok {
+		t.Fatalf("screen for unlinked window pane %d still exists", secondPane.ID)
+	}
+	if _, ok := rt.screens[firstPane.ID]; !ok {
+		t.Fatalf("screen for remaining pane %d was removed", firstPane.ID)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "unlinkw"}, "unlinkw", 80, 24)
+}
+
 func assertPanesFormat(t *testing.T, rt *Runtime, sessionName string, want string) {
 	t.Helper()
 	got := listPanesFormat(rt.state, sessionName, "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}")

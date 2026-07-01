@@ -92,6 +92,7 @@ var commandInfos = []commandInfo{
 	{Name: "start-server", Alias: "start"},
 	{Name: "swap-pane", Alias: "swapp", Usage: "[-dDUZ] [-s src-pane] [-t dst-pane]"},
 	{Name: "swap-window", Alias: "swapw", Usage: "[-d] [-s src-window] [-t dst-window]"},
+	{Name: "unlink-window", Alias: "unlinkw", Usage: "[-k] [-t target-window]"},
 	{Name: "unbind-key", Alias: "unbind", Usage: "[-anq] [-T key-table] key"},
 	{Name: "wait-for", Alias: "wait", Usage: "[-L|-S|-U] channel"},
 }
@@ -337,39 +338,9 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		rt.resizeSessionPanes(currentSession)
 		return ok("")
 	case "kill-window":
-		sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
-		if !found {
-			return fail("can't find window")
-		}
-		if hasAny(args, "-a") {
-			killed, err := rt.state.KillOtherWindows(sessionName, windowIndex)
-			if err != nil {
-				return fail(err.Error())
-			}
-			rt.screensMu.Lock()
-			for _, paneID := range killed {
-				delete(rt.screens, paneID)
-			}
-			rt.screensMu.Unlock()
-			rt.resizeSessionPanes(currentSession)
-			return ok("")
-		}
-		var err error
-		if hasWindow {
-			err = rt.state.KillWindow(sessionName, windowIndex)
-		} else {
-			err = rt.state.KillActiveWindow(sessionName)
-		}
-		if err != nil {
-			return fail(err.Error())
-		}
-		rt.screensMu.Lock()
-		for _, paneID := range paneIDs {
-			delete(rt.screens, paneID)
-		}
-		rt.screensMu.Unlock()
-		rt.resizeSessionPanes(currentSession)
-		return ok("")
+		return rt.cmdKillWindow(args, currentSession)
+	case "unlink-window":
+		return rt.cmdUnlinkWindow(args, currentSession)
 	case "swap-window":
 		return rt.cmdSwapWindow(args, currentSession)
 	case "move-window":
@@ -874,6 +845,57 @@ func (rt *Runtime) cmdSwapWindow(args []string, currentSession string) protocol.
 	if err := rt.state.SwapWindows(sourceSession, sourceWindow, targetSession, targetWindow, hasAny(args, "-d")); err != nil {
 		return fail(err.Error())
 	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdKillWindow(args []string, currentSession string) protocol.Message {
+	sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	if hasAny(args, "-a") {
+		killed, err := rt.state.KillOtherWindows(sessionName, windowIndex)
+		if err != nil {
+			return fail(err.Error())
+		}
+		rt.screensMu.Lock()
+		for _, paneID := range killed {
+			delete(rt.screens, paneID)
+		}
+		rt.screensMu.Unlock()
+		rt.resizeSessionPanes(sessionName)
+		return ok("")
+	}
+	return rt.killTargetWindow(sessionName, windowIndex, hasWindow, paneIDs)
+}
+
+func (rt *Runtime) cmdUnlinkWindow(args []string, currentSession string) protocol.Message {
+	sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	if !hasAny(args, "-k") {
+		return fail("window only linked to one session")
+	}
+	return rt.killTargetWindow(sessionName, windowIndex, hasWindow, paneIDs)
+}
+
+func (rt *Runtime) killTargetWindow(sessionName string, windowIndex int, hasWindow bool, paneIDs []int) protocol.Message {
+	var err error
+	if hasWindow {
+		err = rt.state.KillWindow(sessionName, windowIndex)
+	} else {
+		err = rt.state.KillActiveWindow(sessionName)
+	}
+	if err != nil {
+		return fail(err.Error())
+	}
+	rt.screensMu.Lock()
+	for _, paneID := range paneIDs {
+		delete(rt.screens, paneID)
+	}
+	rt.screensMu.Unlock()
+	rt.resizeSessionPanes(sessionName)
 	return ok("")
 }
 
@@ -1870,6 +1892,8 @@ func normalizeCommandName(name string) string {
 		return "kill-pane"
 	case "killw":
 		return "kill-window"
+	case "unlinkw":
+		return "unlink-window"
 	case "rename":
 		return "rename-session"
 	case "renamew":
@@ -1918,7 +1942,7 @@ func normalizeCommandName(name string) string {
 		return "start-server"
 	case "wait":
 		return "wait-for"
-	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
+	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",

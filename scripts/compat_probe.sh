@@ -130,6 +130,7 @@ compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands respawn-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnp
 compare "list-commands respawn-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnw
+compare "list-commands unlink-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" unlinkw
 compare "start-server command" start-server
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
@@ -425,6 +426,15 @@ compare "kill-window target windows" list-windows -t killw -F "#{window_index}:#
 "${gotmux_cmd[@]}" new-window -t killwa -n third /bin/sh >/dev/null
 compare "kill-window all command" kill-window -a -t killwa:1
 compare "kill-window all windows" list-windows -t killwa -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s unlinkw -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t unlinkw -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s unlinkw -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t unlinkw -n second /bin/sh >/dev/null
+compare_status "unlink-window single link rejection" unlink-window -t unlinkw:1
+compare "unlink-window rejected windows" list-windows -t unlinkw -F "#{window_index}:#{window_name}:#{window_active}"
+compare "unlink-window kill command" unlinkw -k -t unlinkw:1
+compare "unlink-window kill windows" list-windows -t unlinkw -F "#{window_index}:#{window_name}:#{window_active}"
 
 "${tmux_cmd[@]}" new-session -d -s swapw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t swapw -n second /bin/sh
