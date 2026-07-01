@@ -101,10 +101,14 @@ now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `set-buffer -n` buffer renames. Basic
 `clear-history` clears gotmux's pane history ring. Prompt-history commands expose
 the tmux-compatible empty-history shape, and `show-messages` covers command
-metadata plus empty `-J`/`-T` jobs/terminal output. History capture, message log,
-buffer
-chooser, copy mode, mode screens, complete joined/wrapped output, style/escape
-output, and complete target resolution remain.
+metadata plus empty `-J`/`-T` jobs/terminal output. Basic mode entry commands
+now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
+`choose-tree`, `customize-mode`, and `find-window` with tmux-compatible empty
+CLI success in the probed subset; `command-prompt`, `display-panes`, and
+`suspend-client` match detached CLI no-current-client errors. History capture,
+message log, buffer chooser UI, copy mode internals, mode screens, complete
+joined/wrapped output, style/escape output, and complete target resolution
+remain.
 
 ## Phase 6: Advanced tmux Surfaces
 

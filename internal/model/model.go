@@ -170,6 +170,8 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", `"`, "split-window")
 	add("prefix", "%", "split-window", "-h")
 	add("prefix", ";", "last-pane")
+	add("prefix", "[", "copy-mode")
+	add("prefix", "=", "choose-buffer")
 	add("prefix", "c", "new-window")
 	add("prefix", "d", "detach-client")
 	add("prefix", "l", "last-window")
@@ -177,6 +179,9 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "p", "previous-window")
 	add("prefix", "o", "select-pane", "-t", ":.+")
 	add("prefix", "r", "refresh-client")
+	add("prefix", "s", "choose-tree", "-s")
+	add("prefix", "t", "clock-mode")
+	add("prefix", "w", "choose-tree", "-Zw")
 	add("prefix", "x", "kill-pane")
 	for i := 0; i <= 9; i++ {
 		key := fmt.Sprintf("%d", i)

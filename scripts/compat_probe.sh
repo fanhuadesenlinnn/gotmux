@@ -146,6 +146,16 @@ compare "list-commands lock-client format" list-commands -F "#{command_list_name
 compare "list-commands refresh-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" refresh
 compare "list-commands link-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" linkw
 compare "list-commands switch-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" switchc
+compare "list-commands copy-mode format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" copy-mode
+compare "list-commands clock-mode format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" clock-mode
+compare "list-commands choose-tree format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" choose-tree
+compare "list-commands choose-buffer format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" choose-buffer
+compare "list-commands choose-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" choose-client
+compare "list-commands customize-mode format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" customize-mode
+compare "list-commands find-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" findw
+compare "list-commands display-panes format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" displayp
+compare "list-commands command-prompt format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" command-prompt
+compare "list-commands suspend-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" suspendc
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
@@ -163,6 +173,16 @@ compare_status "lock-client no current client" lock-client
 compare_status "refresh-client no current client" refresh-client
 compare_status "switch-client no current client" switch-client -t compat
 compare_status "switch-client missing client" switch-client -c missing -t compat
+compare "clock-mode command" clock-mode
+compare "copy-mode command" copy-mode
+compare "choose-buffer command" choose-buffer
+compare "choose-client command" choose-client
+compare "choose-tree command" choose-tree
+compare "customize-mode command" customize-mode
+compare "find-window command" find-window missing-pattern
+compare_status "display-panes no current client" display-panes
+compare_status "command-prompt no current client" command-prompt
+compare_status "suspend-client no current client" suspend-client
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"

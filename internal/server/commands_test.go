@@ -156,6 +156,26 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("list-commands showmsgs = %q", msg.Text)
 	}
+	for _, tc := range []struct {
+		query string
+		want  string
+	}{
+		{"copy-mode", "copy-mode::[-deHMqSu] [-s src-pane] [-t target-pane]"},
+		{"clock-mode", "clock-mode::[-t target-pane]"},
+		{"choose-tree", "choose-tree::[-GNrswZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
+		{"choose-buffer", "choose-buffer::[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
+		{"choose-client", "choose-client::[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
+		{"customize-mode", "customize-mode::[-NZ] [-F format] [-f filter] [-t target-pane]"},
+		{"findw", "find-window:findw:[-CiNrTZ] [-t target-pane] match-string"},
+		{"displayp", "display-panes:displayp:[-bN] [-d duration] [-t target-client] [template]"},
+		{"command-prompt", "command-prompt::[-1CbeFiklN] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]"},
+		{"suspendc", "suspend-client:suspendc:[-t target-client]"},
+	} {
+		msg = rt.execute([]string{"list-commands", "-F", format, tc.query}, "", 80, 24)
+		if msg.Text != tc.want {
+			t.Fatalf("list-commands %s = %q", tc.query, msg.Text)
+		}
+	}
 	msg = rt.execute([]string{"list-commands", "-F", format, "lock"}, "", 80, 24)
 	want = "lock-server:lock:"
 	if msg.Text != want {
@@ -226,6 +246,38 @@ func TestRefreshClientRequiresCurrentClient(t *testing.T) {
 	msg = rt.executeWithClient([]string{"refresh"}, "", 80, 24, 42)
 	if !msg.OK || msg.Text != "" {
 		t.Fatalf("refresh with client = %#v", msg)
+	}
+}
+
+func TestBasicModeAndClientEntryCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	for _, args := range [][]string{
+		{"clock-mode"},
+		{"copy-mode"},
+		{"choose-buffer"},
+		{"choose-client"},
+		{"choose-tree"},
+		{"customize-mode"},
+		{"findw", "anything"},
+	} {
+		msg := rt.execute(args, "", 80, 24)
+		if !msg.OK || msg.Text != "" {
+			t.Fatalf("%v = %#v", args, msg)
+		}
+	}
+	for _, args := range [][]string{
+		{"command-prompt"},
+		{"displayp"},
+		{"suspend-client"},
+	} {
+		msg := rt.execute(args, "", 80, 24)
+		if msg.OK || msg.Text != "no current client" {
+			t.Fatalf("%v without client = %#v", args, msg)
+		}
+		msg = rt.executeWithClient(args, "", 80, 24, 42)
+		if !msg.OK || msg.Text != "" {
+			t.Fatalf("%v with client = %#v", args, msg)
+		}
 	}
 }
 

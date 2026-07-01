@@ -33,11 +33,20 @@ var commandInfos = []commandInfo{
 	{Name: "bind-key", Alias: "bind", Usage: "[-nr] [-N note] [-T key-table] key [command [arguments]]"},
 	{Name: "break-pane", Alias: "breakp", Usage: "[-abdP] [-F format] [-n window-name] [-s src-pane] [-t dst-window]"},
 	{Name: "capture-pane", Alias: "capturep", Usage: "[-aCeJNpPqT] [-b buffer-name] [-E end-line] [-S start-line] [-t target-pane]"},
+	{Name: "choose-buffer", Usage: "[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
+	{Name: "choose-client", Usage: "[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
+	{Name: "choose-tree", Usage: "[-GNrswZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
 	{Name: "clear-prompt-history", Alias: "clearphist", Usage: "[-T prompt-type]"},
 	{Name: "clear-history", Alias: "clearhist", Usage: "[-H] [-t target-pane]"},
+	{Name: "clock-mode", Usage: "[-t target-pane]"},
+	{Name: "command-prompt", Usage: "[-1CbeFiklN] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]"},
+	{Name: "copy-mode", Usage: "[-deHMqSu] [-s src-pane] [-t target-pane]"},
+	{Name: "customize-mode", Usage: "[-NZ] [-F format] [-f filter] [-t target-pane]"},
 	{Name: "delete-buffer", Alias: "deleteb", Usage: "[-b buffer-name]"},
 	{Name: "detach-client", Alias: "detach", Usage: "[-aP] [-E shell-command] [-s target-session] [-t target-client]"},
 	{Name: "display-message", Alias: "display", Usage: "[-aCIlNpv] [-c target-client] [-d delay] [-F format] [-t target-pane] [message]"},
+	{Name: "display-panes", Alias: "displayp", Usage: "[-bN] [-d duration] [-t target-client] [template]"},
+	{Name: "find-window", Alias: "findw", Usage: "[-CiNrTZ] [-t target-pane] match-string"},
 	{Name: "has-session", Alias: "has", Usage: "[-t target-session]"},
 	{Name: "if-shell", Alias: "if", Usage: "[-bF] [-t target-pane] shell-command command [command]"},
 	{Name: "join-pane", Alias: "joinp", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
@@ -98,6 +107,7 @@ var commandInfos = []commandInfo{
 	{Name: "source-file", Alias: "source", Usage: "[-Fnqv] path ..."},
 	{Name: "split-window", Alias: "splitw", Usage: "[-bdfhIvPZ] [-c start-directory] [-e environment] [-F format] [-l size] [-t target-pane] [shell-command [argument ...]]"},
 	{Name: "start-server", Alias: "start"},
+	{Name: "suspend-client", Alias: "suspendc", Usage: "[-t target-client]"},
 	{Name: "swap-pane", Alias: "swapp", Usage: "[-dDUZ] [-s src-pane] [-t dst-pane]"},
 	{Name: "swap-window", Alias: "swapw", Usage: "[-d] [-s src-window] [-t dst-window]"},
 	{Name: "switch-client", Alias: "switchc", Usage: "[-ElnprZ] [-c target-client] [-t target-session] [-T key-table] [-O order]"},
@@ -179,6 +189,13 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		}
 		if !sessionExists(rt.state, cleanSessionTarget(target)) {
 			return fail(fmt.Sprintf("can't find session: %s", target))
+		}
+		return ok("")
+	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "choose-tree", "customize-mode", "find-window":
+		return ok("")
+	case "command-prompt", "display-panes", "suspend-client":
+		if clientID == 0 {
+			return fail("no current client")
 		}
 		return ok("")
 	case "list-sessions":
@@ -2052,6 +2069,10 @@ func normalizeCommandName(name string) string {
 		return "select-window"
 	case "display":
 		return "display-message"
+	case "displayp":
+		return "display-panes"
+	case "findw":
+		return "find-window"
 	case "last":
 		return "last-window"
 	case "next":
@@ -2164,16 +2185,19 @@ func normalizeCommandName(name string) string {
 		return "run-shell"
 	case "start":
 		return "start-server"
+	case "suspendc":
+		return "suspend-client"
 	case "wait":
 		return "wait-for"
 	case "kill-server", "kill-session", "link-window", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
-		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
+		"send-keys", "display-message", "display-panes", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "pipe-pane", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane":
+		"paste-buffer", "pipe-pane", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane",
+		"clock-mode", "copy-mode", "choose-buffer", "choose-client", "choose-tree", "customize-mode", "command-prompt":
 		return name
 	default:
 		return name

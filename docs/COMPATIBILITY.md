@@ -27,6 +27,7 @@ manual verification note.
 | Basic lock commands | Implemented for `lock-server`/`lock`, `lock-session`/`locks` no-output success and `lock-client` no-current-client errors in the detached CLI subset |
 | Basic client refresh command | Implemented for `refresh-client`/`refresh` metadata, no-current-client CLI errors, and attached-client no-op success for redraw bindings |
 | Basic client switching command | Implemented for `switch-client`/`switchc` metadata, detached CLI no-current-client errors, missing `-c target-client` errors, and attached-client `-t`, `-n`, `-p`, `-l`, and basic `-c client-N` switching |
+| Basic mode/client entry commands | Implemented for `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`, `choose-tree`, `customize-mode`, and `find-window` empty CLI success, plus `display-panes`, `command-prompt`, and `suspend-client` no-current-client errors in the detached CLI subset |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
 | Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
 | `source-file` | Implemented for simple command files and line continuations |
@@ -54,7 +55,7 @@ manual verification note.
 | Full list filtering | Basic truthy filters over implemented format fields exist, but tmux's full format expression language for `-f` filters is incomplete. |
 | Full layout rendering | Pane geometry and basic redraw exist for a small subset, but full layout algorithms, complete floating pane behavior, tmux-style border cells, zoom, custom layouts, and pane movement are incomplete. |
 | Screen model | A basic grid, common CSI parser, alternate-screen switching, and a separate byte history ring exist, but full tmux-style scrollback grid, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
-| Copy mode | Not implemented. |
+| Full copy and choose modes | Entry commands are recognized for the basic CLI subset, but full copy-mode, clock-mode rendering, choose-mode UI, command prompts, and interactive mode key behavior are not implemented. |
 | Mouse support | Not implemented. |
 | Full buffers and paste buffers | Basic in-memory buffers and file load/save exist, but `choose-buffer`, buffer limits, stack pruning, copy-mode integration, and complete paste options are incomplete. |
 | Full `capture-pane` semantics | History ranges, alternate screen selection, mode screen capture, paste buffers, complete `-J`/`-T` behavior across history and mode grids, full escape/style output, hyperlinks, all tmux line flags, and complete target resolution are incomplete. |
@@ -69,7 +70,7 @@ manual verification note.
 | Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
 | Full `switch-client` semantics | Basic attached-client session switching exists, but key-table switching, read-only toggles, sorted session order, environment updates, pane-target active pane selection, and zoom handling remain incomplete. |
 | Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
-| Popups, menus, choose tree, command prompt | Not implemented. |
+| Popups, menus, choose tree, command prompt | Command-prompt no-current-client errors are recognized in the detached CLI subset, but interactive prompts, popups, menus, and complete choose-tree UI remain incomplete. |
 | Full session groups and linked windows | Basic linked windows are implemented through lightweight shared window IDs and panes, but gotmux does not yet have tmux's full winlink model, session groups, alerts, or all link/move edge cases. |
 | tmux terminfo feature negotiation | Minimal `TERM=screen-256color` only. |
 
