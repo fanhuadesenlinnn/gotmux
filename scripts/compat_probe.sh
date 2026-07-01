@@ -127,6 +127,7 @@ compare "list-commands new-session format" list-commands -F "#{command_list_name
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
+compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "start-server command" start-server
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
@@ -140,6 +141,10 @@ compare "wait-for alias wait" wait ready
 compare "wait-for lock command" wait-for -L lock
 compare "wait-for unlock command" wait-for -U lock
 compare_status "wait-for unlock missing" wait-for -U missing
+compare "show prompt history" show-prompt-history
+compare "show prompt history type" showphist -T command
+compare "clear prompt history" clearphist -T command
+compare_status "show prompt history invalid" show-prompt-history -T nope
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"

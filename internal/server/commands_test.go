@@ -295,6 +295,27 @@ func TestWaitFor(t *testing.T) {
 	}
 }
 
+func TestPromptHistoryCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"show-prompt-history"}, "", 80, 24)
+	want := "History for command:\n\n\nHistory for search:\n\n\nHistory for target:\n\n\nHistory for window-target:\n\n"
+	if !msg.OK || msg.Text != want {
+		t.Fatalf("show-prompt-history = %#v", msg)
+	}
+	msg = rt.execute([]string{"showphist", "-T", "command"}, "", 80, 24)
+	if !msg.OK || msg.Text != "History for command:\n\n" {
+		t.Fatalf("showphist -T command = %#v", msg)
+	}
+	msg = rt.execute([]string{"clearphist", "-T", "command"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("clearphist = %#v", msg)
+	}
+	msg = rt.execute([]string{"show-prompt-history", "-T", "nope"}, "", 80, 24)
+	if msg.OK || msg.Text != "invalid type: nope" {
+		t.Fatalf("show-prompt-history invalid = %#v", msg)
+	}
+}
+
 func TestDisplayMessageTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayt", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

@@ -33,6 +33,7 @@ var commandInfos = []commandInfo{
 	{Name: "bind-key", Alias: "bind", Usage: "[-nr] [-N note] [-T key-table] key [command [arguments]]"},
 	{Name: "break-pane", Alias: "breakp", Usage: "[-abdP] [-F format] [-n window-name] [-s src-pane] [-t dst-window]"},
 	{Name: "capture-pane", Alias: "capturep", Usage: "[-aCeJNpPqT] [-b buffer-name] [-E end-line] [-S start-line] [-t target-pane]"},
+	{Name: "clear-prompt-history", Alias: "clearphist", Usage: "[-T prompt-type]"},
 	{Name: "clear-history", Alias: "clearhist", Usage: "[-H] [-t target-pane]"},
 	{Name: "delete-buffer", Alias: "deleteb", Usage: "[-b buffer-name]"},
 	{Name: "detach-client", Alias: "detach", Usage: "[-aP] [-E shell-command] [-s target-session] [-t target-client]"},
@@ -82,6 +83,7 @@ var commandInfos = []commandInfo{
 	{Name: "show-buffer", Alias: "showb", Usage: "[-b buffer-name]"},
 	{Name: "show-environment", Alias: "showenv", Usage: "[-hgs] [-t target-session] [name]"},
 	{Name: "show-options", Alias: "show", Usage: "[-AgHpqsvw] [-t target-pane] [option]"},
+	{Name: "show-prompt-history", Alias: "showphist", Usage: "[-T prompt-type]"},
 	{Name: "show-window-options", Alias: "showw", Usage: "[-gv] [-t target-window] [option]"},
 	{Name: "source-file", Alias: "source", Usage: "[-Fnqv] path ..."},
 	{Name: "split-window", Alias: "splitw", Usage: "[-bdfhIvPZ] [-c start-directory] [-e environment] [-F format] [-l size] [-t target-pane] [shell-command [argument ...]]"},
@@ -420,6 +422,10 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdCapturePane(args, currentSession)
 	case "clear-history":
 		return rt.cmdClearHistory(args, currentSession)
+	case "show-prompt-history":
+		return rt.cmdShowPromptHistory(args)
+	case "clear-prompt-history":
+		return rt.cmdClearPromptHistory(args)
 	case "set-buffer":
 		return rt.cmdSetBuffer(args)
 	case "show-buffer":
@@ -904,6 +910,23 @@ func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protoco
 	}
 	if pane.History != nil {
 		pane.History.Reset()
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowPromptHistory(args []string) protocol.Message {
+	promptType := optionValue(args, "-T", "")
+	text, err := promptHistoryText(promptType)
+	if err != nil {
+		return fail(err.Error())
+	}
+	return ok(text)
+}
+
+func (rt *Runtime) cmdClearPromptHistory(args []string) protocol.Message {
+	promptType := optionValue(args, "-T", "")
+	if promptType != "" && !validPromptType(promptType) {
+		return fail(fmt.Sprintf("invalid type: %s", promptType))
 	}
 	return ok("")
 }
@@ -1570,6 +1593,33 @@ func waitForOperands(args []string) []string {
 	return out
 }
 
+func promptHistoryText(promptType string) (string, error) {
+	if promptType != "" {
+		if !validPromptType(promptType) {
+			return "", fmt.Errorf("invalid type: %s", promptType)
+		}
+		return fmt.Sprintf("History for %s:\n\n", promptType), nil
+	}
+	var parts []string
+	for _, item := range promptTypes() {
+		parts = append(parts, fmt.Sprintf("History for %s:\n\n", item))
+	}
+	return strings.Join(parts, "\n"), nil
+}
+
+func validPromptType(promptType string) bool {
+	for _, item := range promptTypes() {
+		if item == promptType {
+			return true
+		}
+	}
+	return false
+}
+
+func promptTypes() []string {
+	return []string{"command", "search", "target", "window-target"}
+}
+
 func runShellCommand(shellCommand string, cwd string, showStderr bool) (string, int, error) {
 	cmd := exec.Command("sh", "-c", shellCommand)
 	if cwd != "" {
@@ -1748,6 +1798,8 @@ func normalizeCommandName(name string) string {
 		return "move-pane"
 	case "capturep":
 		return "capture-pane"
+	case "clearphist":
+		return "clear-prompt-history"
 	case "clearhist":
 		return "clear-history"
 	case "setb":
@@ -1784,6 +1836,8 @@ func normalizeCommandName(name string) string {
 		return "set-window-option"
 	case "show":
 		return "show-options"
+	case "showphist":
+		return "show-prompt-history"
 	case "showw":
 		return "show-window-options"
 	case "bind":
@@ -1811,13 +1865,13 @@ func normalizeCommandName(name string) string {
 	case "wait":
 		return "wait-for"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
-		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
+		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "start-server", "wait-for":
+		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for":
 		return name
 	default:
 		return name
