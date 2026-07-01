@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	osuser "os/user"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -19,6 +20,7 @@ type Server struct {
 	Sessions            map[string]*Session
 	Clients             map[int64]*Client
 	Buffers             map[string]*Buffer
+	Access              map[string]ServerAccess
 	GlobalOptions       map[string]string
 	GlobalWindowOptions map[string]string
 	GlobalEnvironment   map[string]string
@@ -123,6 +125,11 @@ type Buffer struct {
 	Order     int64
 }
 
+type ServerAccess struct {
+	Name  string
+	Write bool
+}
+
 type Hook struct {
 	Name     string
 	Commands []string
@@ -204,6 +211,7 @@ func NewServer(socketPath string) *Server {
 		Sessions:            make(map[string]*Session),
 		Clients:             make(map[int64]*Client),
 		Buffers:             make(map[string]*Buffer),
+		Access:              make(map[string]ServerAccess),
 		GlobalOptions:       defaultOptions(),
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
@@ -2392,6 +2400,81 @@ func isKnownHook(name string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Server) ListServerAccess() []ServerAccess {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	ownerName, _ := currentServerUser()
+	out := []ServerAccess{{Name: ownerName, Write: true}}
+	names := make([]string, 0, len(s.Access))
+	for name := range s.Access {
+		if name != ownerName {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		out = append(out, s.Access[name])
+	}
+	return out
+}
+
+func (s *Server) ChangeServerAccess(name string, add, remove, readOnly, write bool) error {
+	target, err := osuser.Lookup(name)
+	if err != nil {
+		return fmt.Errorf("unknown user: %s", name)
+	}
+	_, ownerUID := currentServerUser()
+	if target.Uid == "0" || target.Uid == ownerUID {
+		return fmt.Errorf("%s owns the server, can't change access", name)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, exists := s.Access[name]
+	if remove {
+		if !exists {
+			return fmt.Errorf("user %s not found", name)
+		}
+		delete(s.Access, name)
+		return nil
+	}
+	if add {
+		if exists {
+			return fmt.Errorf("user %s is already added", name)
+		}
+		s.Access[name] = ServerAccess{Name: name, Write: true}
+		exists = true
+	}
+	if readOnly || write {
+		entry, ok := s.Access[name]
+		if !ok {
+			entry = ServerAccess{Name: name, Write: true}
+		}
+		if readOnly {
+			entry.Write = false
+		}
+		if write {
+			entry.Write = true
+		}
+		s.Access[name] = entry
+	}
+	return nil
+}
+
+func currentServerUser() (string, string) {
+	current, err := osuser.Current()
+	if err != nil || current == nil {
+		return "unknown", ""
+	}
+	name := current.Username
+	if idx := strings.LastIndexAny(name, `\`); idx >= 0 {
+		name = name[idx+1:]
+	}
+	return name, current.Uid
 }
 
 func (s *Server) GlobalOption(name string) string {

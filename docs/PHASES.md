@@ -25,7 +25,7 @@ fields.
 
 Status: in progress. Basic command sequences, explicit `-f`, default
 `$HOME/.tmux.conf` discovery, `source-file`, basic `list-commands` metadata for
-currently supported commands, basic `list-clients`, string-backed options, basic
+all local tmux command names, basic `list-clients`, string-backed options, basic
 `set-hook`/`show-hooks` hook option storage and display, basic environment
 commands, prefix/root key bindings, `send-prefix`, basic `run-shell` shell
 execution, basic `if-shell` conditionals, and basic `wait-for` synchronization
@@ -108,9 +108,10 @@ now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
 CLI success in the probed subset; `command-prompt`, `display-panes`, and
 `suspend-client` match detached CLI no-current-client errors. `display-menu`,
 `display-popup`, and `confirm-before` now match the same detached-client error
-shape. History capture, message log, buffer chooser UI, copy mode internals,
-mode screens, complete joined/wrapped output, style/escape output, and
-complete target resolution remain.
+shape. Basic `server-access` covers owner listing and in-memory user ACL
+changes in the probed subset. History capture, message log, buffer chooser UI,
+copy mode internals, mode screens, complete joined/wrapped output, style/escape
+output, and complete target resolution remain.
 
 ## Phase 6: Advanced tmux Surfaces
 

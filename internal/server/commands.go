@@ -97,6 +97,7 @@ var commandInfos = []commandInfo{
 	{Name: "select-window", Alias: "selectw", Usage: "[-lnpT] [-t target-window]"},
 	{Name: "send-keys", Alias: "send", Usage: "[-FHKlMRX] [-N repeat-count] [-t target-pane] key ..."},
 	{Name: "send-prefix", Usage: "[-2] [-t target-pane]"},
+	{Name: "server-access", Usage: "[-adlrw] [-t target-pane] [user]"},
 	{Name: "set-buffer", Alias: "setb", Usage: "[-aw] [-b buffer-name] [-n new-buffer-name] [-t target-client] [data]"},
 	{Name: "set-environment", Alias: "setenv", Usage: "[-Fhgru] [-t target-session] name [value]"},
 	{Name: "set-hook", Usage: "[-agpRuw] [-t target-pane] hook [command]"},
@@ -244,6 +245,8 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		return rt.cmdSetEnvironment(args, currentSession)
 	case "show-environment":
 		return rt.cmdShowEnvironment(args, currentSession)
+	case "server-access":
+		return rt.cmdServerAccess(args)
 	case "if-shell":
 		return rt.cmdIfShell(args, currentSession, width, height)
 	case "wait-for":
@@ -1537,6 +1540,35 @@ func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdServerAccess(args []string) protocol.Message {
+	if hasAny(args, "-l") {
+		entries := rt.state.ListServerAccess()
+		lines := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			access := "R"
+			if entry.Write {
+				access = "W"
+			}
+			lines = append(lines, fmt.Sprintf("%s (%s)", entry.Name, access))
+		}
+		return ok(strings.Join(lines, "\n"))
+	}
+	values := serverAccessOperands(args)
+	if len(values) == 0 {
+		return fail("missing user argument")
+	}
+	if hasAny(args, "-a") && hasAny(args, "-d") {
+		return fail("-a and -d cannot be used together")
+	}
+	if hasAny(args, "-r") && hasAny(args, "-w") {
+		return fail("-r and -w cannot be used together")
+	}
+	if err := rt.state.ChangeServerAccess(values[0], hasAny(args, "-a"), hasAny(args, "-d"), hasAny(args, "-r"), hasAny(args, "-w")); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
 func (rt *Runtime) cmdSetHook(args []string, currentSession string) protocol.Message {
 	values := optionOperands(args)
 	if len(values) == 0 {
@@ -1600,6 +1632,26 @@ func hookScope(args []string) string {
 	default:
 		return "session"
 	}
+}
+
+func serverAccessOperands(args []string) []string {
+	values := make([]string, 0, 1)
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			values = append(values, args[i+1:]...)
+			break
+		}
+		if arg == "-t" && i+1 < len(args) {
+			i++
+			continue
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			continue
+		}
+		values = append(values, arg)
+	}
+	return values
 }
 
 func (rt *Runtime) cmdListClients(args []string) protocol.Message {
@@ -2270,10 +2322,10 @@ func normalizeCommandName(name string) string {
 	case "wait":
 		return "wait-for"
 	case "kill-server", "kill-session", "link-window", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
-		"send-keys", "confirm-before", "display-message", "display-menu", "display-panes", "display-popup", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
+		"send-keys", "send-prefix", "server-access", "confirm-before", "display-message", "display-menu", "display-panes", "display-popup", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
 		"source-file", "set-hook", "set-option", "set-window-option", "show-hooks", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "show-messages", "if-shell", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "pipe-pane", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane",

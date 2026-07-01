@@ -3,6 +3,7 @@ package server
 import (
 	"io"
 	"os"
+	osuser "os/user"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +187,54 @@ func TestSetAndShowHooks(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "hooks"}, "hooks", 80, 24)
 }
 
+func TestServerAccessBasicACL(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	current, err := osuser.Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := current.Username
+	if idx := strings.LastIndexAny(owner, `\`); idx >= 0 {
+		owner = owner[idx+1:]
+	}
+	msg := rt.execute([]string{"server-access", "-l"}, "", 80, 24)
+	if !msg.OK || msg.Text != owner+" (W)" {
+		t.Fatalf("server-access -l = %#v", msg)
+	}
+	msg = rt.execute([]string{"server-access"}, "", 80, 24)
+	if msg.OK || msg.Text != "missing user argument" {
+		t.Fatalf("server-access missing user = %#v", msg)
+	}
+	msg = rt.execute([]string{"server-access", owner}, "", 80, 24)
+	if msg.OK || msg.Text != owner+" owns the server, can't change access" {
+		t.Fatalf("server-access owner = %#v", msg)
+	}
+	msg = rt.execute([]string{"server-access", "gotmux-no-such-user"}, "", 80, 24)
+	if msg.OK || msg.Text != "unknown user: gotmux-no-such-user" {
+		t.Fatalf("server-access unknown user = %#v", msg)
+	}
+	if _, err := osuser.Lookup("nobody"); err != nil {
+		return
+	}
+	if msg = rt.execute([]string{"server-access", "-a", "nobody"}, "", 80, 24); !msg.OK {
+		t.Fatalf("server-access -a nobody = %#v", msg)
+	}
+	msg = rt.execute([]string{"server-access", "-l"}, "", 80, 24)
+	if !strings.Contains(msg.Text, "nobody (W)") {
+		t.Fatalf("server-access list after add = %q", msg.Text)
+	}
+	if msg = rt.execute([]string{"server-access", "-r", "nobody"}, "", 80, 24); !msg.OK {
+		t.Fatalf("server-access -r nobody = %#v", msg)
+	}
+	msg = rt.execute([]string{"server-access", "-l"}, "", 80, 24)
+	if !strings.Contains(msg.Text, "nobody (R)") {
+		t.Fatalf("server-access list after read-only = %q", msg.Text)
+	}
+	if msg = rt.execute([]string{"server-access", "-d", "nobody"}, "", 80, 24); !msg.OK {
+		t.Fatalf("server-access -d nobody = %#v", msg)
+	}
+}
+
 func TestListCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	format := "#{command_list_name}:#{command_list_alias}:#{command_list_usage}"
@@ -221,6 +270,7 @@ func TestListCommands(t *testing.T) {
 		{"popup", "display-popup:popup:[-BCEkN] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane] [-T title] [-w width] [-x position] [-y position] [shell-command [argument ...]]"},
 		{"command-prompt", "command-prompt::[-1CbeFiklN] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]"},
 		{"suspendc", "suspend-client:suspendc:[-t target-client]"},
+		{"server-access", "server-access::[-adlrw] [-t target-pane] [user]"},
 		{"set-hook", "set-hook::[-agpRuw] [-t target-pane] hook [command]"},
 		{"show-hooks", "show-hooks::[-gpw] [-t target-pane] [hook]"},
 	} {

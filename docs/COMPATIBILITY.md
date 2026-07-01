@@ -20,13 +20,14 @@ manual verification note.
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic client listing | Implemented for `list-clients`/`lsc` over attached gotmux clients with basic format fields; the probe covers tmux-compatible empty detached-server output |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
-| Basic command metadata | Implemented for `list-commands`/`lscm` over currently supported commands plus `start-server`; the probe covers formatted command-list fields and alias lookup |
+| Basic command metadata | Implemented for `list-commands`/`lscm` over all tmux command names in the local tmux command table; the probe covers formatted command-list fields and alias lookup |
 | Basic shell/config commands | Implemented for `run-shell`/`run` synchronous output, `-b`, `-E`, simple `-C`, `-c`, and `-d`, plus basic `if-shell`/`if` true/false and `-F` branches; the probe covers stdout, stderr opt-in, background mode, shell exit status, and conditional branch execution |
 | Basic pane piping | Implemented for `pipe-pane`/`pipep` output piping to a shell command, empty-command close, `-o` toggle behavior, and basic `-I` command-output-to-pane input |
 | Basic synchronization commands | Implemented for `wait-for`/`wait` signal, wait, lock, and unlock channels; the probe covers signal-before-wait and lock/unlock output, with goroutine tests for blocking wakeups |
 | Basic lock commands | Implemented for `lock-server`/`lock`, `lock-session`/`locks` no-output success and `lock-client` no-current-client errors in the detached CLI subset |
 | Basic client refresh command | Implemented for `refresh-client`/`refresh` metadata, no-current-client CLI errors, and attached-client no-op success for redraw bindings |
 | Basic client switching command | Implemented for `switch-client`/`switchc` metadata, detached CLI no-current-client errors, missing `-c target-client` errors, and attached-client `-t`, `-n`, `-p`, `-l`, and basic `-c client-N` switching |
+| Basic server access command | Implemented for `server-access` metadata, `-l` owner/read-write listing, missing/unknown/owner user errors, and basic non-owner `-a`/`-d`/`-r`/`-w` ACL state when the OS user exists |
 | Basic mode/client entry commands | Implemented for `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`, `choose-tree`, `customize-mode`, and `find-window` empty CLI success, plus `display-panes`, `display-menu`, `display-popup`, `confirm-before`, `command-prompt`, and `suspend-client` no-current-client errors in the detached CLI subset |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
 | Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
@@ -70,6 +71,7 @@ manual verification note.
 | Control mode | Not implemented. |
 | Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
 | Full `switch-client` semantics | Basic attached-client session switching exists, but key-table switching, read-only toggles, sorted session order, environment updates, pane-target active pane selection, and zoom handling remain incomplete. |
+| Full server ACL semantics | Basic `server-access` state is in-memory only; group ACLs, filesystem socket permissions, multi-user attach enforcement, and persisted server ACL edge cases remain incomplete. |
 | Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
 | Popups, menus, choose tree, command prompt | Prompt, popup, menu, and confirm command metadata plus no-current-client errors are recognized in the detached CLI subset, but interactive prompts, popups, menus, confirmations, and complete choose-tree UI remain incomplete. |
 | Full session groups and linked windows | Basic linked windows are implemented through lightweight shared window IDs and panes, but gotmux does not yet have tmux's full winlink model, session groups, alerts, or all link/move edge cases. |

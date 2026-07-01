@@ -159,6 +159,7 @@ compare "list-commands display-panes format" list-commands -F "#{command_list_na
 compare "list-commands display-popup format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" popup
 compare "list-commands command-prompt format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" command-prompt
 compare "list-commands suspend-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" suspendc
+compare "list-commands server-access format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" server-access
 compare "list-commands set-hook format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" set-hook
 compare "list-commands show-hooks format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" show-hooks
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
@@ -191,6 +192,16 @@ compare_status "display-popup no current client" display-popup
 compare_status "confirm-before no current client" confirm-before true
 compare_status "command-prompt no current client" command-prompt
 compare_status "suspend-client no current client" suspend-client
+compare "server-access list" server-access -l
+compare_status "server-access missing user" server-access
+compare_status "server-access owner user" server-access "$(id -un)"
+compare_status "server-access unknown user" server-access gotmux-no-such-user
+if id nobody >/dev/null 2>&1; then
+  compare "server-access add user" server-access -a nobody
+  compare "server-access read-only user" server-access -r nobody
+  compare "server-access list read-only user" server-access -l
+  compare "server-access delete user" server-access -d nobody
+fi
 compare "show-hooks empty global hook" show-hooks -g after-new-window
 compare "set-hook global command" set-hook -g after-new-window "display-message hi"
 compare "set-hook global append command" set-hook -ga after-new-window "display-message there"
