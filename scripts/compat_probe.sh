@@ -759,6 +759,16 @@ compare "untouched target window option" showw -t opttarget:0 -v mode-keys
 compare_key_line "default refresh binding" r
 compare_key_line "list custom key" C-a
 compare_note_line "list custom key note" C-r
+compare "unbind custom key command" unbind-key C-a
+compare_key_line "unbound custom key" C-a
+"${tmux_cmd[@]}" bind-key C-a send-prefix
+"${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null
+"${tmux_cmd[@]}" bind-key C-c send-prefix
+"${gotmux_cmd[@]}" bind-key C-c send-prefix >/dev/null
+compare "unbind prefix table command" unbind-key -a
+"${tmux_cmd[@]}" bind-key -T root F1 display-message root
+"${gotmux_cmd[@]}" bind-key -T root F1 display-message root >/dev/null
+compare "unbind root table command" unbind-key -a -T root
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null

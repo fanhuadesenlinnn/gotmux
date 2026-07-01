@@ -2608,6 +2608,16 @@ func (s *Server) UnbindKey(table, key string) {
 	}
 }
 
+func (s *Server) UnbindKeyTable(table string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if table == "" {
+		table = "prefix"
+	}
+	delete(s.KeyBindings, table)
+}
+
 func (s *Server) KeyBinding(table, key string) (KeyBinding, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

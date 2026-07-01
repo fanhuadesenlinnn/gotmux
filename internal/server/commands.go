@@ -1607,6 +1607,10 @@ func (rt *Runtime) cmdUnbindKey(args []string) protocol.Message {
 	if hasAny(args, "-n") {
 		table = "root"
 	}
+	if hasAny(args, "-a") {
+		rt.state.UnbindKeyTable(table)
+		return ok("")
+	}
 	values := optionOperands(args)
 	if len(values) == 0 {
 		return fail("missing key")

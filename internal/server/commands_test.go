@@ -329,6 +329,42 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if !strings.Contains(msg.Text, "C-b C-r") || !strings.Contains(msg.Text, "reload config") {
 		t.Fatalf("list-keys -N missing note: %q", msg.Text)
 	}
+	msg = rt.execute([]string{"unbind-key", "C-a"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unbind key failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-keys", "-T", "prefix"}, "", 80, 24)
+	if strings.Contains(msg.Text, "C-a send-prefix") {
+		t.Fatalf("list-keys still has unbound key: %q", msg.Text)
+	}
+	msg = rt.execute([]string{"bind-key", "C-a", "send-prefix"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("rebind C-a failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"bind-key", "C-c", "send-prefix"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind C-c failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"unbind-key", "-a"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unbind table failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-keys", "-T", "prefix"}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("prefix table after unbind -a = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"bind-key", "-T", "root", "F1", "display-message", "root"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind root failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"unbind-key", "-a", "-T", "root"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unbind root table failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"list-keys", "-T", "root"}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("root table after unbind -a = %q", msg.Text)
+	}
 }
 
 func TestSetAndShowHooks(t *testing.T) {
