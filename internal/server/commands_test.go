@@ -144,6 +144,11 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("list-commands showmsgs = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"list-commands", "-F", format, "lock"}, "", 80, 24)
+	want = "lock-server:lock:"
+	if msg.Text != want {
+		t.Fatalf("list-commands lock = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"list-commands", "new-sess"}, "", 80, 24)
 	if msg.Text != "new-session (new) [-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]" {
 		t.Fatalf("list-commands prefix = %q", msg.Text)
@@ -156,6 +161,33 @@ func TestListCommands(t *testing.T) {
 	if !msg.OK || msg.Text != "" {
 		t.Fatalf("start-server = %#v", msg)
 	}
+}
+
+func TestLockCommands(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lockp", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	for _, args := range [][]string{
+		{"lock-server"},
+		{"lock"},
+		{"lock-session", "-t", "lockp"},
+		{"locks", "-t", "lockp"},
+	} {
+		msg := rt.execute(args, "lockp", 80, 24)
+		if !msg.OK || msg.Text != "" {
+			t.Fatalf("%v = %#v", args, msg)
+		}
+	}
+	msg := rt.execute([]string{"lock-session", "-t", "missing"}, "lockp", 80, 24)
+	if msg.OK || msg.Text != "can't find session: missing" {
+		t.Fatalf("lock-session missing = %#v", msg)
+	}
+	msg = rt.execute([]string{"lock-client"}, "lockp", 80, 24)
+	if msg.OK || msg.Text != "no current client" {
+		t.Fatalf("lock-client = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "lockp"}, "lockp", 80, 24)
 }
 
 func TestListClients(t *testing.T) {

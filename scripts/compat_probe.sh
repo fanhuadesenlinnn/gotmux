@@ -140,6 +140,9 @@ compare "list-commands new-session format" list-commands -F "#{command_list_name
 compare "list-commands new-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" newp
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
+compare "list-commands lock-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lock
+compare "list-commands lock-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" locks
+compare "list-commands lock-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lockc
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
@@ -148,6 +151,12 @@ compare "list-commands respawn-window format" list-commands -F "#{command_list_n
 compare "list-commands unlink-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" unlinkw
 compare "list-commands show-messages format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showmsgs
 compare "start-server command" start-server
+compare "lock-server command" lock-server
+compare "lock alias command" lock
+compare "lock-session command" lock-session -t compat
+compare "lock-session alias command" locks -t compat
+compare_status "lock-session missing" lock-session -t missing
+compare_status "lock-client no current client" lock-client
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"

@@ -55,6 +55,9 @@ var commandInfos = []commandInfo{
 	{Name: "list-sessions", Alias: "ls", Usage: "[-F format] [-f filter]"},
 	{Name: "list-windows", Alias: "lsw", Usage: "[-ar] [-F format] [-f filter] [-O order][-t target-session]"},
 	{Name: "load-buffer", Alias: "loadb", Usage: "[-b buffer-name] path"},
+	{Name: "lock-client", Alias: "lockc", Usage: "[-t target-client]"},
+	{Name: "lock-server", Alias: "lock"},
+	{Name: "lock-session", Alias: "locks", Usage: "[-t target-session]"},
 	{Name: "move-pane", Alias: "movep", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
 	{Name: "move-window", Alias: "movew", Usage: "[-abdk] [-s src-window] [-t dst-window]"},
 	{Name: "new-pane", Alias: "newp", Usage: "[-bdefhIklPvZ] [-c start-directory] [-e environment] [-F format] [-l size] [-m message] [-p percentage] [-s style] [-S active-border-style] [-R inactive-border-style] [-x width] [-y height] [-X x-position] [-Y y-position] [-t target-pane] [shell-command [argument ...]]"},
@@ -367,6 +370,19 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 			os.Exit(0)
 		}()
 		return ok("server exited")
+	case "lock-server":
+		return ok("")
+	case "lock-session":
+		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
+		if target == "" {
+			target = firstSessionName(rt.state)
+		}
+		if !sessionExists(rt.state, target) {
+			return fail(fmt.Sprintf("can't find session: %s", target))
+		}
+		return ok("")
+	case "lock-client":
+		return fail("no current client")
 	case "rename-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
 		name := lastNonOption(args)
@@ -1969,6 +1985,12 @@ func normalizeCommandName(name string) string {
 		return "load-buffer"
 	case "saveb":
 		return "save-buffer"
+	case "lock":
+		return "lock-server"
+	case "locks":
+		return "lock-session"
+	case "lockc":
+		return "lock-client"
 	case "killp":
 		return "kill-pane"
 	case "killw":
@@ -2025,7 +2047,7 @@ func normalizeCommandName(name string) string {
 		return "start-server"
 	case "wait":
 		return "wait-for"
-	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
+	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",

@@ -24,6 +24,7 @@ manual verification note.
 | Basic shell/config commands | Implemented for `run-shell`/`run` synchronous output, `-b`, `-E`, simple `-C`, `-c`, and `-d`, plus basic `if-shell`/`if` true/false and `-F` branches; the probe covers stdout, stderr opt-in, background mode, shell exit status, and conditional branch execution |
 | Basic pane piping | Implemented for `pipe-pane`/`pipep` output piping to a shell command, empty-command close, `-o` toggle behavior, and basic `-I` command-output-to-pane input |
 | Basic synchronization commands | Implemented for `wait-for`/`wait` signal, wait, lock, and unlock channels; the probe covers signal-before-wait and lock/unlock output, with goroutine tests for blocking wakeups |
+| Basic lock commands | Implemented for `lock-server`/`lock`, `lock-session`/`locks` no-output success and `lock-client` no-current-client errors in the detached CLI subset |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
 | Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
 | `source-file` | Implemented for simple command files and line continuations |
@@ -62,6 +63,7 @@ manual verification note.
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |
 | Message log | `show-messages` does not yet keep tmux-style timestamped command/message history. |
 | Control mode | Not implemented. |
+| Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |
 | tmux terminfo feature negotiation | Minimal `TERM=screen-256color` only. |
