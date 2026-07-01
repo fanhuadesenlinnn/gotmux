@@ -921,6 +921,60 @@ func TestLoadAndSaveBufferCommands(t *testing.T) {
 	}
 }
 
+func TestPipePaneWritesPaneOutputAndToggleCloses(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	dir := t.TempDir()
+	output := dir + "/pipe.txt"
+	paneScript := dir + "/pane.sh"
+	if err := os.WriteFile(paneScript, []byte("#!/bin/sh\nstty -echo\nexec cat\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "pipep", "-n", "first", paneScript}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"pipep", "-o", "-t", "pipep:0.0", "cat > " + shellQuote(output)}, "pipep", 80, 24)
+	if !msg.OK {
+		t.Fatalf("pipe-pane failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"send-keys", "-t", "pipep:0.0", "pipe-alpha", "Enter"}, "pipep", 80, 24)
+	if !msg.OK {
+		t.Fatalf("send-keys failed: %s", msg.Text)
+	}
+	if !waitFileContains(t, output, "pipe-alpha") {
+		t.Fatalf("pipe output did not contain alpha")
+	}
+	msg = rt.execute([]string{"pipep", "-o", "-t", "pipep:0.0", "cat > " + shellQuote(output)}, "pipep", 80, 24)
+	if !msg.OK {
+		t.Fatalf("pipe-pane toggle failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"send-keys", "-t", "pipep:0.0", "pipe-beta", "Enter"}, "pipep", 80, 24)
+	if !msg.OK {
+		t.Fatalf("send-keys beta failed: %s", msg.Text)
+	}
+	time.Sleep(150 * time.Millisecond)
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "pipe-beta") {
+		t.Fatalf("pipe output was still open: %q", string(data))
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "pipep"}, "pipep", 80, 24)
+}
+
+func waitFileContains(t *testing.T, path string, needle string) bool {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(path)
+		if err == nil && strings.Contains(string(data), needle) {
+			return true
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	return false
+}
+
 func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, pane, err := rt.state.NewSession("cap", "", "first", []string{"/bin/sh"})

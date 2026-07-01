@@ -26,12 +26,20 @@ type Runtime struct {
 	screens   map[int]*terminal.Screen
 	waitMu    sync.Mutex
 	waitChans map[string]*waitChannel
+	pipeMu    sync.Mutex
+	pipes     map[int]*panePipe
 }
 
 type attachedClient struct {
 	id   int64
 	conn *protocol.Conn
 	done chan struct{}
+}
+
+type panePipe struct {
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
 }
 
 func Run(ctx context.Context, socketPath string, configFiles []string) error {
@@ -228,6 +236,7 @@ func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {
 			if screen := rt.ensurePaneScreen(pane, pane.Width, pane.Height); screen != nil {
 				screen.Write(data)
 			}
+			rt.writePanePipe(pane.ID, data)
 			pane.Activity = time.Now()
 			rt.broadcastPaneOutput(pane, data)
 		}
@@ -235,6 +244,118 @@ func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {
 			if err != io.EOF && !strings.Contains(err.Error(), "input/output error") {
 				pane.ExitState = err.Error()
 			}
+			return
+		}
+	}
+}
+
+func (rt *Runtime) openPanePipe(pane *model.Pane, shellCommand string, in, out, toggle bool) error {
+	rt.pipeMu.Lock()
+	if rt.pipes == nil {
+		rt.pipes = make(map[int]*panePipe)
+	}
+	if existing := rt.pipes[pane.ID]; existing != nil {
+		rt.closePanePipeLocked(pane.ID, existing)
+		if toggle {
+			rt.pipeMu.Unlock()
+			return nil
+		}
+	}
+	rt.pipeMu.Unlock()
+
+	cmd := exec.Command("/bin/sh", "-c", shellCommand)
+	var stdin io.WriteCloser
+	var stdout io.ReadCloser
+	var err error
+	if out {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return err
+		}
+	}
+	if in {
+		stdout, err = cmd.StdoutPipe()
+		if err != nil {
+			if stdin != nil {
+				_ = stdin.Close()
+			}
+			return err
+		}
+	} else {
+		cmd.Stdout = io.Discard
+	}
+	cmd.Stderr = io.Discard
+	if err := cmd.Start(); err != nil {
+		if stdin != nil {
+			_ = stdin.Close()
+		}
+		if stdout != nil {
+			_ = stdout.Close()
+		}
+		return err
+	}
+	pipe := &panePipe{cmd: cmd, stdin: stdin, stdout: stdout}
+
+	rt.pipeMu.Lock()
+	if rt.pipes == nil {
+		rt.pipes = make(map[int]*panePipe)
+	}
+	rt.pipes[pane.ID] = pipe
+	rt.pipeMu.Unlock()
+
+	if stdout != nil {
+		go rt.copyPipeToPane(pane, pipe)
+	}
+	go func() {
+		_ = cmd.Wait()
+		rt.pipeMu.Lock()
+		if rt.pipes[pane.ID] == pipe {
+			delete(rt.pipes, pane.ID)
+		}
+		rt.pipeMu.Unlock()
+	}()
+	return nil
+}
+
+func (rt *Runtime) closePanePipe(paneID int) {
+	rt.pipeMu.Lock()
+	if pipe := rt.pipes[paneID]; pipe != nil {
+		rt.closePanePipeLocked(paneID, pipe)
+	}
+	rt.pipeMu.Unlock()
+}
+
+func (rt *Runtime) closePanePipeLocked(paneID int, pipe *panePipe) {
+	delete(rt.pipes, paneID)
+	if pipe.stdin != nil {
+		_ = pipe.stdin.Close()
+	}
+	if pipe.stdout != nil {
+		_ = pipe.stdout.Close()
+	}
+}
+
+func (rt *Runtime) writePanePipe(paneID int, data []byte) {
+	rt.pipeMu.Lock()
+	pipe := rt.pipes[paneID]
+	if pipe == nil || pipe.stdin == nil {
+		rt.pipeMu.Unlock()
+		return
+	}
+	if _, err := pipe.stdin.Write(data); err != nil {
+		rt.closePanePipeLocked(paneID, pipe)
+	}
+	rt.pipeMu.Unlock()
+}
+
+func (rt *Runtime) copyPipeToPane(pane *model.Pane, pipe *panePipe) {
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := pipe.stdout.Read(buf)
+		if n > 0 && pane.PTY != nil {
+			_, _ = pane.PTY.Write(buf[:n])
+		}
+		if err != nil {
 			return
 		}
 	}

@@ -116,6 +116,19 @@ compare_key_line() {
   printf 'ok %s\n' "${name}"
 }
 
+wait_file_contains() {
+  local file="$1"
+  local needle="$2"
+  local i
+  for i in {1..80}; do
+    if [[ -f "${file}" ]] && grep -q "${needle}" "${file}"; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  return 1
+}
+
 compare "new-session detached output" new-session -d -s newsout -n first /bin/sh
 compare "new-session print output" new-session -d -P -F "#{session_name}:#{window_index}.#{pane_index}" -s newsp -n first /bin/sh
 
@@ -129,6 +142,7 @@ compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
+compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
 compare "list-commands respawn-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnp
 compare "list-commands respawn-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnw
 compare "list-commands unlink-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" unlinkw
@@ -243,6 +257,42 @@ if ! cmp -s "${tmux_saved_file}" "${gotmux_saved_file}"; then
 fi
 printf 'ok save buffer file\n'
 rm -f "${buffer_file}" "${tmux_saved_file}" "${gotmux_saved_file}"
+
+tmux_pipe_file="$(mktemp)"
+gotmux_pipe_file="$(mktemp)"
+pane_script="$(mktemp)"
+printf '#!/bin/sh\nstty -echo\nexec cat\n' > "${pane_script}"
+chmod +x "${pane_script}"
+"${tmux_cmd[@]}" new-session -d -s pipep -x 80 -y 24 -n first "${pane_script}"
+"${gotmux_cmd[@]}" new-session -d -s pipep -x 80 -y 24 -n first "${pane_script}" >/dev/null
+"${tmux_cmd[@]}" pipep -o -t pipep:0.0 "cat > '${tmux_pipe_file}'"
+"${gotmux_cmd[@]}" pipep -o -t pipep:0.0 "cat > '${gotmux_pipe_file}'" >/dev/null
+"${tmux_cmd[@]}" send-keys -t pipep:0.0 pipe-alpha Enter
+"${gotmux_cmd[@]}" send-keys -t pipep:0.0 pipe-alpha Enter >/dev/null
+if ! wait_file_contains "${tmux_pipe_file}" pipe-alpha || ! wait_file_contains "${gotmux_pipe_file}" pipe-alpha; then
+  echo "compat probe failed: pipe-pane output file" >&2
+  echo "--- tmux" >&2
+  cat "${tmux_pipe_file}" >&2 || true
+  echo "--- gotmux" >&2
+  cat "${gotmux_pipe_file}" >&2 || true
+  exit 1
+fi
+printf 'ok pipe-pane output file\n'
+"${tmux_cmd[@]}" pipep -o -t pipep:0.0 "cat > '${tmux_pipe_file}'"
+"${gotmux_cmd[@]}" pipep -o -t pipep:0.0 "cat > '${gotmux_pipe_file}'" >/dev/null
+"${tmux_cmd[@]}" send-keys -t pipep:0.0 pipe-beta Enter
+"${gotmux_cmd[@]}" send-keys -t pipep:0.0 pipe-beta Enter >/dev/null
+sleep 0.3
+if grep -q pipe-beta "${tmux_pipe_file}" || grep -q pipe-beta "${gotmux_pipe_file}"; then
+  echo "compat probe failed: pipe-pane toggle close" >&2
+  echo "--- tmux" >&2
+  cat "${tmux_pipe_file}" >&2 || true
+  echo "--- gotmux" >&2
+  cat "${gotmux_pipe_file}" >&2 || true
+  exit 1
+fi
+printf 'ok pipe-pane toggle close\n'
+rm -f "${tmux_pipe_file}" "${gotmux_pipe_file}" "${pane_script}"
 
 "${tmux_cmd[@]}" new-session -d -s layh -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t layh -h /bin/sh

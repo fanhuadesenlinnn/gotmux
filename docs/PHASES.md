@@ -106,6 +106,12 @@ output, and complete target resolution remain.
   alerts, jobs, run-shell, pipe-pane, wait-for, locks, and remaining command
   families.
 
+Status: in progress. `run-shell`, `if-shell`, and `wait-for` cover the tested
+command/job subset. Basic `pipe-pane` output piping now writes pane output to a
+shell command, closes on empty commands, and supports the common `-o` toggle
+path in the compatibility probe. Full bidirectional pipe lifecycle behavior,
+hooks, control mode, popups, and linked windows remain.
+
 ## Completion Gate
 
 gotmux is not considered a full tmux clone until the compatibility probe and

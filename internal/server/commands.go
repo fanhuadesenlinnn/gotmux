@@ -63,6 +63,7 @@ var commandInfos = []commandInfo{
 	{Name: "next-layout", Alias: "nextl", Usage: "[-t target-window]"},
 	{Name: "next-window", Alias: "next", Usage: "[-a] [-t target-session]"},
 	{Name: "paste-buffer", Alias: "pasteb", Usage: "[-dpr] [-b buffer-name] [-s separator] [-t target-pane]"},
+	{Name: "pipe-pane", Alias: "pipep", Usage: "[-IOo] [-t target-pane] [shell-command]"},
 	{Name: "previous-layout", Alias: "prevl", Usage: "[-t target-window]"},
 	{Name: "previous-window", Alias: "prev", Usage: "[-a] [-t target-session]"},
 	{Name: "rename-session", Alias: "rename", Usage: "[-t target-session] new-name"},
@@ -419,6 +420,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdDeleteBuffer(args)
 	case "paste-buffer":
 		return rt.cmdPasteBuffer(args, currentSession)
+	case "pipe-pane":
+		return rt.cmdPipePane(args, currentSession)
 	case "load-buffer":
 		return rt.cmdLoadBuffer(args)
 	case "save-buffer":
@@ -1109,6 +1112,30 @@ func (rt *Runtime) cmdPasteBuffer(args []string, currentSession string) protocol
 	_, _ = pane.PTY.Write([]byte(data))
 	if hasAny(args, "-d") {
 		_ = rt.state.DeleteBuffer(optionValue(args, "-b", ""))
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdPipePane(args []string, currentSession string) protocol.Message {
+	pane := rt.targetLivePane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	if pane.Exited {
+		return fail("target pane has exited")
+	}
+	command := strings.Join(trailingCommand(args, map[string]bool{"-t": true}), " ")
+	if command == "" {
+		rt.closePanePipe(pane.ID)
+		return ok("")
+	}
+	in := hasAny(args, "-I")
+	out := hasAny(args, "-O")
+	if !in {
+		out = true
+	}
+	if err := rt.openPanePipe(pane, command, in, out, hasAny(args, "-o")); err != nil {
+		return fail(err.Error())
 	}
 	return ok("")
 }
@@ -1936,6 +1963,8 @@ func normalizeCommandName(name string) string {
 		return "delete-buffer"
 	case "pasteb":
 		return "paste-buffer"
+	case "pipep":
+		return "pipe-pane"
 	case "loadb":
 		return "load-buffer"
 	case "saveb":
@@ -2003,7 +2032,7 @@ func normalizeCommandName(name string) string {
 		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane":
+		"paste-buffer", "pipe-pane", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane":
 		return name
 	default:
 		return name
