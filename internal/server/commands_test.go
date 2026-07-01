@@ -138,6 +138,54 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	}
 }
 
+func TestSetAndShowHooks(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "hooks", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session hooks failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"show-hooks", "-g", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window" {
+		t.Fatalf("empty global hook = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show-hooks", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("empty local hook = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set-hook", "-g", "after-new-window", "display-message hi"}, "hooks", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-hook -g failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set-hook", "-ga", "after-new-window", "display-message there"}, "hooks", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-hook -ga failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-hooks", "-g", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window[0] display-message hi\nafter-new-window[1] display-message there" {
+		t.Fatalf("global hook values = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set-hook", "after-new-window", "display-message local"}, "hooks", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-hook local failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-hooks", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window[0] display-message local" {
+		t.Fatalf("local hook value = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set-hook", "-gu", "after-new-window"}, "hooks", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-hook -gu failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show-hooks", "-g", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window" {
+		t.Fatalf("unset global hook = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show-hooks", "-g", "missing-hook"}, "hooks", 80, 24)
+	if msg.OK || msg.Text != "invalid option: missing-hook" {
+		t.Fatalf("show-hooks invalid = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "hooks"}, "hooks", 80, 24)
+}
+
 func TestListCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	format := "#{command_list_name}:#{command_list_alias}:#{command_list_usage}"
@@ -173,6 +221,8 @@ func TestListCommands(t *testing.T) {
 		{"popup", "display-popup:popup:[-BCEkN] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane] [-T title] [-w width] [-x position] [-y position] [shell-command [argument ...]]"},
 		{"command-prompt", "command-prompt::[-1CbeFiklN] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]"},
 		{"suspendc", "suspend-client:suspendc:[-t target-client]"},
+		{"set-hook", "set-hook::[-agpRuw] [-t target-pane] hook [command]"},
+		{"show-hooks", "show-hooks::[-gpw] [-t target-pane] [hook]"},
 	} {
 		msg = rt.execute([]string{"list-commands", "-F", format, tc.query}, "", 80, 24)
 		if msg.Text != tc.want {

@@ -26,10 +26,11 @@ fields.
 Status: in progress. Basic command sequences, explicit `-f`, default
 `$HOME/.tmux.conf` discovery, `source-file`, basic `list-commands` metadata for
 currently supported commands, basic `list-clients`, string-backed options, basic
-environment commands, prefix/root key bindings, `send-prefix`, basic `run-shell`
-shell execution, basic `if-shell` conditionals, and basic `wait-for`
-synchronization are implemented and covered by `scripts/compat_probe.sh`.
-Basic empty prompt history commands are also covered. Full tmux syntax,
+`set-hook`/`show-hooks` hook option storage and display, basic environment
+commands, prefix/root key bindings, `send-prefix`, basic `run-shell` shell
+execution, basic `if-shell` conditionals, and basic `wait-for` synchronization
+are implemented and covered by `scripts/compat_probe.sh`. Basic empty prompt
+history commands are also covered. Full tmux syntax, hook firing side effects,
 environment edge cases, and complete option/key semantics remain.
 
 ## Phase 3: Terminal Screen Model
@@ -128,8 +129,8 @@ missing `-c target-client` errors, attached-client `-t` target-session
 switching, `-n`/`-p` relative switching, `-l` last-session switching, and
 basic `-c client-N` target-client switching. Full lock screens, bidirectional
 pipe lifecycle behavior, refresh offset/control behavior, full switch-client
-key-table/read-only/sorted-order behavior, hooks, control mode, popups, and
-linked windows remain.
+key-table/read-only/sorted-order behavior, hook execution ordering and context,
+control mode, popups, and linked windows remain.
 
 ## Completion Gate
 

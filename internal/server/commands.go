@@ -99,10 +99,12 @@ var commandInfos = []commandInfo{
 	{Name: "send-prefix", Usage: "[-2] [-t target-pane]"},
 	{Name: "set-buffer", Alias: "setb", Usage: "[-aw] [-b buffer-name] [-n new-buffer-name] [-t target-client] [data]"},
 	{Name: "set-environment", Alias: "setenv", Usage: "[-Fhgru] [-t target-session] name [value]"},
+	{Name: "set-hook", Usage: "[-agpRuw] [-t target-pane] hook [command]"},
 	{Name: "set-option", Alias: "set", Usage: "[-aFgopqsuUw] [-t target-pane] option [value]"},
 	{Name: "set-window-option", Alias: "setw", Usage: "[-aFgoqu] [-t target-window] option [value]"},
 	{Name: "show-buffer", Alias: "showb", Usage: "[-b buffer-name]"},
 	{Name: "show-environment", Alias: "showenv", Usage: "[-hgs] [-t target-session] [name]"},
+	{Name: "show-hooks", Usage: "[-gpw] [-t target-pane] [hook]"},
 	{Name: "show-messages", Alias: "showmsgs", Usage: "[-JT] [-t target-client]"},
 	{Name: "show-options", Alias: "show", Usage: "[-AgHpqsvw] [-t target-pane] [option]"},
 	{Name: "show-prompt-history", Alias: "showphist", Usage: "[-T prompt-type]"},
@@ -223,11 +225,15 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		return rt.cmdSetOption(args, currentSession, "session")
 	case "set-window-option":
 		return rt.cmdSetOption(args, currentSession, "window")
+	case "set-hook":
+		return rt.cmdSetHook(args, currentSession)
 	case "show-options":
 		return rt.cmdShowOptions(args, currentSession)
 	case "show-window-options":
 		windowArgs := append([]string{"-w"}, args...)
 		return rt.cmdShowOptions(windowArgs, currentSession)
+	case "show-hooks":
+		return rt.cmdShowHooks(args, currentSession)
 	case "bind-key":
 		return rt.cmdBindKey(args)
 	case "unbind-key":
@@ -1531,6 +1537,71 @@ func (rt *Runtime) cmdListCommands(args []string) protocol.Message {
 	return ok(strings.Join(lines, "\n"))
 }
 
+func (rt *Runtime) cmdSetHook(args []string, currentSession string) protocol.Message {
+	values := optionOperands(args)
+	if len(values) == 0 {
+		return fail("missing hook")
+	}
+	name := values[0]
+	commandValue := ""
+	if len(values) > 1 {
+		commandValue = strings.Join(values[1:], " ")
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	scope := hookScope(args)
+	if hasAny(args, "-R") {
+		if _, err := rt.state.Hooks(scope, currentSession, name); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+	if err := rt.state.SetHook(scope, currentSession, name, commandValue, hasAny(args, "-a"), hasAny(args, "-u")); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowHooks(args []string, currentSession string) protocol.Message {
+	values := optionOperands(args)
+	name := ""
+	if len(values) > 0 {
+		name = values[0]
+	}
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	hooks, err := rt.state.Hooks(hookScope(args), currentSession, name)
+	if err != nil {
+		return fail(err.Error())
+	}
+	lines := make([]string, 0)
+	for _, hook := range hooks {
+		if len(hook.Commands) == 0 {
+			lines = append(lines, hook.Name)
+			continue
+		}
+		for index, commandValue := range hook.Commands {
+			lines = append(lines, fmt.Sprintf("%s[%d] %s", hook.Name, index, commandValue))
+		}
+	}
+	return ok(strings.Join(lines, "\n"))
+}
+
+func hookScope(args []string) string {
+	switch {
+	case hasAny(args, "-g"):
+		return "global"
+	case hasAny(args, "-w"):
+		return "window"
+	case hasAny(args, "-p"):
+		return "pane"
+	default:
+		return "session"
+	}
+}
+
 func (rt *Runtime) cmdListClients(args []string) protocol.Message {
 	format := optionValue(args, "-F", "")
 	target := cleanSessionTarget(optionValue(args, "-t", ""))
@@ -2200,7 +2271,7 @@ func normalizeCommandName(name string) string {
 		return "wait-for"
 	case "kill-server", "kill-session", "link-window", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
 		"send-keys", "confirm-before", "display-message", "display-menu", "display-panes", "display-popup", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
-		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
+		"source-file", "set-hook", "set-option", "set-window-option", "show-hooks", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",

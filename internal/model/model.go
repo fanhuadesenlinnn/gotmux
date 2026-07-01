@@ -22,6 +22,7 @@ type Server struct {
 	GlobalOptions       map[string]string
 	GlobalWindowOptions map[string]string
 	GlobalEnvironment   map[string]string
+	GlobalHooks         map[string][]string
 	KeyBindings         map[string]map[string]KeyBinding
 	NextSessionID       int
 	NextWindowID        int
@@ -45,6 +46,7 @@ type Session struct {
 	Attached     int
 	Options      map[string]string
 	Environment  map[string]string
+	Hooks        map[string][]string
 }
 
 type Window struct {
@@ -61,6 +63,7 @@ type Window struct {
 	Layout     *LayoutNode
 	LastLayout string
 	Options    map[string]string
+	Hooks      map[string][]string
 }
 
 type Pane struct {
@@ -79,6 +82,7 @@ type Pane struct {
 	PTY        *os.File
 	Process    *exec.Cmd
 	History    *Ring
+	Hooks      map[string][]string
 	Exited     bool
 	ExitState  string
 	Generation int
@@ -119,6 +123,82 @@ type Buffer struct {
 	Order     int64
 }
 
+type Hook struct {
+	Name     string
+	Commands []string
+}
+
+var knownHookNames = []string{
+	"after-bind-key",
+	"after-capture-pane",
+	"after-copy-mode",
+	"after-display-message",
+	"after-display-panes",
+	"after-kill-pane",
+	"after-list-buffers",
+	"after-list-clients",
+	"after-list-keys",
+	"after-list-panes",
+	"after-list-sessions",
+	"after-list-windows",
+	"after-load-buffer",
+	"after-lock-server",
+	"after-new-session",
+	"after-new-window",
+	"after-paste-buffer",
+	"after-pipe-pane",
+	"after-queue",
+	"after-refresh-client",
+	"after-rename-session",
+	"after-rename-window",
+	"after-resize-pane",
+	"after-resize-window",
+	"after-save-buffer",
+	"after-select-layout",
+	"after-select-pane",
+	"after-select-window",
+	"after-send-keys",
+	"after-set-buffer",
+	"after-set-environment",
+	"after-set-hook",
+	"after-set-option",
+	"after-show-environment",
+	"after-show-messages",
+	"after-show-options",
+	"after-split-window",
+	"after-unbind-key",
+	"alert-activity",
+	"alert-bell",
+	"alert-silence",
+	"client-active",
+	"client-attached",
+	"client-detached",
+	"client-focus-in",
+	"client-focus-out",
+	"client-resized",
+	"client-session-changed",
+	"client-light-theme",
+	"client-dark-theme",
+	"command-error",
+	"pane-died",
+	"pane-exited",
+	"pane-focus-in",
+	"pane-focus-out",
+	"pane-mode-changed",
+	"pane-set-clipboard",
+	"pane-title-changed",
+	"session-closed",
+	"session-created",
+	"session-renamed",
+	"session-window-changed",
+	"window-layout-changed",
+	"window-linked",
+	"window-pane-changed",
+	"window-renamed",
+	"window-resized",
+	"window-unlinked",
+}
+
 func NewServer(socketPath string) *Server {
 	return &Server{
 		Sessions:            make(map[string]*Session),
@@ -127,6 +207,7 @@ func NewServer(socketPath string) *Server {
 		GlobalOptions:       defaultOptions(),
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
+		GlobalHooks:         defaultHooks(),
 		KeyBindings:         defaultKeyBindings(),
 		NextClientID:        1,
 		SocketPath:          socketPath,
@@ -156,6 +237,14 @@ func defaultWindowOptions() map[string]string {
 		"pane-base-index":          "0",
 		"tiled-layout-max-columns": "0",
 	}
+}
+
+func defaultHooks() map[string][]string {
+	hooks := make(map[string][]string, len(knownHookNames))
+	for _, name := range knownHookNames {
+		hooks[name] = nil
+	}
+	return hooks
 }
 
 func defaultKeyBindings() map[string]map[string]KeyBinding {
@@ -2182,6 +2271,127 @@ func (s *Server) Options(scope, sessionName string) (map[string]string, error) {
 		return nil, fmt.Errorf("unknown option scope: %s", scope)
 	}
 	return out, nil
+}
+
+func (s *Server) SetHook(scope, sessionName, name, command string, appendValue, unset bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !isKnownHook(name) {
+		return fmt.Errorf("invalid option: %s", name)
+	}
+	hooks, err := s.hooksForScopeLocked(scope, sessionName)
+	if err != nil {
+		return err
+	}
+	if *hooks == nil {
+		if scope == "global" {
+			*hooks = defaultHooks()
+		} else {
+			*hooks = make(map[string][]string)
+		}
+	}
+	if unset {
+		if scope == "global" {
+			(*hooks)[name] = nil
+		} else {
+			delete(*hooks, name)
+		}
+		return nil
+	}
+	if command == "" {
+		(*hooks)[name] = nil
+		return nil
+	}
+	if appendValue {
+		(*hooks)[name] = append(append([]string(nil), (*hooks)[name]...), command)
+		return nil
+	}
+	(*hooks)[name] = []string{command}
+	return nil
+}
+
+func (s *Server) Hooks(scope, sessionName, name string) ([]Hook, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if name != "" && !isKnownHook(name) {
+		return nil, fmt.Errorf("invalid option: %s", name)
+	}
+	hooks, err := s.hooksForScopeLocked(scope, sessionName)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Hook, 0)
+	addHook := func(hookName string, commands []string) {
+		out = append(out, Hook{Name: hookName, Commands: append([]string(nil), commands...)})
+	}
+	if name != "" {
+		if commands, ok := (*hooks)[name]; ok {
+			addHook(name, commands)
+		}
+		return out, nil
+	}
+	if scope == "global" {
+		for _, hookName := range knownHookNames {
+			addHook(hookName, (*hooks)[hookName])
+		}
+		return out, nil
+	}
+	for _, hookName := range knownHookNames {
+		if commands, ok := (*hooks)[hookName]; ok {
+			addHook(hookName, commands)
+		}
+	}
+	return out, nil
+}
+
+func (s *Server) hooksForScopeLocked(scope, sessionName string) (*map[string][]string, error) {
+	switch scope {
+	case "global":
+		return &s.GlobalHooks, nil
+	case "session":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		return &session.Hooks, nil
+	case "window":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		window := session.ActiveWindow()
+		if window == nil {
+			return nil, fmt.Errorf("session has no active window")
+		}
+		return &window.Hooks, nil
+	case "pane":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		window := session.ActiveWindow()
+		if window == nil {
+			return nil, fmt.Errorf("session has no active window")
+		}
+		pane := window.ActivePane()
+		if pane == nil {
+			return nil, fmt.Errorf("window has no active pane")
+		}
+		return &pane.Hooks, nil
+	default:
+		return nil, fmt.Errorf("unknown hook scope: %s", scope)
+	}
+}
+
+func isKnownHook(name string) bool {
+	for _, hookName := range knownHookNames {
+		if hookName == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) GlobalOption(name string) string {

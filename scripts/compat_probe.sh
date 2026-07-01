@@ -159,6 +159,8 @@ compare "list-commands display-panes format" list-commands -F "#{command_list_na
 compare "list-commands display-popup format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" popup
 compare "list-commands command-prompt format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" command-prompt
 compare "list-commands suspend-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" suspendc
+compare "list-commands set-hook format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" set-hook
+compare "list-commands show-hooks format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" show-hooks
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
@@ -189,6 +191,15 @@ compare_status "display-popup no current client" display-popup
 compare_status "confirm-before no current client" confirm-before true
 compare_status "command-prompt no current client" command-prompt
 compare_status "suspend-client no current client" suspend-client
+compare "show-hooks empty global hook" show-hooks -g after-new-window
+compare "set-hook global command" set-hook -g after-new-window "display-message hi"
+compare "set-hook global append command" set-hook -ga after-new-window "display-message there"
+compare "show-hooks global hook" show-hooks -g after-new-window
+compare "set-hook local command" set-hook after-new-window "display-message local"
+compare "show-hooks local hook" show-hooks after-new-window
+compare "unset global hook command" set-hook -gu after-new-window
+compare "show-hooks unset global hook" show-hooks -g after-new-window
+compare_status "show-hooks invalid hook" show-hooks -g missing-hook
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"
