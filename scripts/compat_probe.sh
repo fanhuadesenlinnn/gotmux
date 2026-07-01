@@ -682,6 +682,17 @@ compare "select-window last flag windows" list-windows -t lastw -F "#{window_ind
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
 compare "show global option value" show -gqv status
+"${tmux_cmd[@]}" set -gu status
+"${gotmux_cmd[@]}" set -gu status >/dev/null
+compare "unset global option value" show -gqv status
+"${tmux_cmd[@]}" set -g default-command foo
+"${gotmux_cmd[@]}" set -g default-command foo >/dev/null
+"${tmux_cmd[@]}" set -ga default-command bar
+"${gotmux_cmd[@]}" set -ga default-command bar >/dev/null
+compare "append global option value" show -gqv default-command
+"${tmux_cmd[@]}" set -gu default-command
+"${gotmux_cmd[@]}" set -gu default-command >/dev/null
+compare "unset string global option value" show -gqv default-command
 
 "${tmux_cmd[@]}" setw -g mode-keys vi
 "${gotmux_cmd[@]}" setw -g mode-keys vi >/dev/null

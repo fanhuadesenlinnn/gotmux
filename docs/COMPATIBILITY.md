@@ -34,7 +34,7 @@ manual verification note.
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
-| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw` |
+| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw`, including global/local `-u`, string `-a`, and `show-options -A` inherited values in the tested subset |
 | Basic hook options | Implemented for `set-hook` and `show-hooks` command metadata, global/session/window/pane hook storage, `-g`/`-w`/`-p`, `-a` append, `-u` unset, tmux-style `hook[index] command` display, empty global built-in hook names, and invalid hook errors in the probe subset |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |
@@ -61,7 +61,7 @@ manual verification note.
 | Mouse support | Not implemented. |
 | Full buffers and paste buffers | Basic in-memory buffers and file load/save exist, but `choose-buffer`, buffer limits, stack pruning, copy-mode integration, and complete paste options are incomplete. |
 | Full `capture-pane` semantics | History ranges, alternate screen selection, mode screen capture, paste buffers, complete `-J`/`-T` behavior across history and mode grids, full escape/style output, hyperlinks, all tmux line flags, and complete target resolution are incomplete. |
-| Full option semantics | Only a small string-backed subset exists. Most documented options and option side effects are not implemented; hook storage exists but hook firing side effects are incomplete. |
+| Full option semantics | Only a small string-backed subset exists. Most documented options, option type validation, array option semantics, and option side effects are not implemented; hook storage exists but hook firing side effects are incomplete. |
 | Full environment semantics | Hidden variables, remove markers, update-environment integration, and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
 | Status format language | Only a simple status line is implemented. |

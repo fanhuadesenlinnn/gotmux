@@ -1415,7 +1415,7 @@ func (rt *Runtime) cmdSetOption(args []string, currentSession string, defaultSco
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
-	if err := rt.state.SetOption(scope, currentSession, name, value); err != nil {
+	if err := rt.state.SetOption(scope, currentSession, name, value, hasAny(args, "-a"), hasAny(args, "-u")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1436,7 +1436,8 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
-	options, err := rt.state.Options(scope, currentSession)
+	includeInherited := hasAny(args, "-A")
+	options, err := rt.state.Options(scope, currentSession, includeInherited)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -1445,6 +1446,14 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 	if len(names) > 0 {
 		value, exists := options[names[0]]
 		if !exists {
+			if !includeInherited && (scope == "session" || scope == "window") {
+				inherited, err := rt.state.Options(scope, currentSession, true)
+				if err == nil {
+					if _, known := inherited[names[0]]; known {
+						return ok("")
+					}
+				}
+			}
 			if hasAny(args, "-q") {
 				return ok("")
 			}

@@ -2205,44 +2205,74 @@ func (s *Server) SetClientPrefix(clientID int64, prefix bool) {
 	}
 }
 
-func (s *Server) SetOption(scope, sessionName, name, value string) error {
+func (s *Server) SetOption(scope, sessionName, name, value string, appendValue, unset bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	options, err := s.optionsForScopeLocked(scope, sessionName)
+	if err != nil {
+		return err
+	}
+	if unset {
+		switch scope {
+		case "global":
+			if value, ok := defaultOptions()[name]; ok {
+				options[name] = value
+			} else {
+				delete(options, name)
+			}
+		case "global-window":
+			if value, ok := defaultWindowOptions()[name]; ok {
+				options[name] = value
+			} else {
+				delete(options, name)
+			}
+		default:
+			delete(options, name)
+		}
+		return nil
+	}
+	if appendValue {
+		value = options[name] + value
+	}
+	options[name] = value
+	return nil
+}
+
+func (s *Server) optionsForScopeLocked(scope, sessionName string) (map[string]string, error) {
 	switch scope {
 	case "global":
-		s.GlobalOptions[name] = value
+		return s.GlobalOptions, nil
 	case "global-window":
-		s.GlobalWindowOptions[name] = value
+		return s.GlobalWindowOptions, nil
 	case "session":
 		session := s.Sessions[sessionName]
 		if session == nil {
-			return fmt.Errorf("can't find session: %s", sessionName)
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
 		}
 		if session.Options == nil {
 			session.Options = make(map[string]string)
 		}
-		session.Options[name] = value
+		return session.Options, nil
 	case "window":
 		session := s.Sessions[sessionName]
 		if session == nil {
-			return fmt.Errorf("can't find session: %s", sessionName)
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
 		}
 		window := session.ActiveWindow()
 		if window == nil {
-			return fmt.Errorf("session has no active window")
+			return nil, fmt.Errorf("session has no active window")
 		}
 		if window.Options == nil {
 			window.Options = make(map[string]string)
 		}
-		window.Options[name] = value
+		return window.Options, nil
 	default:
-		return fmt.Errorf("unknown option scope: %s", scope)
+		return nil, fmt.Errorf("unknown option scope: %s", scope)
 	}
-	return nil
 }
 
-func (s *Server) Options(scope, sessionName string) (map[string]string, error) {
+func (s *Server) Options(scope, sessionName string, includeInherited bool) (map[string]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -2258,14 +2288,18 @@ func (s *Server) Options(scope, sessionName string) (map[string]string, error) {
 	case "global-window":
 		copyOptions(s.GlobalWindowOptions)
 	case "session":
-		copyOptions(s.GlobalOptions)
+		if includeInherited {
+			copyOptions(s.GlobalOptions)
+		}
 		session := s.Sessions[sessionName]
 		if session == nil {
 			return nil, fmt.Errorf("can't find session: %s", sessionName)
 		}
 		copyOptions(session.Options)
 	case "window":
-		copyOptions(s.GlobalWindowOptions)
+		if includeInherited {
+			copyOptions(s.GlobalWindowOptions)
+		}
 		session := s.Sessions[sessionName]
 		if session == nil {
 			return nil, fmt.Errorf("can't find session: %s", sessionName)

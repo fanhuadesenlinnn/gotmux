@@ -25,7 +25,8 @@ fields.
 
 Status: in progress. Basic command sequences, explicit `-f`, default
 `$HOME/.tmux.conf` discovery, `source-file`, basic `list-commands` metadata for
-all local tmux command names, basic `list-clients`, string-backed options, basic
+all local tmux command names, basic `list-clients`, string-backed options with
+global/local unset, string append, and `show-options -A`, basic
 `set-hook`/`show-hooks` hook option storage and display, basic environment
 commands, prefix/root key bindings, `send-prefix`, basic `run-shell` shell
 execution, basic `if-shell` conditionals, and basic `wait-for` synchronization

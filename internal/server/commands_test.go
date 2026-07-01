@@ -121,6 +121,70 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "off" {
 		t.Fatalf("show status = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"set", "-gu", "status"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset global status failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "status"}, "", 80, 24)
+	if msg.Text != "on" {
+		t.Fatalf("unset global status = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-g", "default-command", "foo"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set global default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-ga", "default-command", "bar"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("append global default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "default-command"}, "", 80, 24)
+	if msg.Text != "foobar" {
+		t.Fatalf("append global default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-gu", "default-command"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset global default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "default-command"}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("unset global default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"new-session", "-d", "-s", "opts", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session opts failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-g", "default-command", "base"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set inherited default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-v", "default-command"}, "opts", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("local inherited default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-Av", "default-command"}, "opts", 80, 24)
+	if msg.Text != "base" {
+		t.Fatalf("inherited default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-a", "default-command", "plus"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("append local default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-v", "default-command"}, "opts", 80, 24)
+	if msg.Text != "plus" {
+		t.Fatalf("append local default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-u", "default-command"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset local default-command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-v", "default-command"}, "opts", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("unset local default-command = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-Av", "default-command"}, "opts", 80, 24)
+	if msg.Text != "base" {
+		t.Fatalf("inherited after local unset = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"show", "-gwqv", "main-pane-width"}, "", 80, 24)
 	if msg.Text != "80" {
 		t.Fatalf("show main-pane-width = %q", msg.Text)
@@ -128,6 +192,30 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	msg = rt.execute([]string{"showw", "-gv", "mode-keys"}, "", 80, 24)
 	if msg.Text != "emacs" {
 		t.Fatalf("showw mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setw", "-g", "mode-keys", "vi"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set global window mode-keys failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"setw", "mode-keys", "emacs"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set local window mode-keys failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showw", "-v", "mode-keys"}, "opts", 80, 24)
+	if msg.Text != "emacs" {
+		t.Fatalf("local window mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setw", "-u", "mode-keys"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset local window mode-keys failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showw", "-v", "mode-keys"}, "opts", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("unset local window mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-Awv", "mode-keys"}, "opts", 80, 24)
+	if msg.Text != "vi" {
+		t.Fatalf("inherited window mode-keys = %q", msg.Text)
 	}
 	msg = rt.execute([]string{"bind-key", "C-a", "send-prefix"}, "", 80, 24)
 	if !msg.OK {
