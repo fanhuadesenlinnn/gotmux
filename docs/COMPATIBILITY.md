@@ -44,7 +44,7 @@ manual verification note.
 | Basic multi-pane redraw | Implemented for screen-backed pane snapshots with simple ASCII borders; full tmux-style redraw is not complete |
 | Basic `capture-pane` | Implemented for `-p`, visible screen lines, simple `-S`/`-E` ranges, simple pane targets in the probe subset, basic `-N`/`-T` whitespace handling, basic `-J` wrapped-line joining, visible-line `-F`/`-L` prefixes, and basic `-C` visible text escaping |
 | Basic `clear-history` | Implemented for clearing gotmux's pane history ring; the visible screen snapshot is left unchanged |
-| Basic paste buffers | Implemented for `set-buffer`, `set-buffer -n`, `show-buffer`, `list-buffers`, `delete-buffer`, `paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`; the probe covers set/show/list/rename/delete, file load/save, and capture-to-buffer |
+| Basic paste buffers | Implemented for `set-buffer`, `set-buffer -n`, `show-buffer`, `list-buffers`, basic `list-buffers -f` truthy filters and `-O name`/`-O size`, `delete-buffer`, `paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`; the probe covers set/show/list/filter/order/rename/delete, file load/save, and capture-to-buffer |
 | tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, `capture-pane`, and buffer subsets |
 | macOS/Linux static Go builds | Implemented |
 

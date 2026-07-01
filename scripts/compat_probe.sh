@@ -164,6 +164,7 @@ compare "list-commands set-hook format" list-commands -F "#{command_list_name}:#
 compare "list-commands show-hooks format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" show-hooks
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
+compare "list-commands list-buffers format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lsb
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
 compare "list-commands respawn-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnp
 compare "list-commands respawn-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnw
@@ -303,6 +304,15 @@ compare "show renamed buffer" show-buffer -b renamed
 "${tmux_cmd[@]}" delete-buffer -b renamed
 "${gotmux_cmd[@]}" delete-buffer -b renamed >/dev/null
 compare "delete renamed buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
+
+"${tmux_cmd[@]}" set-buffer -b zed "zed"
+"${tmux_cmd[@]}" set-buffer -b alpha "alpha"
+"${gotmux_cmd[@]}" set-buffer -b zed "zed" >/dev/null
+"${gotmux_cmd[@]}" set-buffer -b alpha "alpha" >/dev/null
+compare "list buffers order name" list-buffers -O name -F "#{buffer_name}"
+compare "list buffers truthy filter" list-buffers -f "#{buffer_name}" -F "#{buffer_name}"
+compare "list buffers false filter" list-buffers -f "0" -F "#{buffer_name}"
+compare_status "list buffers invalid order" list-buffers -O nope
 
 buffer_file="$(mktemp)"
 tmux_saved_file="$(mktemp)"

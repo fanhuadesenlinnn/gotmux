@@ -273,6 +273,7 @@ func TestListCommands(t *testing.T) {
 		{"server-access", "server-access::[-adlrw] [-t target-pane] [user]"},
 		{"set-hook", "set-hook::[-agpRuw] [-t target-pane] hook [command]"},
 		{"show-hooks", "show-hooks::[-gpw] [-t target-pane] [hook]"},
+		{"lsb", "list-buffers:lsb:[-F format] [-f filter] [-O order]"},
 	} {
 		msg = rt.execute([]string{"list-commands", "-F", format, tc.query}, "", 80, 24)
 		if msg.Text != tc.want {
@@ -1138,6 +1139,22 @@ func TestBufferCommands(t *testing.T) {
 	msg = rt.execute([]string{"list-buffers", "-F", "#{buffer_name}:#{buffer_size}:#{buffer_sample}"}, "", 80, 24)
 	if !strings.Contains(msg.Text, "buffer0:5:plain") || !strings.Contains(msg.Text, "renamed:11:hello world") {
 		t.Fatalf("list-buffers auto = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-O", "name", "-F", "#{buffer_name}"}, "", 80, 24)
+	if msg.Text != "buffer0\nrenamed" {
+		t.Fatalf("list-buffers -O name = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-f", "#{buffer_name}", "-F", "#{buffer_name}"}, "", 80, 24)
+	if msg.Text != "buffer0\nrenamed" {
+		t.Fatalf("list-buffers truthy filter = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-f", "0", "-F", "#{buffer_name}"}, "", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("list-buffers false filter = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-buffers", "-O", "nope"}, "", 80, 24)
+	if msg.OK || msg.Text != "invalid sort order" {
+		t.Fatalf("list-buffers invalid order = %#v", msg)
 	}
 	msg = rt.execute([]string{"delete-buffer", "-b", "renamed"}, "", 80, 24)
 	if !msg.OK {

@@ -99,7 +99,8 @@ for basic `capture-pane -J` joining. Visible-line `capture-pane -F` flags and
 `capture-pane -C` escaping for visible backslashes. Basic in-memory paste buffers
 now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `paste-buffer`, `load-buffer`, `save-buffer`, `capture-pane -b`, and
-`set-buffer -n` buffer renames. Basic
+`set-buffer -n` buffer renames. `list-buffers` now also supports basic truthy
+`-f` filters and `-O name`/`-O size` sort orders in the probed subset. Basic
 `clear-history` clears gotmux's pane history ring. Prompt-history commands expose
 the tmux-compatible empty-history shape, and `show-messages` covers command
 metadata plus empty `-J`/`-T` jobs/terminal output. Basic mode entry commands

@@ -60,7 +60,7 @@ var commandInfos = []commandInfo{
 	{Name: "last-pane", Alias: "lastp", Usage: "[-deZ] [-t target-window]"},
 	{Name: "last-window", Alias: "last", Usage: "[-t target-session]"},
 	{Name: "link-window", Alias: "linkw", Usage: "[-abdk] [-s src-window] [-t dst-window]"},
-	{Name: "list-buffers", Alias: "lsb", Usage: "[-F format]"},
+	{Name: "list-buffers", Alias: "lsb", Usage: "[-F format] [-f filter] [-O order]"},
 	{Name: "list-clients", Alias: "lsc", Usage: "[-F format] [-f filter] [-O order][-t target-session]"},
 	{Name: "list-commands", Alias: "lscm", Usage: "[-F format] [command]"},
 	{Name: "list-keys", Alias: "lsk", Usage: "[-1aN] [-F format] [-P prefix-string] [-T key-table] [key]"},
@@ -1239,9 +1239,29 @@ func (rt *Runtime) cmdShowBuffer(args []string) protocol.Message {
 
 func (rt *Runtime) cmdListBuffers(args []string) protocol.Message {
 	format := optionValue(args, "-F", "")
+	filter := optionValue(args, "-f", "")
 	buffers := rt.state.ListBuffers()
+	switch order := optionValue(args, "-O", ""); order {
+	case "", "time":
+	case "name":
+		sort.Slice(buffers, func(i, j int) bool {
+			return buffers[i].Name < buffers[j].Name
+		})
+	case "size":
+		sort.Slice(buffers, func(i, j int) bool {
+			if len(buffers[i].Data) == len(buffers[j].Data) {
+				return buffers[i].Name < buffers[j].Name
+			}
+			return len(buffers[i].Data) < len(buffers[j].Data)
+		})
+	default:
+		return fail("invalid sort order")
+	}
 	lines := make([]string, 0, len(buffers))
 	for _, buffer := range buffers {
+		if filter != "" && !formatBufferTruthy(filter, buffer) {
+			continue
+		}
 		if format != "" {
 			lines = append(lines, formatBuffer(format, buffer))
 			continue
@@ -2906,6 +2926,11 @@ func formatBuffer(template string, buffer model.Buffer) string {
 		out = strings.ReplaceAll(out, old, newValue)
 	}
 	return out
+}
+
+func formatBufferTruthy(template string, buffer model.Buffer) bool {
+	value := strings.TrimSpace(formatBuffer(template, buffer))
+	return value != "" && value != "0"
 }
 
 func bufferSample(data string) string {
