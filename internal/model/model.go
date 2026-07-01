@@ -73,6 +73,7 @@ type Pane struct {
 	Top        int
 	Width      int
 	Height     int
+	Floating   bool
 	CreatedAt  time.Time
 	Activity   time.Time
 	PTY        *os.File
@@ -306,6 +307,50 @@ func (s *Server) SplitPaneWithLayoutByIndexDetached(sessionName string, windowIn
 		}
 	}
 	return nil, fmt.Errorf("can't find window: %d", windowIndex)
+}
+
+func (s *Server) NewFloatingPaneDetached(sessionName string, windowIndex int, hasWindow bool, cwd string, command []string, detached bool, left, top, width, height int) (*Pane, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil, fmt.Errorf("can't find session: %s", sessionName)
+	}
+	window := session.ActiveWindow()
+	if hasWindow {
+		window = nil
+		for _, candidate := range session.Windows {
+			if candidate.Index == windowIndex {
+				window = candidate
+				break
+			}
+		}
+	}
+	if window == nil {
+		return nil, fmt.Errorf("can't find window: %d", windowIndex)
+	}
+	if cwd == "" {
+		cwd = session.CWD
+	}
+	activeID := -1
+	if active := window.ActivePane(); active != nil {
+		activeID = active.ID
+	}
+	pane := s.newPaneLocked(session, window, cwd, command)
+	pane.Floating = true
+	pane.Width = clampSize(width, window.Width, maxInt(1, window.Width/2))
+	pane.Height = clampSize(height, window.Height, maxInt(1, window.Height/4))
+	pane.Left = clampPosition(left, window.Width-pane.Width, 0)
+	pane.Top = clampPosition(top, window.Height-pane.Height, 0)
+	if !detached {
+		selectPaneByID(window, pane.ID)
+	} else if activeID != -1 {
+		setActivePaneByID(window, activeID)
+	}
+	window.Activity = time.Now()
+	session.Activity = time.Now()
+	return pane, nil
 }
 
 func (s *Server) splitPaneInWindowLocked(session *Session, window *Window, cwd string, command []string, orientation string, detached bool) *Pane {
@@ -2322,6 +2367,38 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func clampSize(value, total, fallback int) int {
+	if total <= 0 {
+		total = fallback
+	}
+	if value <= 0 {
+		value = fallback
+	}
+	if value < 1 {
+		return 1
+	}
+	if total > 0 && value > total {
+		return total
+	}
+	return value
+}
+
+func clampPosition(value, maxPosition, fallback int) int {
+	if value < 0 {
+		value = fallback
+	}
+	if value < 0 {
+		return 0
+	}
+	if maxPosition < 0 {
+		return 0
+	}
+	if value > maxPosition {
+		return maxPosition
+	}
+	return value
 }
 
 func clampedPaneIndex(window *Window, index int) int {

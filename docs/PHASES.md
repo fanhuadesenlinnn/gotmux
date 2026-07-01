@@ -62,7 +62,9 @@ target windows, explicit-target `swap-window` swaps window positions, and basic
 `move-window` moves and renumbers windows. `last-window` and `select-window -l`
 track and switch back to the previous window in the probe subset. `new-window -d`
 and `split-window -d` keep the existing active window or pane, and basic `-P`
-creation output is compared against tmux. `select-pane -L/-R/-U/-D`,
+creation output is compared against tmux. Basic floating `new-pane`/`newp`
+creates tmux-style default floating panes and supports explicit size/position
+values in the probe subset. `select-pane -L/-R/-U/-D`,
 `select-pane -l`, and `last-pane` cover direction and last-pane selection in
 the tested geometry subset. Basic `resize-window -x/-y` and directional size
 adjustments recalculate pane layouts. `kill-pane -a` and `kill-window -a` keep
@@ -71,8 +73,9 @@ the target pane or window and remove the rest in the probed subset. Basic
 returns tmux's single-link error. Basic `respawn-pane -k` and
 `respawn-window -k` restart targeted panes/windows.
 Geometry is compared with tmux through `scripts/compat_probe.sh`;
-custom layout strings, old-layout restore, marked pane defaults, floating panes,
-target-index pane moves, join/move size and placement flags, tmux-style border
+custom layout strings, old-layout restore, marked pane defaults, complete
+floating pane movement and mode behavior, target-index pane moves, join/move
+size and placement flags, tmux-style border
 rendering, zoom, and pane movement commands remain.
 
 ## Phase 5: Modes, Buffers, and Input

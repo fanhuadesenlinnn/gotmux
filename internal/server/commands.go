@@ -57,6 +57,7 @@ var commandInfos = []commandInfo{
 	{Name: "load-buffer", Alias: "loadb", Usage: "[-b buffer-name] path"},
 	{Name: "move-pane", Alias: "movep", Usage: "[-bdfhv] [-l size] [-s src-pane] [-t dst-pane]"},
 	{Name: "move-window", Alias: "movew", Usage: "[-abdk] [-s src-window] [-t dst-window]"},
+	{Name: "new-pane", Alias: "newp", Usage: "[-bdefhIklPvZ] [-c start-directory] [-e environment] [-F format] [-l size] [-m message] [-p percentage] [-s style] [-S active-border-style] [-R inactive-border-style] [-x width] [-y height] [-X x-position] [-Y y-position] [-t target-pane] [shell-command [argument ...]]"},
 	{Name: "new-session", Alias: "new", Usage: "[-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]"},
 	{Name: "new-window", Alias: "neww", Usage: "[-abdkPS] [-c start-directory] [-e environment] [-F format] [-n window-name] [-t target-window] [shell-command [argument ...]]"},
 	{Name: "next-layout", Alias: "nextl", Usage: "[-t target-window]"},
@@ -173,6 +174,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdListCommands(args)
 	case "new-window":
 		return rt.cmdNewWindow(args, currentSession, width, height)
+	case "new-pane":
+		return rt.cmdNewPane(args, currentSession, width, height)
 	case "split-window":
 		return rt.cmdSplitWindow(args, currentSession, width, height)
 	case "source-file":
@@ -509,6 +512,46 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 		return fail(err.Error())
 	}
 	if err := rt.startPane(pane, width, height); err != nil {
+		return fail(err.Error())
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+	if hasAny(args, "-P") {
+		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
+	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdNewPane(args []string, currentSession string, width, height int) protocol.Message {
+	if hasAny(args, "-L") {
+		return rt.cmdSplitWindow(args, currentSession, width, height)
+	}
+	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find pane")
+	}
+	cwd := optionValue(args, "-c", "")
+	command := trailingCommand(args, map[string]bool{
+		"-B": true, "-c": true, "-e": true, "-F": true, "-l": true,
+		"-m": true, "-p": true, "-s": true, "-S": true, "-R": true,
+		"-t": true, "-T": true, "-x": true, "-X": true, "-y": true, "-Y": true,
+	})
+	windowWidth, windowHeight := rt.windowSize(sessionName, windowIndex)
+	if windowWidth <= 0 {
+		windowWidth = width
+	}
+	if windowHeight <= 0 {
+		windowHeight = height
+	}
+	paneWidth := sizeOption(args, "-x", windowWidth, max(1, windowWidth/2))
+	paneHeight := sizeOption(args, "-y", windowHeight, max(1, windowHeight/4))
+	left := positionOption(args, "-X", windowWidth, 4)
+	top := positionOption(args, "-Y", windowHeight, 2)
+	pane, err := rt.state.NewFloatingPaneDetached(sessionName, windowIndex, hasWindow, cwd, command, hasAny(args, "-d"), left, top, paneWidth, paneHeight)
+	if err != nil {
+		return fail(err.Error())
+	}
+	if err := rt.startPane(pane, pane.Width, pane.Height); err != nil {
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
@@ -1845,6 +1888,8 @@ func normalizeCommandName(name string) string {
 		return "list-commands"
 	case "neww":
 		return "new-window"
+	case "newp":
+		return "new-pane"
 	case "splitw":
 		return "split-window"
 	case "selectw":
@@ -1958,7 +2003,7 @@ func normalizeCommandName(name string) string {
 		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for":
+		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for", "new-pane":
 		return name
 	default:
 		return name
@@ -2024,6 +2069,44 @@ func commandSize(args []string, width, height int) (int, int) {
 		}
 	}
 	return width, height
+}
+
+func sizeOption(args []string, name string, total int, fallback int) int {
+	value := optionValue(args, name, "")
+	if value == "" || value == "-" {
+		return fallback
+	}
+	if strings.HasSuffix(value, "%") {
+		percent, err := strconv.Atoi(strings.TrimSuffix(value, "%"))
+		if err == nil && percent > 0 {
+			return max(1, total*percent/100)
+		}
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func positionOption(args []string, name string, total int, fallback int) int {
+	value := optionValue(args, name, "")
+	if value == "" || value == "-" {
+		return fallback
+	}
+	if strings.HasSuffix(value, "%") {
+		percent, err := strconv.Atoi(strings.TrimSuffix(value, "%"))
+		if err == nil && percent >= 0 {
+			return max(0, total*percent/100)
+		}
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func positiveOption(args []string, name string, label string) (int, error) {
@@ -2607,6 +2690,20 @@ func (rt *Runtime) targetWindowInfo(target string, currentSession string) (strin
 		return sessionName, window.Index, hasWindow, paneIDs, true
 	}
 	return sessionName, windowIndex, hasWindow, nil, false
+}
+
+func (rt *Runtime) windowSize(sessionName string, windowIndex int) (int, int) {
+	for _, session := range snapshotSessions(rt.state) {
+		if session.Name != sessionName {
+			continue
+		}
+		for _, window := range session.Windows {
+			if window.Index == windowIndex {
+				return window.Width, window.Height
+			}
+		}
+	}
+	return 0, 0
 }
 
 func parsePaneTarget(target string) (session string, window int, pane int, hasWindow bool, hasPane bool) {

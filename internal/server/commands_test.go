@@ -638,6 +638,30 @@ func TestSplitWindowDetachedAndPrint(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "splitd"}, "splitd", 80, 24)
 }
 
+func TestNewPaneCreatesFloatingPaneAndPrints(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "newp", "-n", "first", "-x", "80", "-y", "24", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"new-pane", "-P", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}", "-t", "newp", "/bin/sh"}, "newp", 80, 24)
+	if !msg.OK || msg.Text != "1:4:2:40:6:1" {
+		t.Fatalf("new-pane -P output = %#v, want floating geometry", msg)
+	}
+	panes := rt.execute([]string{"list-panes", "-t", "newp", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"}, "newp", 80, 24)
+	if panes.Text != "0:0:0:80:24:0\n1:4:2:40:6:1" {
+		t.Fatalf("panes after new-pane = %q", panes.Text)
+	}
+	msg = rt.execute([]string{"newp", "-d", "-x", "20", "-y", "5", "-X", "3", "-Y", "4", "-t", "newp", "/bin/sh"}, "newp", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("newp -d = %#v, want empty success", msg)
+	}
+	panes = rt.execute([]string{"list-panes", "-t", "newp", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"}, "newp", 80, 24)
+	if panes.Text != "0:0:0:80:24:0\n1:4:2:40:6:1\n2:3:4:20:5:0" {
+		t.Fatalf("panes after newp -d = %q", panes.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "newp"}, "newp", 80, 24)
+}
+
 func TestLastWindowCommands(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "lastw", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

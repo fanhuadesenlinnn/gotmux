@@ -124,6 +124,7 @@ compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{wind
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"
 compare "list-clients empty" list-clients -F "#{client_name}:#{session_name}:#{client_width}:#{client_height}"
 compare "list-commands new-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" new-session
+compare "list-commands new-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" newp
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
@@ -502,6 +503,13 @@ compare "new-window detached command" new-window -d -t newwd -n second /bin/sh
 compare "new-window detached windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
 compare "new-window print command" new-window -P -F "#{window_index}:#{window_name}" -t newwd -n third /bin/sh
 compare "new-window print windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s newp -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s newp -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "new-pane print command" new-pane -P -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}" -t newp /bin/sh
+compare "new-pane panes" list-panes -t newp -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+compare "new-pane detached command" newp -d -x 20 -y 5 -X 3 -Y 4 -t newp /bin/sh
+compare "new-pane detached panes" list-panes -t newp -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
 "${tmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh >/dev/null
