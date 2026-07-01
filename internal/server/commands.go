@@ -1412,10 +1412,11 @@ func (rt *Runtime) cmdSetOption(args []string, currentSession string, defaultSco
 	if hasAny(args, "-w") {
 		scope = "window"
 	}
-	if currentSession == "" {
-		currentSession = firstSessionName(rt.state)
+	targetSession, targetWindow, hasWindow, targetErr := rt.optionCommandTarget(args, currentSession, scope)
+	if targetErr != "" {
+		return fail(targetErr)
 	}
-	if err := rt.state.SetOption(scope, currentSession, name, value, hasAny(args, "-a"), hasAny(args, "-u")); err != nil {
+	if err := rt.state.SetOptionTarget(scope, targetSession, targetWindow, hasWindow, name, value, hasAny(args, "-a"), hasAny(args, "-u")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1433,11 +1434,12 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 			scope = "window"
 		}
 	}
-	if currentSession == "" {
-		currentSession = firstSessionName(rt.state)
-	}
 	includeInherited := hasAny(args, "-A")
-	options, err := rt.state.Options(scope, currentSession, includeInherited)
+	targetSession, targetWindow, hasWindow, targetErr := rt.optionCommandTarget(args, currentSession, scope)
+	if targetErr != "" {
+		return fail(targetErr)
+	}
+	options, err := rt.state.OptionsTarget(scope, targetSession, targetWindow, hasWindow, includeInherited)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -1447,7 +1449,7 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 		value, exists := options[names[0]]
 		if !exists {
 			if !includeInherited && (scope == "session" || scope == "window") {
-				inherited, err := rt.state.Options(scope, currentSession, true)
+				inherited, err := rt.state.OptionsTarget(scope, targetSession, targetWindow, hasWindow, true)
 				if err == nil {
 					if _, known := inherited[names[0]]; known {
 						return ok("")
@@ -1478,6 +1480,38 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 		}
 	}
 	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) optionCommandTarget(args []string, currentSession string, scope string) (string, int, bool, string) {
+	if scope == "global" || scope == "global-window" {
+		return "", 0, false, ""
+	}
+	target := optionValue(args, "-t", currentSession)
+	if target == "" {
+		target = firstSessionName(rt.state)
+	}
+	if scope == "window" {
+		sessionName, windowIndex, _, _, found := rt.targetWindowInfo(target, currentSession)
+		if found {
+			return sessionName, windowIndex, true, ""
+		}
+		if sessionName == "" || !sessionExists(rt.state, sessionName) {
+			return "", 0, false, fmt.Sprintf("no such session: %s", sessionName)
+		}
+		windowTarget := cleanSessionTarget(optionValue(args, "-t", target))
+		return "", 0, false, fmt.Sprintf("no such window: %s", windowTarget)
+	}
+	sessionName, _, _, _, _ := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(rt.state)
+	}
+	if !sessionExists(rt.state, sessionName) {
+		return "", 0, false, fmt.Sprintf("no such session: %s", sessionName)
+	}
+	return sessionName, 0, false, ""
 }
 
 func (rt *Runtime) cmdBindKey(args []string) protocol.Message {

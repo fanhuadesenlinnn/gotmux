@@ -2206,10 +2206,14 @@ func (s *Server) SetClientPrefix(clientID int64, prefix bool) {
 }
 
 func (s *Server) SetOption(scope, sessionName, name, value string, appendValue, unset bool) error {
+	return s.SetOptionTarget(scope, sessionName, 0, false, name, value, appendValue, unset)
+}
+
+func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, hasWindow bool, name, value string, appendValue, unset bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	options, err := s.optionsForScopeLocked(scope, sessionName)
+	options, err := s.optionsForScopeLocked(scope, sessionName, windowIndex, hasWindow)
 	if err != nil {
 		return err
 	}
@@ -2239,7 +2243,7 @@ func (s *Server) SetOption(scope, sessionName, name, value string, appendValue, 
 	return nil
 }
 
-func (s *Server) optionsForScopeLocked(scope, sessionName string) (map[string]string, error) {
+func (s *Server) optionsForScopeLocked(scope, sessionName string, windowIndex int, hasWindow bool) (map[string]string, error) {
 	switch scope {
 	case "global":
 		return s.GlobalOptions, nil
@@ -2260,6 +2264,15 @@ func (s *Server) optionsForScopeLocked(scope, sessionName string) (map[string]st
 			return nil, fmt.Errorf("can't find session: %s", sessionName)
 		}
 		window := session.ActiveWindow()
+		if hasWindow {
+			window = nil
+			for _, candidate := range session.Windows {
+				if candidate.Index == windowIndex {
+					window = candidate
+					break
+				}
+			}
+		}
 		if window == nil {
 			return nil, fmt.Errorf("session has no active window")
 		}
@@ -2273,6 +2286,10 @@ func (s *Server) optionsForScopeLocked(scope, sessionName string) (map[string]st
 }
 
 func (s *Server) Options(scope, sessionName string, includeInherited bool) (map[string]string, error) {
+	return s.OptionsTarget(scope, sessionName, 0, false, includeInherited)
+}
+
+func (s *Server) OptionsTarget(scope, sessionName string, windowIndex int, hasWindow bool, includeInherited bool) (map[string]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -2305,6 +2322,15 @@ func (s *Server) Options(scope, sessionName string, includeInherited bool) (map[
 			return nil, fmt.Errorf("can't find session: %s", sessionName)
 		}
 		window := session.ActiveWindow()
+		if hasWindow {
+			window = nil
+			for _, candidate := range session.Windows {
+				if candidate.Index == windowIndex {
+					window = candidate
+					break
+				}
+			}
+		}
 		if window == nil {
 			return nil, fmt.Errorf("session has no active window")
 		}

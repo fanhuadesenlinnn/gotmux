@@ -700,6 +700,18 @@ compare "show global window option" show -gw mode-keys
 compare "show-window-options command" show-window-options -gv mode-keys
 compare "show-window-options alias" showw -gv mode-keys
 
+"${tmux_cmd[@]}" new-session -d -s opttarget -x 80 -y 24 -n first /bin/sh
+"${tmux_cmd[@]}" new-window -t opttarget -n second /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s opttarget -x 80 -y 24 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-window -t opttarget -n second /bin/sh >/dev/null
+"${tmux_cmd[@]}" set -t opttarget status off
+"${gotmux_cmd[@]}" set -t opttarget status off >/dev/null
+compare "target session option" show -t opttarget -v status
+"${tmux_cmd[@]}" setw -t opttarget:1 mode-keys vi
+"${gotmux_cmd[@]}" setw -t opttarget:1 mode-keys vi >/dev/null
+compare "target window option" showw -t opttarget:1 -v mode-keys
+compare "untouched target window option" showw -t opttarget:0 -v mode-keys
+
 "${tmux_cmd[@]}" bind-key C-a send-prefix
 "${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null
 compare_key_line "default refresh binding" r

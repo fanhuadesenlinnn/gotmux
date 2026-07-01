@@ -185,6 +185,26 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "base" {
 		t.Fatalf("inherited after local unset = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"new-session", "-d", "-s", "opttarget", "-n", "first", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session opttarget failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"new-window", "-t", "opttarget", "-n", "second", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-window opttarget failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-t", "opttarget", "status", "off"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set target session option failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-t", "opttarget", "-v", "status"}, "opts", 80, 24)
+	if msg.Text != "off" {
+		t.Fatalf("target session status = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-t", "opts", "-v", "status"}, "opts", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("untouched session status = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"show", "-gwqv", "main-pane-width"}, "", 80, 24)
 	if msg.Text != "80" {
 		t.Fatalf("show main-pane-width = %q", msg.Text)
@@ -216,6 +236,22 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	msg = rt.execute([]string{"show", "-Awv", "mode-keys"}, "opts", 80, 24)
 	if msg.Text != "vi" {
 		t.Fatalf("inherited window mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setw", "-t", "opttarget:1", "mode-keys", "vi"}, "opts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set target window option failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showw", "-t", "opttarget:1", "-v", "mode-keys"}, "opts", 80, 24)
+	if msg.Text != "vi" {
+		t.Fatalf("target window mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showw", "-t", "opttarget:0", "-v", "mode-keys"}, "opts", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("untouched window mode-keys = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showw", "-t", "opttarget:9", "-v", "mode-keys"}, "opts", 80, 24)
+	if msg.OK || msg.Text != "no such window: opttarget:9" {
+		t.Fatalf("missing target window = ok %v text %q", msg.OK, msg.Text)
 	}
 	msg = rt.execute([]string{"bind-key", "C-a", "send-prefix"}, "", 80, 24)
 	if !msg.OK {
