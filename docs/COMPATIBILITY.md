@@ -25,6 +25,7 @@ manual verification note.
 | Basic pane piping | Implemented for `pipe-pane`/`pipep` output piping to a shell command, empty-command close, `-o` toggle behavior, and basic `-I` command-output-to-pane input |
 | Basic synchronization commands | Implemented for `wait-for`/`wait` signal, wait, lock, and unlock channels; the probe covers signal-before-wait and lock/unlock output, with goroutine tests for blocking wakeups |
 | Basic lock commands | Implemented for `lock-server`/`lock`, `lock-session`/`locks` no-output success and `lock-client` no-current-client errors in the detached CLI subset |
+| Basic client refresh command | Implemented for `refresh-client`/`refresh` metadata, no-current-client CLI errors, and attached-client no-op success for redraw bindings |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
 | Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
 | `source-file` | Implemented for simple command files and line continuations |
@@ -63,6 +64,7 @@ manual verification note.
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |
 | Message log | `show-messages` does not yet keep tmux-style timestamped command/message history. |
 | Control mode | Not implemented. |
+| Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
 | Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |

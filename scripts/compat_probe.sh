@@ -103,8 +103,8 @@ compare_key_line() {
   local name="$1"
   local key="$2"
   local tmux_output gotmux_output
-  tmux_output="$("${tmux_cmd[@]}" list-keys -T prefix | grep -E "[[:space:]]${key}[[:space:]]" | sed -E 's/[[:space:]]+/ /g')"
-  gotmux_output="$("${gotmux_cmd[@]}" list-keys -T prefix | grep -E "[[:space:]]${key}[[:space:]]" | sed -E 's/[[:space:]]+/ /g')"
+  tmux_output="$("${tmux_cmd[@]}" list-keys -T prefix | sed -E 's/[[:space:]]+/ /g' | awk -v key="${key}" '$1 == "bind-key" && $2 == "-T" && $3 == "prefix" && $4 == key { print }')"
+  gotmux_output="$("${gotmux_cmd[@]}" list-keys -T prefix | sed -E 's/[[:space:]]+/ /g' | awk -v key="${key}" '$1 == "bind-key" && $2 == "-T" && $3 == "prefix" && $4 == key { print }')"
   if [[ "${tmux_output}" != "${gotmux_output}" ]]; then
     echo "compat probe failed: ${name}" >&2
     echo "--- tmux" >&2
@@ -143,6 +143,7 @@ compare "list-commands start-server format" list-commands -F "#{command_list_nam
 compare "list-commands lock-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lock
 compare "list-commands lock-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" locks
 compare "list-commands lock-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lockc
+compare "list-commands refresh-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" refresh
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
@@ -157,6 +158,7 @@ compare "lock-session command" lock-session -t compat
 compare "lock-session alias command" locks -t compat
 compare_status "lock-session missing" lock-session -t missing
 compare_status "lock-client no current client" lock-client
+compare_status "refresh-client no current client" refresh-client
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"
@@ -608,6 +610,7 @@ compare "show-window-options alias" showw -gv mode-keys
 
 "${tmux_cmd[@]}" bind-key C-a send-prefix
 "${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null
+compare_key_line "default refresh binding" r
 compare_key_line "list custom key" C-a
 
 "${tmux_cmd[@]}" setenv FOO bar

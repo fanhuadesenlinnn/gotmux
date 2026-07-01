@@ -149,6 +149,11 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("list-commands lock = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"list-commands", "-F", format, "refresh"}, "", 80, 24)
+	want = "refresh-client:refresh:[-cDlLRSU] [-A pane:state] [-B name:what:format] [-C XxY] [-f flags] [-r pane:report] [-t target-client] [adjustment]"
+	if msg.Text != want {
+		t.Fatalf("list-commands refresh = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"list-commands", "new-sess"}, "", 80, 24)
 	if msg.Text != "new-session (new) [-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]" {
 		t.Fatalf("list-commands prefix = %q", msg.Text)
@@ -188,6 +193,18 @@ func TestLockCommands(t *testing.T) {
 		t.Fatalf("lock-client = %#v", msg)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "lockp"}, "lockp", 80, 24)
+}
+
+func TestRefreshClientRequiresCurrentClient(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"refresh-client"}, "", 80, 24)
+	if msg.OK || msg.Text != "no current client" {
+		t.Fatalf("refresh-client without client = %#v", msg)
+	}
+	msg = rt.executeWithClient([]string{"refresh"}, "", 80, 24, 42)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("refresh with client = %#v", msg)
+	}
 }
 
 func TestListClients(t *testing.T) {

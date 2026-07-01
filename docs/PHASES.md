@@ -111,8 +111,9 @@ command/job subset. Basic `pipe-pane` output piping now writes pane output to a
 shell command, closes on empty commands, and supports the common `-o` toggle
 path in the compatibility probe. Full bidirectional pipe lifecycle behavior,
 `lock-server` and `lock-session` cover the basic detached CLI no-op behavior.
-Full lock screens, bidirectional pipe lifecycle behavior, hooks, control mode,
-popups, and linked windows remain.
+`refresh-client` covers no-current-client CLI errors and attached-client redraw
+entry points. Full lock screens, bidirectional pipe lifecycle behavior, refresh
+offset/control behavior, hooks, control mode, popups, and linked windows remain.
 
 ## Completion Gate
 

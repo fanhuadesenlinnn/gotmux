@@ -174,6 +174,7 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "n", "next-window")
 	add("prefix", "p", "previous-window")
 	add("prefix", "o", "select-pane", "-t", ":.+")
+	add("prefix", "r", "refresh-client")
 	add("prefix", "x", "kill-pane")
 	for i := 0; i <= 9; i++ {
 		key := fmt.Sprintf("%d", i)

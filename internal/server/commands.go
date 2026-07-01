@@ -69,6 +69,7 @@ var commandInfos = []commandInfo{
 	{Name: "pipe-pane", Alias: "pipep", Usage: "[-IOo] [-t target-pane] [shell-command]"},
 	{Name: "previous-layout", Alias: "prevl", Usage: "[-t target-window]"},
 	{Name: "previous-window", Alias: "prev", Usage: "[-a] [-t target-session]"},
+	{Name: "refresh-client", Alias: "refresh", Usage: "[-cDlLRSU] [-A pane:state] [-B name:what:format] [-C XxY] [-f flags] [-r pane:report] [-t target-client] [adjustment]"},
 	{Name: "rename-session", Alias: "rename", Usage: "[-t target-session] new-name"},
 	{Name: "rename-window", Alias: "renamew", Usage: "[-t target-window] new-name"},
 	{Name: "resize-pane", Alias: "resizep", Usage: "[-DLMRTUZ] [-x width] [-y height] [-t target-pane] [adjustment]"},
@@ -104,6 +105,10 @@ var commandInfos = []commandInfo{
 }
 
 func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
+	return rt.executeMessageForClient(msg, currentSession, 0)
+}
+
+func (rt *Runtime) executeMessageForClient(msg protocol.Message, currentSession string, clientID int64) protocol.Message {
 	commands := msg.Commands
 	var err error
 	if len(commands) == 0 {
@@ -112,10 +117,14 @@ func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) p
 			return fail(err.Error())
 		}
 	}
-	return rt.executeCommands(commands, currentSession, msg.Width, msg.Height)
+	return rt.executeCommandsForClient(commands, currentSession, msg.Width, msg.Height, clientID)
 }
 
 func (rt *Runtime) executeCommands(commands [][]string, currentSession string, width, height int) protocol.Message {
+	return rt.executeCommandsForClient(commands, currentSession, width, height, 0)
+}
+
+func (rt *Runtime) executeCommandsForClient(commands [][]string, currentSession string, width, height int, clientID int64) protocol.Message {
 	var texts []string
 	last := ok("")
 	activeSession := currentSession
@@ -123,7 +132,7 @@ func (rt *Runtime) executeCommands(commands [][]string, currentSession string, w
 		if len(argv) == 0 {
 			continue
 		}
-		last = rt.execute(argv, activeSession, width, height)
+		last = rt.executeWithClient(argv, activeSession, width, height, clientID)
 		if last.Session != "" {
 			activeSession = last.Session
 		} else if activeSession == "" {
@@ -146,6 +155,10 @@ func (rt *Runtime) executeCommands(commands [][]string, currentSession string, w
 }
 
 func (rt *Runtime) execute(argv []string, currentSession string, width, height int) protocol.Message {
+	return rt.executeWithClient(argv, currentSession, width, height, 0)
+}
+
+func (rt *Runtime) executeWithClient(argv []string, currentSession string, width, height int, clientID int64) protocol.Message {
 	if len(argv) == 0 {
 		argv = []string{"new-session"}
 	}
@@ -383,6 +396,11 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return ok("")
 	case "lock-client":
 		return fail("no current client")
+	case "refresh-client":
+		if clientID == 0 {
+			return fail("no current client")
+		}
+		return ok("")
 	case "rename-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
 		name := lastNonOption(args)
@@ -1945,6 +1963,8 @@ func normalizeCommandName(name string) string {
 		return "next-window"
 	case "prev":
 		return "previous-window"
+	case "refresh":
+		return "refresh-client"
 	case "selectp":
 		return "select-pane"
 	case "lastp":
@@ -2047,7 +2067,7 @@ func normalizeCommandName(name string) string {
 		return "start-server"
 	case "wait":
 		return "wait-for"
-	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
+	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",

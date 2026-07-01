@@ -143,7 +143,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 			_ = conn.Write(protocol.Message{Type: protocol.TypeExit, Text: "detached"})
 			return
 		case protocol.TypeCommand:
-			result := rt.executeMessage(next, rt.state.ActiveSessionName(client.ID))
+			result := rt.executeMessageForClient(next, rt.state.ActiveSessionName(client.ID), client.ID)
 			_ = conn.Write(result)
 			rt.redrawClient(client.ID)
 		}
