@@ -72,13 +72,17 @@ the tested geometry subset. Basic `resize-window -x/-y` and directional size
 adjustments recalculate pane layouts. `kill-pane -a` and `kill-window -a` keep
 the target pane or window and remove the rest in the probed subset. Basic
 `unlink-window -k` removes single-link windows while plain `unlink-window`
-returns tmux's single-link error. Basic `respawn-pane -k` and
-`respawn-window -k` restart targeted panes/windows.
+returns tmux's single-link error. Basic `link-window` links a window into
+another session or index, supports `-d` and `-k` in the probed subset, and
+plain `unlink-window` now removes linked windows without killing the shared
+pane state. Basic `respawn-pane -k` and `respawn-window -k` restart targeted
+panes/windows.
 Geometry is compared with tmux through `scripts/compat_probe.sh`;
 custom layout strings, old-layout restore, marked pane defaults, complete
 floating pane movement and mode behavior, target-index pane moves, join/move
 size and placement flags, tmux-style border
-rendering, zoom, and pane movement commands remain.
+rendering, zoom, full winlink/session-group semantics, and pane movement
+commands remain.
 
 ## Phase 5: Modes, Buffers, and Input
 

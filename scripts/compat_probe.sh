@@ -144,6 +144,7 @@ compare "list-commands lock-server format" list-commands -F "#{command_list_name
 compare "list-commands lock-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" locks
 compare "list-commands lock-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lockc
 compare "list-commands refresh-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" refresh
+compare "list-commands link-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" linkw
 compare "list-commands switch-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" switchc
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
@@ -506,6 +507,22 @@ compare_status "unlink-window single link rejection" unlink-window -t unlinkw:1
 compare "unlink-window rejected windows" list-windows -t unlinkw -F "#{window_index}:#{window_name}:#{window_active}"
 compare "unlink-window kill command" unlinkw -k -t unlinkw:1
 compare "unlink-window kill windows" list-windows -t unlinkw -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s linka -x 80 -y 24 -n one /bin/sh
+"${tmux_cmd[@]}" new-session -d -s linkb -x 80 -y 24 -n two /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s linka -x 80 -y 24 -n one /bin/sh >/dev/null
+"${gotmux_cmd[@]}" new-session -d -s linkb -x 80 -y 24 -n two /bin/sh >/dev/null
+compare "link-window command" link-window -s linka:0 -t linkb:2
+compare "link-window source windows" list-windows -t linka -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "link-window target windows" list-windows -t linkb -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "unlink linked window command" unlink-window -t linkb:2
+compare "unlink linked source windows" list-windows -t linka -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "unlink linked target windows" list-windows -t linkb -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "link-window detached command" linkw -d -s linka:0 -t linkb:2
+compare "link-window detached windows" list-windows -t linkb -F "#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "link-window replace command" link-window -k -s linka:0 -t linkb:0
+compare "link-window replace source windows" list-windows -t linka -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
+compare "link-window replace target windows" list-windows -t linkb -F "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"
 
 "${tmux_cmd[@]}" new-session -d -s swapw -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t swapw -n second /bin/sh

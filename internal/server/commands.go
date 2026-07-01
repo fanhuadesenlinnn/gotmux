@@ -47,6 +47,7 @@ var commandInfos = []commandInfo{
 	{Name: "kill-window", Alias: "killw", Usage: "[-a] [-t target-window]"},
 	{Name: "last-pane", Alias: "lastp", Usage: "[-deZ] [-t target-window]"},
 	{Name: "last-window", Alias: "last", Usage: "[-t target-session]"},
+	{Name: "link-window", Alias: "linkw", Usage: "[-abdk] [-s src-window] [-t dst-window]"},
 	{Name: "list-buffers", Alias: "lsb", Usage: "[-F format]"},
 	{Name: "list-clients", Alias: "lsc", Usage: "[-F format] [-f filter] [-O order][-t target-session]"},
 	{Name: "list-commands", Alias: "lscm", Usage: "[-F format] [command]"},
@@ -363,6 +364,8 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		return rt.cmdKillWindow(args, currentSession)
 	case "unlink-window":
 		return rt.cmdUnlinkWindow(args, currentSession)
+	case "link-window":
+		return rt.cmdLinkWindow(args, currentSession)
 	case "swap-window":
 		return rt.cmdSwapWindow(args, currentSession)
 	case "move-window":
@@ -1010,14 +1013,21 @@ func (rt *Runtime) cmdKillWindow(args []string, currentSession string) protocol.
 }
 
 func (rt *Runtime) cmdUnlinkWindow(args []string, currentSession string) protocol.Message {
-	sessionName, windowIndex, hasWindow, paneIDs, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	sessionName, windowIndex, _, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
 	if !found {
 		return fail("can't find window")
 	}
-	if !hasAny(args, "-k") {
-		return fail("window only linked to one session")
+	killed, err := rt.state.UnlinkWindow(sessionName, windowIndex, hasAny(args, "-k"))
+	if err != nil {
+		return fail(err.Error())
 	}
-	return rt.killTargetWindow(sessionName, windowIndex, hasWindow, paneIDs)
+	rt.screensMu.Lock()
+	for _, paneID := range killed {
+		delete(rt.screens, paneID)
+	}
+	rt.screensMu.Unlock()
+	rt.resizeSessionPanes(sessionName)
+	return ok("")
 }
 
 func (rt *Runtime) killTargetWindow(sessionName string, windowIndex int, hasWindow bool, paneIDs []int) protocol.Message {
@@ -1036,6 +1046,34 @@ func (rt *Runtime) killTargetWindow(sessionName string, windowIndex int, hasWind
 	}
 	rt.screensMu.Unlock()
 	rt.resizeSessionPanes(sessionName)
+	return ok("")
+}
+
+func (rt *Runtime) cmdLinkWindow(args []string, currentSession string) protocol.Message {
+	if currentSession == "" {
+		currentSession = firstSessionName(rt.state)
+	}
+	sourceSession, sourceWindow, _, _, sourceFound := rt.targetWindowInfo(optionValue(args, "-s", currentSession), currentSession)
+	if !sourceFound {
+		return fail("can't find window")
+	}
+	targetSession, targetWindow, hasWindow := moveWindowTarget(optionValue(args, "-t", ""), currentSession)
+	if !hasWindow {
+		return fail("bad window target")
+	}
+	killed, err := rt.state.LinkWindow(sourceSession, sourceWindow, targetSession, targetWindow, hasAny(args, "-d"), hasAny(args, "-k"))
+	if err != nil {
+		return fail(err.Error())
+	}
+	rt.screensMu.Lock()
+	for _, paneID := range killed {
+		delete(rt.screens, paneID)
+	}
+	rt.screensMu.Unlock()
+	rt.resizeSessionPanes(sourceSession)
+	if targetSession != sourceSession {
+		rt.resizeSessionPanes(targetSession)
+	}
 	return ok("")
 }
 
@@ -2072,6 +2110,8 @@ func normalizeCommandName(name string) string {
 		return "kill-pane"
 	case "killw":
 		return "kill-window"
+	case "linkw":
+		return "link-window"
 	case "unlinkw":
 		return "unlink-window"
 	case "rename":
@@ -2126,7 +2166,7 @@ func normalizeCommandName(name string) string {
 		return "start-server"
 	case "wait":
 		return "wait-for"
-	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
+	case "kill-server", "kill-session", "link-window", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
@@ -2458,7 +2498,7 @@ func listWindowsForSession(session *model.Session, format string, filter string,
 		}
 		mark := ""
 		active := session.ActiveWindow()
-		if active != nil && active.ID == window.ID {
+		if active == window {
 			mark = "*"
 		}
 		prefix := ""

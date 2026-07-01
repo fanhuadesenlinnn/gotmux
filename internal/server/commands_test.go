@@ -166,6 +166,11 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("list-commands refresh = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"list-commands", "-F", format, "linkw"}, "", 80, 24)
+	want = "link-window:linkw:[-abdk] [-s src-window] [-t dst-window]"
+	if msg.Text != want {
+		t.Fatalf("list-commands linkw = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"list-commands", "-F", format, "switchc"}, "", 80, 24)
 	want = "switch-client:switchc:[-ElnprZ] [-c target-client] [-t target-session] [-T key-table] [-O order]"
 	if msg.Text != want {
@@ -1713,6 +1718,58 @@ func TestUnlinkWindowRequiresKillFlagForSingleLinkAndDropsScreens(t *testing.T) 
 		t.Fatalf("screen for remaining pane %d was removed", firstPane.ID)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "unlinkw"}, "unlinkw", 80, 24)
+}
+
+func TestLinkWindowLinksUnlinksAndReplacesTargets(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lna", "-n", "one", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session lna failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "lnb", "-n", "two", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session lnb failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"link-window", "-s", "lna:0", "-t", "lnb:2"}, "lna", 80, 24)
+	if !msg.OK {
+		t.Fatalf("link-window failed: %s", msg.Text)
+	}
+	windows := rt.execute([]string{"list-windows", "-a", "-F", "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "lna:0:one:@0:1\nlnb:0:two:@1:0\nlnb:2:one:@0:1" {
+		t.Fatalf("windows after link-window = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"unlink-window", "-t", "lnb:2"}, "lnb", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unlink linked window failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-a", "-F", "#{session_name}:#{window_index}:#{window_name}:#{window_id}"}, "", 80, 24)
+	if windows.Text != "lna:0:one:@0\nlnb:0:two:@1" {
+		t.Fatalf("windows after unlink-window = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"linkw", "-d", "-s", "lna:0", "-t", "lnb:2"}, "lna", 80, 24)
+	if !msg.OK {
+		t.Fatalf("link-window -d failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "lnb", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "lnb", 80, 24)
+	if windows.Text != "0:two:1\n2:one:0" {
+		t.Fatalf("windows after link-window -d = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"link-window", "-k", "-s", "lna:0", "-t", "lnb:0"}, "lna", 80, 24)
+	if !msg.OK {
+		t.Fatalf("link-window -k failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-a", "-F", "#{session_name}:#{window_index}:#{window_name}:#{window_id}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "lna:0:one:@0:1\nlnb:0:one:@0:1\nlnb:2:one:@0:0" {
+		t.Fatalf("windows after link-window -k = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"link-window", "-s", "lna:0", "-t", "lna:2"}, "lna", 80, 24)
+	if !msg.OK {
+		t.Fatalf("same-session link-window failed: %s", msg.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "lna", "-F", "#{window_index}:#{window_name}:#{window_id}:#{window_active}"}, "lna", 80, 24)
+	if windows.Text != "0:one:@0:0\n2:one:@0:1" {
+		t.Fatalf("same-session linked active window = %q", windows.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "lna"}, "lna", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "lnb"}, "lnb", 80, 24)
 }
 
 func assertPanesFormat(t *testing.T, rt *Runtime, sessionName string, want string) {

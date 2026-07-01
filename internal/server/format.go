@@ -92,7 +92,7 @@ func formatValue(key string, ctx formatContext) string {
 	case "window_active":
 		if ctx.session != nil && ctx.window != nil {
 			active := ctx.session.ActiveWindow()
-			if active != nil && active.ID == ctx.window.ID {
+			if active == ctx.window {
 				return "1"
 			}
 		}
