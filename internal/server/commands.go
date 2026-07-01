@@ -429,7 +429,7 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
-		return ok("gotmux 0.1.0")
+		return ok("gotmux 0.1.1")
 	default:
 		return fail(fmt.Sprintf("unknown command: %s", argv[0]))
 	}
