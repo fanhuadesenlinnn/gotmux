@@ -34,7 +34,7 @@ manual verification note.
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
-| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw`, including global/local `-u`, string `-a`, `show-options -A` inherited values, and basic `-t` session/window targets in the tested subset |
+| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw`, including global/local/server `-u`, string `-a`, `show-options -A`, basic `show-options -H` hook output, basic `-s` server scope, and basic `-t` session/window targets in the tested subset |
 | Basic hook options | Implemented for `set-hook` and `show-hooks` command metadata, global/session/window/pane hook storage, `-g`/`-w`/`-p`, `-a` append, `-u` unset, tmux-style `hook[index] command` display, empty global built-in hook names, and invalid hook errors in the probe subset |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-u`, and `-s` in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `unbind-key`, `list-keys`, prefix dispatch, root table dispatch for simple keys, and `send-prefix` |

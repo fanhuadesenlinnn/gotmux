@@ -121,6 +121,42 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "off" {
 		t.Fatalf("show status = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-sqv", "escape-time"}, "", 80, 24)
+	if msg.Text != "10" {
+		t.Fatalf("show server escape-time = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "escape-time"}, "", 80, 24)
+	if msg.Text != "10" {
+		t.Fatalf("show global escape-time = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-s", "escape-time", "123"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set server escape-time failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-sqv", "escape-time"}, "", 80, 24)
+	if msg.Text != "123" {
+		t.Fatalf("updated server escape-time = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-su", "escape-time"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset server escape-time failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-sqv", "escape-time"}, "", 80, 24)
+	if msg.Text != "10" {
+		t.Fatalf("unset server escape-time = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-s", "prefix", "C-a"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set server prefix failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-sqv", "prefix"}, "", 80, 24)
+	if msg.Text != "C-a" {
+		t.Fatalf("server prefix = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "prefix"}, "", 80, 24)
+	if msg.Text != "C-b" {
+		t.Fatalf("global prefix after server set = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"set", "-gu", "status"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("unset global status failed: %s", msg.Text)
@@ -272,9 +308,17 @@ func TestSetAndShowHooks(t *testing.T) {
 	if msg.Text != "after-new-window" {
 		t.Fatalf("empty global hook = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-H", "-g", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window" {
+		t.Fatalf("empty global hook through show-options = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"show-hooks", "after-new-window"}, "hooks", 80, 24)
 	if msg.Text != "" {
 		t.Fatalf("empty local hook = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-H", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "" {
+		t.Fatalf("empty local hook through show-options = %q", msg.Text)
 	}
 	msg = rt.execute([]string{"set-hook", "-g", "after-new-window", "display-message hi"}, "hooks", 80, 24)
 	if !msg.OK {
@@ -287,6 +331,14 @@ func TestSetAndShowHooks(t *testing.T) {
 	msg = rt.execute([]string{"show-hooks", "-g", "after-new-window"}, "hooks", 80, 24)
 	if msg.Text != "after-new-window[0] display-message hi\nafter-new-window[1] display-message there" {
 		t.Fatalf("global hook values = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-H", "-g", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "after-new-window[0] display-message hi\nafter-new-window[1] display-message there" {
+		t.Fatalf("global hook values through show-options = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-H", "-g", "-v", "after-new-window"}, "hooks", 80, 24)
+	if msg.Text != "display-message hi\ndisplay-message there" {
+		t.Fatalf("global hook commands through show-options = %q", msg.Text)
 	}
 	msg = rt.execute([]string{"set-hook", "after-new-window", "display-message local"}, "hooks", 80, 24)
 	if !msg.OK {

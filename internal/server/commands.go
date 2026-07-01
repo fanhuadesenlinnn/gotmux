@@ -1412,6 +1412,9 @@ func (rt *Runtime) cmdSetOption(args []string, currentSession string, defaultSco
 	if hasAny(args, "-w") {
 		scope = "window"
 	}
+	if hasAny(args, "-s") {
+		scope = "server"
+	}
 	targetSession, targetWindow, hasWindow, targetErr := rt.optionCommandTarget(args, currentSession, scope)
 	if targetErr != "" {
 		return fail(targetErr)
@@ -1434,6 +1437,9 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 			scope = "window"
 		}
 	}
+	if hasAny(args, "-s") {
+		scope = "server"
+	}
 	includeInherited := hasAny(args, "-A")
 	targetSession, targetWindow, hasWindow, targetErr := rt.optionCommandTarget(args, currentSession, scope)
 	if targetErr != "" {
@@ -1448,6 +1454,15 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 	if len(names) > 0 {
 		value, exists := options[names[0]]
 		if !exists {
+			if hasAny(args, "-H") {
+				hooks, err := rt.state.Hooks(optionHookScope(scope), targetSession, names[0])
+				if err == nil {
+					return ok(strings.Join(formatHooks(hooks, valueOnly), "\n"))
+				}
+			}
+			if scope == "server" && rt.optionKnownOutsideServer(names[0], targetSession) {
+				return ok("")
+			}
 			if !includeInherited && (scope == "session" || scope == "window") {
 				inherited, err := rt.state.OptionsTarget(scope, targetSession, targetWindow, hasWindow, true)
 				if err == nil {
@@ -1479,11 +1494,18 @@ func (rt *Runtime) cmdShowOptions(args []string, currentSession string) protocol
 			lines = append(lines, fmt.Sprintf("%s %s", key, options[key]))
 		}
 	}
+	if hasAny(args, "-H") {
+		hooks, err := rt.state.Hooks(optionHookScope(scope), targetSession, "")
+		if err != nil {
+			return fail(err.Error())
+		}
+		lines = append(lines, formatHooks(hooks, valueOnly)...)
+	}
 	return ok(strings.Join(lines, "\n"))
 }
 
 func (rt *Runtime) optionCommandTarget(args []string, currentSession string, scope string) (string, int, bool, string) {
-	if scope == "global" || scope == "global-window" {
+	if scope == "server" || scope == "global" || scope == "global-window" {
 		return "", 0, false, ""
 	}
 	target := optionValue(args, "-t", currentSession)
@@ -1512,6 +1534,53 @@ func (rt *Runtime) optionCommandTarget(args []string, currentSession string, sco
 		return "", 0, false, fmt.Sprintf("no such session: %s", sessionName)
 	}
 	return sessionName, 0, false, ""
+}
+
+func (rt *Runtime) optionKnownOutsideServer(name string, currentSession string) bool {
+	global, err := rt.state.OptionsTarget("global", "", 0, false, true)
+	if err == nil {
+		if _, ok := global[name]; ok {
+			return true
+		}
+	}
+	window, err := rt.state.OptionsTarget("global-window", currentSession, 0, false, true)
+	if err == nil {
+		if _, ok := window[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func optionHookScope(optionScope string) string {
+	switch optionScope {
+	case "global", "global-window", "server":
+		return "global"
+	case "window":
+		return "window"
+	default:
+		return "session"
+	}
+}
+
+func formatHooks(hooks []model.Hook, valueOnly bool) []string {
+	lines := make([]string, 0)
+	for _, hook := range hooks {
+		if len(hook.Commands) == 0 {
+			if !valueOnly {
+				lines = append(lines, hook.Name)
+			}
+			continue
+		}
+		for index, commandValue := range hook.Commands {
+			if valueOnly {
+				lines = append(lines, commandValue)
+			} else {
+				lines = append(lines, fmt.Sprintf("%s[%d] %s", hook.Name, index, commandValue))
+			}
+		}
+	}
+	return lines
 }
 
 func (rt *Runtime) cmdBindKey(args []string) protocol.Message {
@@ -1671,17 +1740,7 @@ func (rt *Runtime) cmdShowHooks(args []string, currentSession string) protocol.M
 	if err != nil {
 		return fail(err.Error())
 	}
-	lines := make([]string, 0)
-	for _, hook := range hooks {
-		if len(hook.Commands) == 0 {
-			lines = append(lines, hook.Name)
-			continue
-		}
-		for index, commandValue := range hook.Commands {
-			lines = append(lines, fmt.Sprintf("%s[%d] %s", hook.Name, index, commandValue))
-		}
-	}
-	return ok(strings.Join(lines, "\n"))
+	return ok(strings.Join(formatHooks(hooks, false), "\n"))
 }
 
 func hookScope(args []string) string {

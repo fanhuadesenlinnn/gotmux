@@ -204,11 +204,15 @@ if id nobody >/dev/null 2>&1; then
   compare "server-access delete user" server-access -d nobody
 fi
 compare "show-hooks empty global hook" show-hooks -g after-new-window
+compare "show-options hooks empty global hook" show -H -g after-new-window
 compare "set-hook global command" set-hook -g after-new-window "display-message hi"
 compare "set-hook global append command" set-hook -ga after-new-window "display-message there"
 compare "show-hooks global hook" show-hooks -g after-new-window
+compare "show-options hooks global hook" show -H -g after-new-window
+compare "show-options hooks global values" show -H -gv after-new-window
 compare "set-hook local command" set-hook after-new-window "display-message local"
 compare "show-hooks local hook" show-hooks after-new-window
+compare "show-options hooks local hook" show -H after-new-window
 compare "unset global hook command" set-hook -gu after-new-window
 compare "show-hooks unset global hook" show-hooks -g after-new-window
 compare_status "show-hooks invalid hook" show-hooks -g missing-hook
@@ -682,6 +686,18 @@ compare "select-window last flag windows" list-windows -t lastw -F "#{window_ind
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
 compare "show global option value" show -gqv status
+compare "show server option value" show -sqv escape-time
+"${tmux_cmd[@]}" set -s escape-time 123
+"${gotmux_cmd[@]}" set -s escape-time 123 >/dev/null
+compare "set server option value" show -sqv escape-time
+compare "server option visible globally" show -gqv escape-time
+"${tmux_cmd[@]}" set -su escape-time
+"${gotmux_cmd[@]}" set -su escape-time >/dev/null
+compare "unset server option value" show -sqv escape-time
+"${tmux_cmd[@]}" set -s prefix C-a
+"${gotmux_cmd[@]}" set -s prefix C-a >/dev/null
+compare "server-specific option value" show -sqv prefix
+compare "server set leaves global option" show -gqv prefix
 "${tmux_cmd[@]}" set -gu status
 "${gotmux_cmd[@]}" set -gu status >/dev/null
 compare "unset global option value" show -gqv status

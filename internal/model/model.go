@@ -21,6 +21,7 @@ type Server struct {
 	Clients             map[int64]*Client
 	Buffers             map[string]*Buffer
 	Access              map[string]ServerAccess
+	ServerOptions       map[string]string
 	GlobalOptions       map[string]string
 	GlobalWindowOptions map[string]string
 	GlobalEnvironment   map[string]string
@@ -212,6 +213,7 @@ func NewServer(socketPath string) *Server {
 		Clients:             make(map[int64]*Client),
 		Buffers:             make(map[string]*Buffer),
 		Access:              make(map[string]ServerAccess),
+		ServerOptions:       defaultServerOptions(),
 		GlobalOptions:       defaultOptions(),
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
@@ -228,9 +230,14 @@ func defaultOptions() map[string]string {
 		"base-index":      "0",
 		"default-command": "",
 		"default-shell":   DefaultShell(),
-		"escape-time":     "500",
 		"prefix":          "C-b",
 		"status":          "on",
+	}
+}
+
+func defaultServerOptions() map[string]string {
+	return map[string]string{
+		"escape-time": "10",
 	}
 }
 
@@ -2213,12 +2220,19 @@ func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, has
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	options, err := s.optionsForScopeLocked(scope, sessionName, windowIndex, hasWindow)
+	storageScope := optionStorageScope(scope, name)
+	options, err := s.optionsForScopeLocked(storageScope, sessionName, windowIndex, hasWindow)
 	if err != nil {
 		return err
 	}
 	if unset {
-		switch scope {
+		switch storageScope {
+		case "server":
+			if value, ok := defaultServerOptions()[name]; ok {
+				options[name] = value
+			} else {
+				delete(options, name)
+			}
 		case "global":
 			if value, ok := defaultOptions()[name]; ok {
 				options[name] = value
@@ -2245,6 +2259,8 @@ func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, has
 
 func (s *Server) optionsForScopeLocked(scope, sessionName string, windowIndex int, hasWindow bool) (map[string]string, error) {
 	switch scope {
+	case "server":
+		return s.ServerOptions, nil
 	case "global":
 		return s.GlobalOptions, nil
 	case "global-window":
@@ -2300,7 +2316,10 @@ func (s *Server) OptionsTarget(scope, sessionName string, windowIndex int, hasWi
 		}
 	}
 	switch scope {
+	case "server":
+		copyOptions(s.ServerOptions)
 	case "global":
+		copyOptions(s.ServerOptions)
 		copyOptions(s.GlobalOptions)
 	case "global-window":
 		copyOptions(s.GlobalWindowOptions)
@@ -2339,6 +2358,15 @@ func (s *Server) OptionsTarget(scope, sessionName string, windowIndex int, hasWi
 		return nil, fmt.Errorf("unknown option scope: %s", scope)
 	}
 	return out, nil
+}
+
+func optionStorageScope(scope, name string) string {
+	if scope == "global" {
+		if _, ok := defaultServerOptions()[name]; ok {
+			return "server"
+		}
+	}
+	return scope
 }
 
 func (s *Server) SetHook(scope, sessionName, name, command string, appendValue, unset bool) error {
