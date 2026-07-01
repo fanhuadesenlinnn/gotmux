@@ -84,6 +84,7 @@ var commandInfos = []commandInfo{
 	{Name: "set-window-option", Alias: "setw", Usage: "[-aFgoqu] [-t target-window] option [value]"},
 	{Name: "show-buffer", Alias: "showb", Usage: "[-b buffer-name]"},
 	{Name: "show-environment", Alias: "showenv", Usage: "[-hgs] [-t target-session] [name]"},
+	{Name: "show-messages", Alias: "showmsgs", Usage: "[-JT] [-t target-client]"},
 	{Name: "show-options", Alias: "show", Usage: "[-AgHpqsvw] [-t target-pane] [option]"},
 	{Name: "show-prompt-history", Alias: "showphist", Usage: "[-T prompt-type]"},
 	{Name: "show-window-options", Alias: "showw", Usage: "[-gv] [-t target-window] [option]"},
@@ -399,6 +400,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdCapturePane(args, currentSession)
 	case "clear-history":
 		return rt.cmdClearHistory(args, currentSession)
+	case "show-messages":
+		return rt.cmdShowMessages(args)
 	case "show-prompt-history":
 		return rt.cmdShowPromptHistory(args)
 	case "clear-prompt-history":
@@ -983,6 +986,10 @@ func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protoco
 	if pane.History != nil {
 		pane.History.Reset()
 	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdShowMessages(args []string) protocol.Message {
 	return ok("")
 }
 
@@ -1924,6 +1931,8 @@ func normalizeCommandName(name string) string {
 		return "set-environment"
 	case "showenv":
 		return "show-environment"
+	case "showmsgs":
+		return "show-messages"
 	case "send":
 		return "send-keys"
 	case "resizep":
@@ -1946,7 +1955,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for":

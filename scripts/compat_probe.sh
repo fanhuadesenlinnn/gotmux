@@ -131,6 +131,7 @@ compare "list-commands prompt history format" list-commands -F "#{command_list_n
 compare "list-commands respawn-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnp
 compare "list-commands respawn-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnw
 compare "list-commands unlink-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" unlinkw
+compare "list-commands show-messages format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showmsgs
 compare "start-server command" start-server
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
@@ -148,6 +149,8 @@ compare "show prompt history" show-prompt-history
 compare "show prompt history type" showphist -T command
 compare "clear prompt history" clearphist -T command
 compare_status "show prompt history invalid" show-prompt-history -T nope
+compare "show messages jobs" show-messages -J
+compare "show messages terminals" showmsgs -T
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"

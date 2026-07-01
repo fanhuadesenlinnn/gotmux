@@ -139,6 +139,11 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("lscm display = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"list-commands", "-F", format, "showmsgs"}, "", 80, 24)
+	want = "show-messages:showmsgs:[-JT] [-t target-client]"
+	if msg.Text != want {
+		t.Fatalf("list-commands showmsgs = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"list-commands", "new-sess"}, "", 80, 24)
 	if msg.Text != "new-session (new) [-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]" {
 		t.Fatalf("list-commands prefix = %q", msg.Text)
@@ -313,6 +318,20 @@ func TestPromptHistoryCommands(t *testing.T) {
 	msg = rt.execute([]string{"show-prompt-history", "-T", "nope"}, "", 80, 24)
 	if msg.OK || msg.Text != "invalid type: nope" {
 		t.Fatalf("show-prompt-history invalid = %#v", msg)
+	}
+}
+
+func TestShowMessagesEmptyJobsAndTerminals(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	for _, args := range [][]string{
+		{"show-messages", "-J"},
+		{"showmsgs", "-T"},
+		{"show-messages", "-J", "-T"},
+	} {
+		msg := rt.execute(args, "", 80, 24)
+		if !msg.OK || msg.Text != "" {
+			t.Fatalf("%v = %#v", args, msg)
+		}
 	}
 }
 

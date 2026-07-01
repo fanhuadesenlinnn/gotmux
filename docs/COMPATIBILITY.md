@@ -24,6 +24,7 @@ manual verification note.
 | Basic shell/config commands | Implemented for `run-shell`/`run` synchronous output, `-b`, `-E`, simple `-C`, `-c`, and `-d`, plus basic `if-shell`/`if` true/false and `-F` branches; the probe covers stdout, stderr opt-in, background mode, shell exit status, and conditional branch execution |
 | Basic synchronization commands | Implemented for `wait-for`/`wait` signal, wait, lock, and unlock channels; the probe covers signal-before-wait and lock/unlock output, with goroutine tests for blocking wakeups |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
+| Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
@@ -57,6 +58,7 @@ manual verification note.
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
 | Status format language | Only a simple status line is implemented. |
 | Hooks and jobs | Hooks are not implemented; jobs are limited to the basic `run-shell` subset. |
+| Message log | `show-messages` does not yet keep tmux-style timestamped command/message history. |
 | Control mode | Not implemented. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |

@@ -90,7 +90,10 @@ for basic `capture-pane -J` joining. Visible-line `capture-pane -F` flags and
 now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `paste-buffer`, `load-buffer`, `save-buffer`, `capture-pane -b`, and
 `set-buffer -n` buffer renames. Basic
-`clear-history` clears gotmux's pane history ring. History capture, buffer
+`clear-history` clears gotmux's pane history ring. Prompt-history commands expose
+the tmux-compatible empty-history shape, and `show-messages` covers command
+metadata plus empty `-J`/`-T` jobs/terminal output. History capture, message log,
+buffer
 chooser, copy mode, mode screens, complete joined/wrapped output, style/escape
 output, and complete target resolution remain.
 
