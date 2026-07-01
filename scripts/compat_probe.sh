@@ -686,6 +686,7 @@ compare "select-window last flag windows" list-windows -t lastw -F "#{window_ind
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
 compare "show global option value" show -gqv status
+compare_status "set-once global option already set" set -go status on
 compare "show server option value" show -sqv escape-time
 "${tmux_cmd[@]}" set -s escape-time 123
 "${gotmux_cmd[@]}" set -s escape-time 123 >/dev/null
@@ -697,7 +698,13 @@ compare "unset server option value" show -sqv escape-time
 "${tmux_cmd[@]}" set -s prefix C-a
 "${gotmux_cmd[@]}" set -s prefix C-a >/dev/null
 compare "server-specific option value" show -sqv prefix
+compare_status "set-once server option already set" set -so prefix C-c
 compare "server set leaves global option" show -gqv prefix
+"${tmux_cmd[@]}" new-session -d -s optonce -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s optonce -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "set-once local option" set -o -t optonce status off
+compare_status "set-once local option already set" set -o -t optonce status on
+compare "set-once local option value" show -t optonce -v status
 "${tmux_cmd[@]}" set -gu status
 "${gotmux_cmd[@]}" set -gu status >/dev/null
 compare "unset global option value" show -gqv status

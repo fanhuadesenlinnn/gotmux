@@ -2212,11 +2212,11 @@ func (s *Server) SetClientPrefix(clientID int64, prefix bool) {
 	}
 }
 
-func (s *Server) SetOption(scope, sessionName, name, value string, appendValue, unset bool) error {
-	return s.SetOptionTarget(scope, sessionName, 0, false, name, value, appendValue, unset)
+func (s *Server) SetOption(scope, sessionName, name, value string, appendValue, unset, setOnce bool) error {
+	return s.SetOptionTarget(scope, sessionName, 0, false, name, value, appendValue, unset, setOnce)
 }
 
-func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, hasWindow bool, name, value string, appendValue, unset bool) error {
+func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, hasWindow bool, name, value string, appendValue, unset, setOnce bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -2249,6 +2249,11 @@ func (s *Server) SetOptionTarget(scope, sessionName string, windowIndex int, has
 			delete(options, name)
 		}
 		return nil
+	}
+	if setOnce {
+		if _, exists := options[name]; exists {
+			return fmt.Errorf("already set: %s", name)
+		}
 	}
 	if appendValue {
 		value = options[name] + value

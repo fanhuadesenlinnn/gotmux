@@ -121,6 +121,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "off" {
 		t.Fatalf("show status = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"set", "-go", "status", "on"}, "", 80, 24)
+	if msg.OK || msg.Text != "already set: status" {
+		t.Fatalf("set-once global status = %#v", msg)
+	}
 	msg = rt.execute([]string{"show", "-sqv", "escape-time"}, "", 80, 24)
 	if msg.Text != "10" {
 		t.Fatalf("show server escape-time = %q", msg.Text)
@@ -152,6 +156,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	msg = rt.execute([]string{"show", "-sqv", "prefix"}, "", 80, 24)
 	if msg.Text != "C-a" {
 		t.Fatalf("server prefix = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-so", "prefix", "C-c"}, "", 80, 24)
+	if msg.OK || msg.Text != "already set: prefix" {
+		t.Fatalf("set-once server prefix = %#v", msg)
 	}
 	msg = rt.execute([]string{"show", "-gqv", "prefix"}, "", 80, 24)
 	if msg.Text != "C-b" {
@@ -188,6 +196,22 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	msg = rt.execute([]string{"new-session", "-d", "-s", "opts", "/bin/sh"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("new-session opts failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"new-session", "-d", "-s", "once", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session once failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-o", "status", "off"}, "once", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set-once local status failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"set", "-o", "status", "on"}, "once", 80, 24)
+	if msg.OK || msg.Text != "already set: status" {
+		t.Fatalf("repeat set-once local status = %#v", msg)
+	}
+	msg = rt.execute([]string{"show", "-v", "status"}, "once", 80, 24)
+	if msg.Text != "off" {
+		t.Fatalf("set-once local status value = %q", msg.Text)
 	}
 	msg = rt.execute([]string{"set", "-g", "default-command", "base"}, "opts", 80, 24)
 	if !msg.OK {

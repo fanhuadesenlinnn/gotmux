@@ -1419,7 +1419,7 @@ func (rt *Runtime) cmdSetOption(args []string, currentSession string, defaultSco
 	if targetErr != "" {
 		return fail(targetErr)
 	}
-	if err := rt.state.SetOptionTarget(scope, targetSession, targetWindow, hasWindow, name, value, hasAny(args, "-a"), hasAny(args, "-u")); err != nil {
+	if err := rt.state.SetOptionTarget(scope, targetSession, targetWindow, hasWindow, name, value, hasAny(args, "-a"), hasAny(args, "-u"), hasAny(args, "-o")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
