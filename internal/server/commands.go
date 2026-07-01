@@ -21,6 +21,13 @@ type commandInfo struct {
 	Usage string
 }
 
+type waitChannel struct {
+	woken   bool
+	locked  bool
+	waiters []chan struct{}
+	lockers []chan struct{}
+}
+
 var commandInfos = []commandInfo{
 	{Name: "attach-session", Alias: "attach", Usage: "[-dErx] [-c working-directory] [-f flags] [-t target-session]"},
 	{Name: "bind-key", Alias: "bind", Usage: "[-nr] [-N note] [-T key-table] key [command [arguments]]"},
@@ -82,6 +89,7 @@ var commandInfos = []commandInfo{
 	{Name: "swap-pane", Alias: "swapp", Usage: "[-dDUZ] [-s src-pane] [-t dst-pane]"},
 	{Name: "swap-window", Alias: "swapw", Usage: "[-d] [-s src-window] [-t dst-window]"},
 	{Name: "unbind-key", Alias: "unbind", Usage: "[-anq] [-T key-table] key"},
+	{Name: "wait-for", Alias: "wait", Usage: "[-L|-S|-U] channel"},
 }
 
 func (rt *Runtime) executeMessage(msg protocol.Message, currentSession string) protocol.Message {
@@ -184,6 +192,8 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdShowEnvironment(args, currentSession)
 	case "if-shell":
 		return rt.cmdIfShell(args, currentSession, width, height)
+	case "wait-for":
+		return rt.cmdWaitFor(args)
 	case "send-prefix":
 		return rt.cmdSendPrefix(args, currentSession)
 	case "select-window":
@@ -1264,6 +1274,33 @@ func (rt *Runtime) cmdIfShell(args []string, currentSession string, width, heigh
 	return runSelected(elseCommand)
 }
 
+func (rt *Runtime) cmdWaitFor(args []string) protocol.Message {
+	values := waitForOperands(args)
+	if len(values) == 0 {
+		return fail("missing channel")
+	}
+	if len(values) > 1 {
+		return fail("too many arguments")
+	}
+	name := values[0]
+	switch {
+	case hasAny(args, "-S"):
+		rt.waitSignal(name)
+		return ok("")
+	case hasAny(args, "-L"):
+		rt.waitLock(name)
+		return ok("")
+	case hasAny(args, "-U"):
+		if !rt.waitUnlock(name) {
+			return fail(fmt.Sprintf("channel %s not locked", name))
+		}
+		return ok("")
+	default:
+		rt.waitForSignal(name)
+		return ok("")
+	}
+}
+
 func (rt *Runtime) cmdRunShell(args []string, currentSession string, width, height int) protocol.Message {
 	delay, err := runShellDelay(args)
 	if err != nil {
@@ -1517,6 +1554,22 @@ func displayMessageOperands(args []string) []string {
 	return out
 }
 
+func waitForOperands(args []string) []string {
+	var out []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i+1:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
+}
+
 func runShellCommand(shellCommand string, cwd string, showStderr bool) (string, int, error) {
 	cmd := exec.Command("sh", "-c", shellCommand)
 	if cwd != "" {
@@ -1547,6 +1600,96 @@ func runShellCommand(shellCommand string, cwd string, showStderr bool) (string, 
 		}
 	}
 	return text, code, err
+}
+
+func (rt *Runtime) waitChannelLocked(name string) *waitChannel {
+	if rt.waitChans == nil {
+		rt.waitChans = make(map[string]*waitChannel)
+	}
+	wc := rt.waitChans[name]
+	if wc == nil {
+		wc = &waitChannel{}
+		rt.waitChans[name] = wc
+	}
+	return wc
+}
+
+func (rt *Runtime) removeWaitChannelLocked(name string, wc *waitChannel) {
+	if wc.locked || wc.woken || len(wc.waiters) > 0 || len(wc.lockers) > 0 {
+		return
+	}
+	delete(rt.waitChans, name)
+}
+
+func (rt *Runtime) waitSignal(name string) {
+	rt.waitMu.Lock()
+	wc := rt.waitChannelLocked(name)
+	waiters := wc.waiters
+	wc.waiters = nil
+	if len(waiters) == 0 {
+		wc.woken = true
+		rt.waitMu.Unlock()
+		return
+	}
+	rt.removeWaitChannelLocked(name, wc)
+	rt.waitMu.Unlock()
+	for _, waiter := range waiters {
+		close(waiter)
+	}
+}
+
+func (rt *Runtime) waitForSignal(name string) {
+	rt.waitMu.Lock()
+	wc := rt.waitChannelLocked(name)
+	if wc.woken {
+		wc.woken = false
+		rt.removeWaitChannelLocked(name, wc)
+		rt.waitMu.Unlock()
+		return
+	}
+	waiter := make(chan struct{})
+	wc.waiters = append(wc.waiters, waiter)
+	rt.waitMu.Unlock()
+	<-waiter
+}
+
+func (rt *Runtime) waitLock(name string) {
+	rt.waitMu.Lock()
+	wc := rt.waitChannelLocked(name)
+	if !wc.locked {
+		wc.locked = true
+		rt.waitMu.Unlock()
+		return
+	}
+	locker := make(chan struct{})
+	wc.lockers = append(wc.lockers, locker)
+	rt.waitMu.Unlock()
+	<-locker
+}
+
+func (rt *Runtime) waitUnlock(name string) bool {
+	rt.waitMu.Lock()
+	wc := (*waitChannel)(nil)
+	if rt.waitChans != nil {
+		wc = rt.waitChans[name]
+	}
+	if wc == nil || !wc.locked {
+		rt.waitMu.Unlock()
+		return false
+	}
+	var locker chan struct{}
+	if len(wc.lockers) > 0 {
+		locker = wc.lockers[0]
+		wc.lockers = wc.lockers[1:]
+	} else {
+		wc.locked = false
+		rt.removeWaitChannelLocked(name, wc)
+	}
+	rt.waitMu.Unlock()
+	if locker != nil {
+		close(locker)
+	}
+	return true
 }
 
 func normalizeCommandName(name string) string {
@@ -1665,6 +1808,8 @@ func normalizeCommandName(name string) string {
 		return "run-shell"
 	case "start":
 		return "start-server"
+	case "wait":
+		return "wait-for"
 	case "kill-server", "kill-session", "rename-session", "rename-window", "swap-window", "move-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
@@ -1672,7 +1817,7 @@ func normalizeCommandName(name string) string {
 		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
-		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "start-server":
+		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "start-server", "wait-for":
 		return name
 	default:
 		return name

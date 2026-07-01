@@ -25,8 +25,8 @@ Status: in progress. Basic command sequences, explicit `-f`, default
 `$HOME/.tmux.conf` discovery, `source-file`, basic `list-commands` metadata for
 currently supported commands, basic `list-clients`, string-backed options, basic
 environment commands, prefix/root key bindings, `send-prefix`, basic `run-shell`
-shell execution, and basic `if-shell` conditionals are implemented and covered by
-`scripts/compat_probe.sh`. Full tmux syntax,
+shell execution, basic `if-shell` conditionals, and basic `wait-for`
+synchronization are implemented and covered by `scripts/compat_probe.sh`. Full tmux syntax,
 environment edge cases, and complete option/key semantics remain.
 
 ## Phase 3: Terminal Screen Model

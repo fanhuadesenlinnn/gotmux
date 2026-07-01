@@ -126,6 +126,7 @@ compare "list-clients empty" list-clients -F "#{client_name}:#{session_name}:#{c
 compare "list-commands new-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" new-session
 compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" display
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
+compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "start-server command" start-server
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
@@ -134,6 +135,11 @@ compare_status "run-shell exit status" run-shell "exit 7"
 compare "if-shell true branch" if-shell "true" "display-message -p yes" "display-message -p no"
 compare "if-shell false branch" if-shell "false" "display-message -p yes" "display-message -p no"
 compare "if-shell format branch" if -F "1" "display-message -p fmt-yes" "display-message -p fmt-no"
+compare "wait-for signal command" wait-for -S ready
+compare "wait-for alias wait" wait ready
+compare "wait-for lock command" wait-for -L lock
+compare "wait-for unlock command" wait-for -U lock
+compare_status "wait-for unlock missing" wait-for -U missing
 compare "display-message formats" display-message -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"

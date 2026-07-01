@@ -24,6 +24,8 @@ type Runtime struct {
 	clients   map[int64]*attachedClient
 	screensMu sync.RWMutex
 	screens   map[int]*terminal.Screen
+	waitMu    sync.Mutex
+	waitChans map[string]*waitChannel
 }
 
 type attachedClient struct {

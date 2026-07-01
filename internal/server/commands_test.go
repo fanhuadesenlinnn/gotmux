@@ -5,8 +5,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
+	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
@@ -226,6 +228,70 @@ func TestIfShell(t *testing.T) {
 	msg = rt.execute([]string{"if-shell", "false", "display-message -p yes"}, "", 80, 24)
 	if !msg.OK || msg.Text != "" {
 		t.Fatalf("if-shell false without else = %#v", msg)
+	}
+}
+
+func TestWaitFor(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"wait-for", "-S", "ready"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("wait-for -S failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"wait", "ready"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("wait alias failed: %s", msg.Text)
+	}
+
+	done := make(chan protocol.Message, 1)
+	go func() {
+		done <- rt.execute([]string{"wait-for", "async"}, "", 80, 24)
+	}()
+	select {
+	case msg := <-done:
+		t.Fatalf("wait-for returned before signal: %#v", msg)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if msg = rt.execute([]string{"wait-for", "-S", "async"}, "", 80, 24); !msg.OK {
+		t.Fatalf("wait-for signal failed: %s", msg.Text)
+	}
+	select {
+	case msg := <-done:
+		if !msg.OK {
+			t.Fatalf("wait-for waiter failed: %#v", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("wait-for waiter did not wake")
+	}
+
+	if msg = rt.execute([]string{"wait-for", "-L", "lock"}, "", 80, 24); !msg.OK {
+		t.Fatalf("wait-for lock failed: %s", msg.Text)
+	}
+	lockDone := make(chan protocol.Message, 1)
+	go func() {
+		lockDone <- rt.execute([]string{"wait-for", "-L", "lock"}, "", 80, 24)
+	}()
+	select {
+	case msg := <-lockDone:
+		t.Fatalf("second lock returned before unlock: %#v", msg)
+	case <-time.After(20 * time.Millisecond):
+	}
+	if msg = rt.execute([]string{"wait-for", "-U", "lock"}, "", 80, 24); !msg.OK {
+		t.Fatalf("wait-for unlock failed: %s", msg.Text)
+	}
+	select {
+	case msg := <-lockDone:
+		if !msg.OK {
+			t.Fatalf("wait-for second lock failed: %#v", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("wait-for lock waiter did not wake")
+	}
+	if msg = rt.execute([]string{"wait-for", "-U", "lock"}, "", 80, 24); !msg.OK {
+		t.Fatalf("wait-for final unlock failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"wait-for", "-U", "missing"}, "", 80, 24)
+	if msg.OK || msg.Text != "channel missing not locked" {
+		t.Fatalf("wait-for missing unlock = %#v", msg)
 	}
 }
 
