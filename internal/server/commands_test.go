@@ -167,7 +167,10 @@ func TestListCommands(t *testing.T) {
 		{"choose-client", "choose-client::[-NrZ] [-F format] [-f filter] [-K key-format] [-O sort-order] [-t target-pane] [template]"},
 		{"customize-mode", "customize-mode::[-NZ] [-F format] [-f filter] [-t target-pane]"},
 		{"findw", "find-window:findw:[-CiNrTZ] [-t target-pane] match-string"},
+		{"confirm", "confirm-before:confirm:[-by] [-c confirm-key] [-p prompt] [-t target-client] command"},
+		{"menu", "display-menu:menu:[-MO] [-b border-lines] [-c target-client] [-C starting-choice] [-H selected-style] [-s style] [-S border-style] [-t target-pane] [-T title] [-x position] [-y position] name [key] [command] ..."},
 		{"displayp", "display-panes:displayp:[-bN] [-d duration] [-t target-client] [template]"},
+		{"popup", "display-popup:popup:[-BCEkN] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane] [-T title] [-w width] [-x position] [-y position] [shell-command [argument ...]]"},
 		{"command-prompt", "command-prompt::[-1CbeFiklN] [-I inputs] [-p prompts] [-t target-client] [-T prompt-type] [template]"},
 		{"suspendc", "suspend-client:suspendc:[-t target-client]"},
 	} {
@@ -267,7 +270,10 @@ func TestBasicModeAndClientEntryCommands(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"command-prompt"},
+		{"confirm-before", "true"},
+		{"menu", "item", "i", "true"},
 		{"displayp"},
+		{"popup"},
 		{"suspend-client"},
 	} {
 		msg := rt.execute(args, "", 80, 24)

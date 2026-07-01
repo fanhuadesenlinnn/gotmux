@@ -44,8 +44,11 @@ var commandInfos = []commandInfo{
 	{Name: "customize-mode", Usage: "[-NZ] [-F format] [-f filter] [-t target-pane]"},
 	{Name: "delete-buffer", Alias: "deleteb", Usage: "[-b buffer-name]"},
 	{Name: "detach-client", Alias: "detach", Usage: "[-aP] [-E shell-command] [-s target-session] [-t target-client]"},
+	{Name: "confirm-before", Alias: "confirm", Usage: "[-by] [-c confirm-key] [-p prompt] [-t target-client] command"},
+	{Name: "display-menu", Alias: "menu", Usage: "[-MO] [-b border-lines] [-c target-client] [-C starting-choice] [-H selected-style] [-s style] [-S border-style] [-t target-pane] [-T title] [-x position] [-y position] name [key] [command] ..."},
 	{Name: "display-message", Alias: "display", Usage: "[-aCIlNpv] [-c target-client] [-d delay] [-F format] [-t target-pane] [message]"},
 	{Name: "display-panes", Alias: "displayp", Usage: "[-bN] [-d duration] [-t target-client] [template]"},
+	{Name: "display-popup", Alias: "popup", Usage: "[-BCEkN] [-b border-lines] [-c target-client] [-d start-directory] [-e environment] [-h height] [-s style] [-S border-style] [-t target-pane] [-T title] [-w width] [-x position] [-y position] [shell-command [argument ...]]"},
 	{Name: "find-window", Alias: "findw", Usage: "[-CiNrTZ] [-t target-pane] match-string"},
 	{Name: "has-session", Alias: "has", Usage: "[-t target-session]"},
 	{Name: "if-shell", Alias: "if", Usage: "[-bF] [-t target-pane] shell-command command [command]"},
@@ -193,7 +196,7 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		return ok("")
 	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "choose-tree", "customize-mode", "find-window":
 		return ok("")
-	case "command-prompt", "display-panes", "suspend-client":
+	case "command-prompt", "confirm-before", "display-menu", "display-panes", "display-popup", "suspend-client":
 		if clientID == 0 {
 			return fail("no current client")
 		}
@@ -2067,10 +2070,16 @@ func normalizeCommandName(name string) string {
 		return "split-window"
 	case "selectw":
 		return "select-window"
+	case "confirm":
+		return "confirm-before"
 	case "display":
 		return "display-message"
+	case "menu":
+		return "display-menu"
 	case "displayp":
 		return "display-panes"
+	case "popup":
+		return "display-popup"
 	case "findw":
 		return "find-window"
 	case "last":
@@ -2190,7 +2199,7 @@ func normalizeCommandName(name string) string {
 	case "wait":
 		return "wait-for"
 	case "kill-server", "kill-session", "link-window", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
-		"send-keys", "display-message", "display-panes", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
+		"send-keys", "confirm-before", "display-message", "display-menu", "display-panes", "display-popup", "find-window", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "suspend-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
 		"show-environment", "show-messages", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",

@@ -105,10 +105,11 @@ metadata plus empty `-J`/`-T` jobs/terminal output. Basic mode entry commands
 now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
 `choose-tree`, `customize-mode`, and `find-window` with tmux-compatible empty
 CLI success in the probed subset; `command-prompt`, `display-panes`, and
-`suspend-client` match detached CLI no-current-client errors. History capture,
-message log, buffer chooser UI, copy mode internals, mode screens, complete
-joined/wrapped output, style/escape output, and complete target resolution
-remain.
+`suspend-client` match detached CLI no-current-client errors. `display-menu`,
+`display-popup`, and `confirm-before` now match the same detached-client error
+shape. History capture, message log, buffer chooser UI, copy mode internals,
+mode screens, complete joined/wrapped output, style/escape output, and
+complete target resolution remain.
 
 ## Phase 6: Advanced tmux Surfaces
 

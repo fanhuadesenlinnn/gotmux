@@ -153,7 +153,10 @@ compare "list-commands choose-buffer format" list-commands -F "#{command_list_na
 compare "list-commands choose-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" choose-client
 compare "list-commands customize-mode format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" customize-mode
 compare "list-commands find-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" findw
+compare "list-commands confirm-before format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" confirm
+compare "list-commands display-menu format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" menu
 compare "list-commands display-panes format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" displayp
+compare "list-commands display-popup format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" popup
 compare "list-commands command-prompt format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" command-prompt
 compare "list-commands suspend-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" suspendc
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
@@ -181,6 +184,9 @@ compare "choose-tree command" choose-tree
 compare "customize-mode command" customize-mode
 compare "find-window command" find-window missing-pattern
 compare_status "display-panes no current client" display-panes
+compare_status "display-menu no current client" display-menu item i true
+compare_status "display-popup no current client" display-popup
+compare_status "confirm-before no current client" confirm-before true
 compare_status "command-prompt no current client" command-prompt
 compare_status "suspend-client no current client" suspend-client
 compare "run-shell stdout" run-shell "printf alpha"
