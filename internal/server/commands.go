@@ -99,6 +99,7 @@ var commandInfos = []commandInfo{
 	{Name: "start-server", Alias: "start"},
 	{Name: "swap-pane", Alias: "swapp", Usage: "[-dDUZ] [-s src-pane] [-t dst-pane]"},
 	{Name: "swap-window", Alias: "swapw", Usage: "[-d] [-s src-window] [-t dst-window]"},
+	{Name: "switch-client", Alias: "switchc", Usage: "[-ElnprZ] [-c target-client] [-t target-session] [-T key-table] [-O order]"},
 	{Name: "unlink-window", Alias: "unlinkw", Usage: "[-k] [-t target-window]"},
 	{Name: "unbind-key", Alias: "unbind", Usage: "[-anq] [-T key-table] key"},
 	{Name: "wait-for", Alias: "wait", Usage: "[-L|-S|-U] channel"},
@@ -401,6 +402,8 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 			return fail("no current client")
 		}
 		return ok("")
+	case "switch-client":
+		return rt.cmdSwitchClient(args, clientID)
 	case "rename-session":
 		target := cleanSessionTarget(optionValue(args, "-t", currentSession))
 		name := lastNonOption(args)
@@ -929,6 +932,60 @@ func (rt *Runtime) cmdSwapWindow(args []string, currentSession string) protocol.
 		return fail(err.Error())
 	}
 	return ok("")
+}
+
+func (rt *Runtime) cmdSwitchClient(args []string, clientID int64) protocol.Message {
+	targetClientID := clientID
+	if targetClient := optionValue(args, "-c", ""); targetClient != "" {
+		resolved, ok := rt.resolveClientTarget(targetClient)
+		if !ok {
+			return fail("can't find client: " + targetClient)
+		}
+		targetClientID = resolved
+	} else if clientID == 0 {
+		return fail("no current client")
+	}
+	if hasAny(args, "-n") {
+		if err := rt.state.SwitchClientRelative(targetClientID, 1); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+	if hasAny(args, "-p") {
+		if err := rt.state.SwitchClientRelative(targetClientID, -1); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+	if hasAny(args, "-l") {
+		if err := rt.state.SwitchClientLast(targetClientID); err != nil {
+			return fail(err.Error())
+		}
+		return ok("")
+	}
+	target := cleanSessionTarget(optionValue(args, "-t", ""))
+	if target == "" {
+		return ok("")
+	}
+	if strings.Contains(target, ":") || strings.Contains(target, ".") {
+		target, _, _, _, _ = parsePaneTarget(target)
+	}
+	if target == "" {
+		return fail("can't find session")
+	}
+	if err := rt.state.SwitchClient(targetClientID, target); err != nil {
+		return fail(err.Error())
+	}
+	return ok("")
+}
+
+func (rt *Runtime) resolveClientTarget(target string) (int64, bool) {
+	idText := strings.TrimPrefix(target, "client-")
+	id, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return id, rt.state.ClientExists(id)
 }
 
 func (rt *Runtime) cmdKillWindow(args []string, currentSession string) protocol.Message {
@@ -2023,6 +2080,8 @@ func normalizeCommandName(name string) string {
 		return "rename-window"
 	case "swapw":
 		return "swap-window"
+	case "switchc":
+		return "switch-client"
 	case "movew":
 		return "move-window"
 	case "source":
@@ -2067,7 +2126,7 @@ func normalizeCommandName(name string) string {
 		return "start-server"
 	case "wait":
 		return "wait-for"
-	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "move-window", "unlink-window",
+	case "kill-server", "kill-session", "lock-server", "lock-session", "lock-client", "refresh-client", "rename-session", "rename-window", "swap-window", "switch-client", "move-window", "unlink-window",
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",

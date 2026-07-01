@@ -26,6 +26,7 @@ manual verification note.
 | Basic synchronization commands | Implemented for `wait-for`/`wait` signal, wait, lock, and unlock channels; the probe covers signal-before-wait and lock/unlock output, with goroutine tests for blocking wakeups |
 | Basic lock commands | Implemented for `lock-server`/`lock`, `lock-session`/`locks` no-output success and `lock-client` no-current-client errors in the detached CLI subset |
 | Basic client refresh command | Implemented for `refresh-client`/`refresh` metadata, no-current-client CLI errors, and attached-client no-op success for redraw bindings |
+| Basic client switching command | Implemented for `switch-client`/`switchc` metadata, detached CLI no-current-client errors, missing `-c target-client` errors, and attached-client `-t`, `-n`, `-p`, `-l`, and basic `-c client-N` switching |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
 | Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata and empty `-J`/`-T` jobs/terminal output |
 | `source-file` | Implemented for simple command files and line continuations |
@@ -66,6 +67,7 @@ manual verification note.
 | Message log | `show-messages` does not yet keep tmux-style timestamped command/message history. |
 | Control mode | Not implemented. |
 | Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
+| Full `switch-client` semantics | Basic attached-client session switching exists, but key-table switching, read-only toggles, sorted session order, environment updates, pane-target active pane selection, and zoom handling remain incomplete. |
 | Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
 | Popups, menus, choose tree, command prompt | Not implemented. |
 | Session groups and linked windows | Not implemented. |

@@ -114,8 +114,13 @@ shell command, closes on empty commands, and supports the common `-o` toggle
 path in the compatibility probe. Full bidirectional pipe lifecycle behavior,
 `lock-server` and `lock-session` cover the basic detached CLI no-op behavior.
 `refresh-client` covers no-current-client CLI errors and attached-client redraw
-entry points. Full lock screens, bidirectional pipe lifecycle behavior, refresh
-offset/control behavior, hooks, control mode, popups, and linked windows remain.
+entry points. Basic `switch-client` covers current-client requirements,
+missing `-c target-client` errors, attached-client `-t` target-session
+switching, `-n`/`-p` relative switching, `-l` last-session switching, and
+basic `-c client-N` target-client switching. Full lock screens, bidirectional
+pipe lifecycle behavior, refresh offset/control behavior, full switch-client
+key-table/read-only/sorted-order behavior, hooks, control mode, popups, and
+linked windows remain.
 
 ## Completion Gate
 

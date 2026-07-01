@@ -166,6 +166,11 @@ func TestListCommands(t *testing.T) {
 	if msg.Text != want {
 		t.Fatalf("list-commands refresh = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"list-commands", "-F", format, "switchc"}, "", 80, 24)
+	want = "switch-client:switchc:[-ElnprZ] [-c target-client] [-t target-session] [-T key-table] [-O order]"
+	if msg.Text != want {
+		t.Fatalf("list-commands switchc = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"list-commands", "new-sess"}, "", 80, 24)
 	if msg.Text != "new-session (new) [-AdDEPX] [-c start-directory] [-e environment] [-F format] [-f flags] [-n window-name] [-s session-name] [-t target-session] [-x width] [-y height] [shell-command [argument ...]]" {
 		t.Fatalf("list-commands prefix = %q", msg.Text)
@@ -219,6 +224,51 @@ func TestRefreshClientRequiresCurrentClient(t *testing.T) {
 	}
 }
 
+func TestSwitchClientTargetsAndRelativeSessions(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "sw1", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session sw1 failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "sw2", "-n", "second", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session sw2 failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("sw1", 80, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"switch-client", "-t", "sw2"}, "sw1", 80, 24)
+	if msg.OK || msg.Text != "no current client" {
+		t.Fatalf("switch-client without current client = %#v", msg)
+	}
+	msg = rt.executeWithClient([]string{"switch-client", "-t", "sw2"}, "sw1", 80, 24, client.ID)
+	if !msg.OK || rt.state.ActiveSessionName(client.ID) != "sw2" {
+		t.Fatalf("switch-client -t = %#v active=%s", msg, rt.state.ActiveSessionName(client.ID))
+	}
+	msg = rt.executeWithClient([]string{"switch-client", "-l"}, "sw2", 80, 24, client.ID)
+	if !msg.OK || rt.state.ActiveSessionName(client.ID) != "sw1" {
+		t.Fatalf("switch-client -l = %#v active=%s", msg, rt.state.ActiveSessionName(client.ID))
+	}
+	msg = rt.executeWithClient([]string{"switch-client", "-n"}, "sw1", 80, 24, client.ID)
+	if !msg.OK || rt.state.ActiveSessionName(client.ID) != "sw2" {
+		t.Fatalf("switch-client -n = %#v active=%s", msg, rt.state.ActiveSessionName(client.ID))
+	}
+	msg = rt.executeWithClient([]string{"switchc", "-p"}, "sw2", 80, 24, client.ID)
+	if !msg.OK || rt.state.ActiveSessionName(client.ID) != "sw1" {
+		t.Fatalf("switch-client -p = %#v active=%s", msg, rt.state.ActiveSessionName(client.ID))
+	}
+	msg = rt.execute([]string{"switch-client", "-c", "client-1", "-t", "sw2"}, "sw1", 80, 24)
+	if !msg.OK || rt.state.ActiveSessionName(client.ID) != "sw2" {
+		t.Fatalf("switch-client -c = %#v active=%s", msg, rt.state.ActiveSessionName(client.ID))
+	}
+	msg = rt.execute([]string{"switch-client", "-c", "missing", "-t", "sw1"}, "sw2", 80, 24)
+	if msg.OK || msg.Text != "can't find client: missing" {
+		t.Fatalf("switch-client missing client = %#v", msg)
+	}
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "sw1"}, "sw1", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "sw2"}, "sw2", 80, 24)
+}
+
 func TestListClients(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	format := "#{client_name}:#{session_name}:#{client_width}:#{client_height}:#{client_termname}"
@@ -234,7 +284,7 @@ func TestListClients(t *testing.T) {
 		t.Fatal(err)
 	}
 	msg = rt.execute([]string{"lsc", "-F", format, "-t", "clients"}, "", 80, 24)
-	if msg.Text != "client-0:clients:100:30:screen-256color" {
+	if msg.Text != "client-1:clients:100:30:screen-256color" {
 		t.Fatalf("list-clients format = %q", msg.Text)
 	}
 	msg = rt.execute([]string{"list-clients", "-F", format, "-t", "missing"}, "", 80, 24)

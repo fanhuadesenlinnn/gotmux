@@ -95,12 +95,13 @@ type LayoutNode struct {
 }
 
 type Client struct {
-	ID          int64
-	SessionName string
-	Width       int
-	Height      int
-	Prefix      bool
-	ReadOnly    bool
+	ID              int64
+	SessionName     string
+	LastSessionName string
+	Width           int
+	Height          int
+	Prefix          bool
+	ReadOnly        bool
 }
 
 type KeyBinding struct {
@@ -127,6 +128,7 @@ func NewServer(socketPath string) *Server {
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
 		KeyBindings:         defaultKeyBindings(),
+		NextClientID:        1,
 		SocketPath:          socketPath,
 		StartedAt:           time.Now(),
 	}
@@ -1723,6 +1725,87 @@ func (s *Server) DetachClient(id int64) {
 	delete(s.Clients, id)
 }
 
+func (s *Server) SwitchClient(clientID int64, sessionName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	client := s.Clients[clientID]
+	if client == nil {
+		return fmt.Errorf("no current client")
+	}
+	target := s.Sessions[sessionName]
+	if target == nil {
+		return fmt.Errorf("can't find session: %s", sessionName)
+	}
+	s.switchClientLocked(client, target)
+	return nil
+}
+
+func (s *Server) SwitchClientRelative(clientID int64, delta int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	client := s.Clients[clientID]
+	if client == nil {
+		return fmt.Errorf("no current client")
+	}
+	sessions := make([]*Session, 0, len(s.Sessions))
+	for _, session := range s.Sessions {
+		sessions = append(sessions, session)
+	}
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].ID < sessions[j].ID
+	})
+	if len(sessions) == 0 {
+		return fmt.Errorf("can't find session")
+	}
+	currentIndex := -1
+	for index, session := range sessions {
+		if session.Name == client.SessionName {
+			currentIndex = index
+			break
+		}
+	}
+	if currentIndex == -1 {
+		return fmt.Errorf("can't find session: %s", client.SessionName)
+	}
+	next := sessions[(currentIndex+delta+len(sessions))%len(sessions)]
+	s.switchClientLocked(client, next)
+	return nil
+}
+
+func (s *Server) SwitchClientLast(clientID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	client := s.Clients[clientID]
+	if client == nil {
+		return fmt.Errorf("no current client")
+	}
+	if client.LastSessionName == "" {
+		return fmt.Errorf("can't find last session")
+	}
+	target := s.Sessions[client.LastSessionName]
+	if target == nil {
+		return fmt.Errorf("can't find last session")
+	}
+	s.switchClientLocked(client, target)
+	return nil
+}
+
+func (s *Server) switchClientLocked(client *Client, target *Session) {
+	if client.SessionName == target.Name {
+		return
+	}
+	if current := s.Sessions[client.SessionName]; current != nil && current.Attached > 0 {
+		current.Attached--
+	}
+	client.LastSessionName = client.SessionName
+	client.SessionName = target.Name
+	target.Attached++
+	target.Activity = time.Now()
+}
+
 func (s *Server) ListClients() []Client {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -1735,6 +1818,13 @@ func (s *Server) ListClients() []Client {
 		return clients[i].ID < clients[j].ID
 	})
 	return clients
+}
+
+func (s *Server) ClientExists(id int64) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.Clients[id] != nil
 }
 
 func (s *Server) SetClientSize(id int64, width, height int) {

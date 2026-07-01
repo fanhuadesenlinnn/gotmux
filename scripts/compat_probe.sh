@@ -144,6 +144,7 @@ compare "list-commands lock-server format" list-commands -F "#{command_list_name
 compare "list-commands lock-session format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" locks
 compare "list-commands lock-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" lockc
 compare "list-commands refresh-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" refresh
+compare "list-commands switch-client format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" switchc
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
 compare "list-commands pipe-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" pipep
@@ -159,6 +160,8 @@ compare "lock-session alias command" locks -t compat
 compare_status "lock-session missing" lock-session -t missing
 compare_status "lock-client no current client" lock-client
 compare_status "refresh-client no current client" refresh-client
+compare_status "switch-client no current client" switch-client -t compat
+compare_status "switch-client missing client" switch-client -c missing -t compat
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
 compare "run-shell background" run-shell -b "printf beta"
