@@ -568,6 +568,37 @@ func TestNewWindowDetachedAndPrint(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "newwd"}, "newwd", 80, 24)
 }
 
+func TestRespawnPaneAndWindow(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "respawn", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"respawn-pane", "-t", "respawn:0.0", "/bin/sh"}, "respawn", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "still active") {
+		t.Fatalf("respawn-pane without -k = %#v", msg)
+	}
+	msg = rt.execute([]string{"respawnp", "-k", "-t", "respawn:0.0", "/bin/sh"}, "respawn", 80, 24)
+	if !msg.OK {
+		t.Fatalf("respawn-pane -k failed: %s", msg.Text)
+	}
+	panes := rt.execute([]string{"list-panes", "-t", "respawn", "-F", "#{pane_index}:#{pane_active}"}, "respawn", 80, 24)
+	if panes.Text != "0:1" {
+		t.Fatalf("panes after respawn-pane = %q", panes.Text)
+	}
+	if msg = rt.execute([]string{"split-window", "-t", "respawn", "-h", "/bin/sh"}, "respawn", 80, 24); !msg.OK {
+		t.Fatalf("split-window failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"respawnw", "-k", "-t", "respawn:0", "/bin/sh"}, "respawn", 80, 24)
+	if !msg.OK {
+		t.Fatalf("respawn-window -k failed: %s", msg.Text)
+	}
+	panes = rt.execute([]string{"list-panes", "-t", "respawn", "-F", "#{pane_index}:#{pane_active}"}, "respawn", 80, 24)
+	if panes.Text != "0:1" {
+		t.Fatalf("panes after respawn-window = %q", panes.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "respawn"}, "respawn", 80, 24)
+}
+
 func TestSplitWindowDetachedAndPrint(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	if msg := rt.execute([]string{"new-session", "-d", "-s", "splitd", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {

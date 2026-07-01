@@ -128,6 +128,8 @@ compare "list-commands alias query" lscm -F "#{command_list_name}:#{command_list
 compare "list-commands start-server format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" start
 compare "list-commands wait-for format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" wait
 compare "list-commands prompt history format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" showphist
+compare "list-commands respawn-pane format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnp
+compare "list-commands respawn-window format" list-commands -F "#{command_list_name}:#{command_list_alias}:#{command_list_usage}" respawnw
 compare "start-server command" start-server
 compare "run-shell stdout" run-shell "printf alpha"
 compare "run-shell alias stderr" run -E "printf err >&2"
@@ -487,6 +489,14 @@ compare "new-window detached command" new-window -d -t newwd -n second /bin/sh
 compare "new-window detached windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
 compare "new-window print command" new-window -P -F "#{window_index}:#{window_name}" -t newwd -n third /bin/sh
 compare "new-window print windows" list-windows -t newwd -F "#{window_index}:#{window_name}:#{window_active}"
+
+"${tmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh >/dev/null
+compare "respawn-pane command" respawn-pane -k -t respawn:0.0 /bin/sh
+"${tmux_cmd[@]}" split-window -t respawn -h /bin/sh
+"${gotmux_cmd[@]}" split-window -t respawn -h /bin/sh >/dev/null
+compare "respawn-window command" respawn-window -k -t respawn:0 /bin/sh
+compare "respawn-window panes" list-panes -t respawn -F "#{pane_index}:#{pane_active}"
 
 "${tmux_cmd[@]}" new-session -d -s splitd -x 80 -y 24 -n first /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s splitd -x 80 -y 24 -n first /bin/sh >/dev/null

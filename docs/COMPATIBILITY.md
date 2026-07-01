@@ -14,7 +14,7 @@ manual verification note.
 | Detached sessions | Implemented |
 | `new-session` output | Implemented for tmux-style quiet default and basic `-P`/`-F` print output |
 | Attach/detach | Implemented |
-| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, basic `resize-window`, and basic `move-window`/renumber |
+| Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic `split-window -d`/`-P`, basic `resize-window`, basic `move-window`/renumber, and basic `respawn-pane`/`respawn-window -k` |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |

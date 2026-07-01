@@ -148,8 +148,12 @@ func (rt *Runtime) handleCommand(conn *protocol.Conn, msg protocol.Message) {
 }
 
 func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
-	if pane == nil || pane.PTY != nil || pane.Exited {
+	if pane == nil || pane.PTY != nil {
 		return nil
+	}
+	if pane.Exited {
+		pane.Exited = false
+		pane.ExitState = ""
 	}
 	if width <= 0 {
 		width = 80
@@ -190,11 +194,16 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	pane.Process = cmd
 	pane.Width = paneWidth
 	pane.Height = paneHeight
+	pane.Generation++
+	generation := pane.Generation
 	rt.ensurePaneScreen(pane, paneWidth, paneHeight)
 
-	go rt.readPane(pane)
+	go rt.readPane(pane, file, generation)
 	go func() {
 		err := cmd.Wait()
+		if pane.Generation != generation {
+			return
+		}
 		if err != nil {
 			pane.ExitState = err.Error()
 		} else {
@@ -206,10 +215,13 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 	return nil
 }
 
-func (rt *Runtime) readPane(pane *model.Pane) {
+func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {
 	buf := make([]byte, 32*1024)
 	for {
-		n, err := pane.PTY.Read(buf)
+		n, err := file.Read(buf)
+		if pane.Generation != generation {
+			return
+		}
 		if n > 0 {
 			data := append([]byte(nil), buf[:n]...)
 			pane.History.Write(data)

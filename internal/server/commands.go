@@ -68,6 +68,8 @@ var commandInfos = []commandInfo{
 	{Name: "rename-window", Alias: "renamew", Usage: "[-t target-window] new-name"},
 	{Name: "resize-pane", Alias: "resizep", Usage: "[-DLMRTUZ] [-x width] [-y height] [-t target-pane] [adjustment]"},
 	{Name: "resize-window", Alias: "resizew", Usage: "[-aADLRU] [-x width] [-y height] [-t target-window] [adjustment]"},
+	{Name: "respawn-pane", Alias: "respawnp", Usage: "[-k] [-c start-directory] [-e environment] [-t target-pane] [shell-command [argument ...]]"},
+	{Name: "respawn-window", Alias: "respawnw", Usage: "[-k] [-c start-directory] [-e environment] [-t target-window] [shell-command [argument ...]]"},
 	{Name: "rotate-window", Alias: "rotatew", Usage: "[-DUZ] [-t target-window]"},
 	{Name: "run-shell", Alias: "run", Usage: "[-bCE] [-c start-directory] [-d delay] [-t target-pane] [shell-command [argument ...]]"},
 	{Name: "save-buffer", Alias: "saveb", Usage: "[-a] [-b buffer-name] path"},
@@ -288,6 +290,10 @@ func (rt *Runtime) execute(argv []string, currentSession string, width, height i
 		return rt.cmdResizePane(args, currentSession)
 	case "resize-window":
 		return rt.cmdResizeWindow(args, currentSession)
+	case "respawn-pane":
+		return rt.cmdRespawnPane(args, currentSession, width, height)
+	case "respawn-window":
+		return rt.cmdRespawnWindow(args, currentSession, width, height)
 	case "next-layout":
 		return rt.cmdApplyLayout(args, currentSession, "", "next")
 	case "previous-layout":
@@ -612,6 +618,50 @@ func (rt *Runtime) cmdResizeWindow(args []string, currentSession string) protoco
 	if len(paneIDs) > 0 {
 		rt.resizePanes(rt.state.WindowPanesContainingPane(paneIDs[0]))
 	}
+	return ok("")
+}
+
+func (rt *Runtime) cmdRespawnPane(args []string, currentSession string, width, height int) protocol.Message {
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-t": true})
+	respawned, err := rt.state.RespawnPaneByID(pane.ID, optionValue(args, "-c", ""), command, hasAny(args, "-k"))
+	if err != nil {
+		return fail("respawn pane failed: " + err.Error())
+	}
+	rt.screensMu.Lock()
+	delete(rt.screens, respawned.ID)
+	rt.screensMu.Unlock()
+	if err := rt.startPane(respawned, width, height); err != nil {
+		return fail(err.Error())
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(respawned.ID))
+	return ok("")
+}
+
+func (rt *Runtime) cmdRespawnWindow(args []string, currentSession string, width, height int) protocol.Message {
+	sessionName, windowIndex, _, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find window")
+	}
+	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-t": true})
+	pane, killed, err := rt.state.RespawnWindowByIndex(sessionName, windowIndex, optionValue(args, "-c", ""), command, hasAny(args, "-k"))
+	if err != nil {
+		return fail("respawn window failed: " + err.Error())
+	}
+	rt.screensMu.Lock()
+	delete(rt.screens, pane.ID)
+	for _, paneID := range killed {
+		delete(rt.screens, paneID)
+	}
+	rt.screensMu.Unlock()
+	rt.state.SetActiveWindowSize(sessionName, width, height)
+	if err := rt.startPane(pane, width, height); err != nil {
+		return fail(err.Error())
+	}
+	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
 	return ok("")
 }
 
@@ -1856,6 +1906,10 @@ func normalizeCommandName(name string) string {
 		return "resize-pane"
 	case "resizew":
 		return "resize-window"
+	case "respawnp":
+		return "respawn-pane"
+	case "respawnw":
+		return "respawn-window"
 	case "selectl":
 		return "select-layout"
 	case "run":
@@ -1868,7 +1922,7 @@ func normalizeCommandName(name string) string {
 		"send-keys", "display-message", "capture-pane", "clear-history", "clear-prompt-history", "detach-client", "version",
 		"source-file", "set-option", "set-window-option", "show-options", "show-window-options",
 		"bind-key", "unbind-key", "list-keys", "set-environment",
-		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
+		"show-environment", "if-shell", "send-prefix", "resize-pane", "resize-window", "respawn-pane", "respawn-window", "last-window", "last-pane", "next-layout", "previous-layout", "select-layout",
 		"swap-pane", "rotate-window", "run-shell", "break-pane", "join-pane", "move-pane",
 		"set-buffer", "show-buffer", "list-buffers", "delete-buffer",
 		"paste-buffer", "load-buffer", "save-buffer", "list-clients", "list-commands", "show-prompt-history", "start-server", "wait-for":

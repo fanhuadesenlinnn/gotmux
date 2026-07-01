@@ -64,22 +64,23 @@ type Window struct {
 }
 
 type Pane struct {
-	ID        int
-	Index     int
-	Command   []string
-	Env       []string
-	CWD       string
-	Left      int
-	Top       int
-	Width     int
-	Height    int
-	CreatedAt time.Time
-	Activity  time.Time
-	PTY       *os.File
-	Process   *exec.Cmd
-	History   *Ring
-	Exited    bool
-	ExitState string
+	ID         int
+	Index      int
+	Command    []string
+	Env        []string
+	CWD        string
+	Left       int
+	Top        int
+	Width      int
+	Height     int
+	CreatedAt  time.Time
+	Activity   time.Time
+	PTY        *os.File
+	Process    *exec.Cmd
+	History    *Ring
+	Exited     bool
+	ExitState  string
+	Generation int
 }
 
 type LayoutNode struct {
@@ -414,6 +415,64 @@ func (s *Server) KillOtherPanesByID(paneID int) ([]int, error) {
 	location.window.Activity = time.Now()
 	location.session.Activity = time.Now()
 	return killed, nil
+}
+
+func (s *Server) RespawnPaneByID(paneID int, cwd string, command []string, killActive bool) (*Pane, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return nil, fmt.Errorf("can't find pane: %d", paneID)
+	}
+	if location.pane.PTY != nil && !location.pane.Exited && !killActive {
+		return nil, fmt.Errorf("pane still active")
+	}
+	respawnPaneLocked(location.session, location.window, location.pane, cwd, command, killActive)
+	return location.pane, nil
+}
+
+func (s *Server) RespawnWindowByIndex(sessionName string, windowIndex int, cwd string, command []string, killActive bool) (*Pane, []int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session := s.Sessions[sessionName]
+	if session == nil {
+		return nil, nil, fmt.Errorf("can't find session: %s", sessionName)
+	}
+	var window *Window
+	for _, candidate := range session.Windows {
+		if candidate.Index == windowIndex {
+			window = candidate
+			break
+		}
+	}
+	if window == nil {
+		return nil, nil, fmt.Errorf("can't find window: %d", windowIndex)
+	}
+	pane := window.ActivePane()
+	if pane == nil {
+		return nil, nil, fmt.Errorf("window has no active pane")
+	}
+	if pane.PTY != nil && !pane.Exited && !killActive {
+		return nil, nil, fmt.Errorf("window still active")
+	}
+	killed := make([]int, 0, len(window.Panes)-1)
+	for _, other := range window.Panes {
+		if other.ID == pane.ID {
+			continue
+		}
+		killed = append(killed, other.ID)
+		killPane(other)
+	}
+	window.Panes = []*Pane{pane}
+	window.Active = 0
+	window.LastPaneID = 0
+	pane.Index = 0
+	window.Layout = &LayoutNode{PaneID: pane.ID}
+	respawnPaneLocked(session, window, pane, cwd, command, killActive)
+	window.recalculateLayout()
+	return pane, killed, nil
 }
 
 func (s *Server) BreakPaneByID(paneID int, name string, detached bool) (*Session, *Window, *Pane, error) {
@@ -2829,6 +2888,30 @@ func killPane(pane *Pane) {
 		_ = pane.Process.Process.Kill()
 	}
 	pane.Exited = true
+}
+
+func respawnPaneLocked(session *Session, window *Window, pane *Pane, cwd string, command []string, killActive bool) {
+	if killActive {
+		killPane(pane)
+	}
+	if cwd != "" {
+		pane.CWD = cwd
+	}
+	if len(command) > 0 {
+		pane.Command = NormalizeCommand(command)
+	}
+	pane.PTY = nil
+	pane.Process = nil
+	pane.History = NewRing(HistoryBytes)
+	pane.Exited = false
+	pane.ExitState = ""
+	pane.Activity = time.Now()
+	if window != nil {
+		window.Activity = time.Now()
+	}
+	if session != nil {
+		session.Activity = time.Now()
+	}
 }
 
 func reindexPanes(window *Window) {
