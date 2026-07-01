@@ -180,7 +180,7 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		}
 		return ok("")
 	case "list-sessions":
-		return ok(listSessionsFormat(rt.state, optionValue(args, "-F", "")))
+		return ok(listSessionsCommand(rt.state, args))
 	case "list-windows":
 		return ok(listWindowsCommand(rt.state, args, currentSession))
 	case "list-panes":
@@ -2323,15 +2323,27 @@ func listSessions(state *model.Server) string {
 	return listSessionsFormat(state, format)
 }
 
+func listSessionsCommand(state *model.Server, args []string) string {
+	return listSessionsFormatFiltered(state, optionValue(args, "-F", ""), optionValue(args, "-f", ""))
+}
+
 func listSessionsFormat(state *model.Server, format string) string {
+	return listSessionsFormatFiltered(state, format, "")
+}
+
+func listSessionsFormatFiltered(state *model.Server, format string, filter string) string {
 	sessions := snapshotSessions(state)
 	if len(sessions) == 0 {
 		return ""
 	}
 	lines := make([]string, 0, len(sessions))
 	for _, session := range sessions {
+		ctx := formatContext{session: session, window: session.ActiveWindow(), pane: activePane(session)}
+		if filter != "" && !formatTruthy(filter, ctx) {
+			continue
+		}
 		if format != "" {
-			lines = append(lines, formatString(format, formatContext{session: session, window: session.ActiveWindow(), pane: activePane(session)}))
+			lines = append(lines, formatString(format, ctx))
 		} else {
 			lines = append(lines, fmt.Sprintf("%s: %d windows (created %s) [%dx%d]",
 				session.Name, len(session.Windows), session.CreatedAt.Format("Mon Jan _2 15:04:05 2006"), activeWidth(session), activeHeight(session)))
@@ -2346,17 +2358,22 @@ func listWindows(state *model.Server, sessionName string) string {
 
 func listWindowsCommand(state *model.Server, args []string, currentSession string) string {
 	format := optionValue(args, "-F", "")
+	filter := optionValue(args, "-f", "")
 	if hasAny(args, "-a") {
 		lines := make([]string, 0)
 		for _, session := range snapshotSessions(state) {
-			lines = append(lines, listWindowsForSession(session, format, true)...)
+			lines = append(lines, listWindowsForSession(session, format, filter, true)...)
 		}
 		return strings.Join(lines, "\n")
 	}
-	return listWindowsFormat(state, targetSession(args, currentSession), format)
+	return listWindowsFormatFiltered(state, targetSession(args, currentSession), format, filter)
 }
 
 func listWindowsFormat(state *model.Server, sessionName string, format string) string {
+	return listWindowsFormatFiltered(state, sessionName, format, "")
+}
+
+func listWindowsFormatFiltered(state *model.Server, sessionName string, format string, filter string) string {
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
 	}
@@ -2364,16 +2381,20 @@ func listWindowsFormat(state *model.Server, sessionName string, format string) s
 		if session.Name != sessionName {
 			continue
 		}
-		return strings.Join(listWindowsForSession(session, format, false), "\n")
+		return strings.Join(listWindowsForSession(session, format, filter, false), "\n")
 	}
 	return ""
 }
 
-func listWindowsForSession(session *model.Session, format string, includeSession bool) []string {
+func listWindowsForSession(session *model.Session, format string, filter string, includeSession bool) []string {
 	lines := make([]string, 0, len(session.Windows))
 	for _, window := range session.Windows {
+		ctx := formatContext{session: session, window: window, pane: window.ActivePane()}
+		if filter != "" && !formatTruthy(filter, ctx) {
+			continue
+		}
 		if format != "" {
-			lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: window.ActivePane()}))
+			lines = append(lines, formatString(format, ctx))
 			continue
 		}
 		mark := ""
@@ -2396,11 +2417,12 @@ func listPanes(state *model.Server, sessionName string) string {
 
 func listPanesCommand(state *model.Server, args []string, currentSession string) string {
 	format := optionValue(args, "-F", "")
+	filter := optionValue(args, "-f", "")
 	if hasAny(args, "-a") {
 		lines := make([]string, 0)
 		for _, session := range snapshotSessions(state) {
 			for _, window := range session.Windows {
-				lines = append(lines, listPanesForWindow(session, window, format, true, true)...)
+				lines = append(lines, listPanesForWindow(session, window, format, filter, true, true)...)
 			}
 		}
 		return strings.Join(lines, "\n")
@@ -2419,16 +2441,20 @@ func listPanesCommand(state *model.Server, args []string, currentSession string)
 			}
 			lines := make([]string, 0)
 			for _, window := range session.Windows {
-				lines = append(lines, listPanesForWindow(session, window, format, false, true)...)
+				lines = append(lines, listPanesForWindow(session, window, format, filter, false, true)...)
 			}
 			return strings.Join(lines, "\n")
 		}
 		return ""
 	}
-	return listPanesFormat(state, targetSession(args, currentSession), format)
+	return listPanesFormatFiltered(state, targetSession(args, currentSession), format, filter)
 }
 
 func listPanesFormat(state *model.Server, sessionName string, format string) string {
+	return listPanesFormatFiltered(state, sessionName, format, "")
+}
+
+func listPanesFormatFiltered(state *model.Server, sessionName string, format string, filter string) string {
 	if sessionName == "" {
 		sessionName = firstSessionName(state)
 	}
@@ -2456,16 +2482,20 @@ func listPanesFormat(state *model.Server, sessionName string, format string) str
 		if window == nil {
 			return ""
 		}
-		return strings.Join(listPanesForWindow(session, window, format, false, false), "\n")
+		return strings.Join(listPanesForWindow(session, window, format, filter, false, false), "\n")
 	}
 	return ""
 }
 
-func listPanesForWindow(session *model.Session, window *model.Window, format string, includeSession bool, includeWindow bool) []string {
+func listPanesForWindow(session *model.Session, window *model.Window, format string, filter string, includeSession bool, includeWindow bool) []string {
 	lines := make([]string, 0, len(window.Panes))
 	for _, pane := range window.Panes {
+		ctx := formatContext{session: session, window: window, pane: pane}
+		if filter != "" && !formatTruthy(filter, ctx) {
+			continue
+		}
 		if format != "" {
-			lines = append(lines, formatString(format, formatContext{session: session, window: window, pane: pane}))
+			lines = append(lines, formatString(format, ctx))
 			continue
 		}
 		mark := ""

@@ -11,7 +11,9 @@ specific as each area gets implemented.
 - Match simple format output for `list-sessions`, `list-windows`,
   `list-panes`, and `display-message`.
 
-Status: complete for the current probe subset.
+Status: complete for the current probe subset, including basic truthy
+`list-sessions`/`list-windows`/`list-panes -f` filters over implemented format
+fields.
 
 ## Phase 2: Command Language and Configuration
 

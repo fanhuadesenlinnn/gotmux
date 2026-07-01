@@ -17,7 +17,7 @@ manual verification note.
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, `unlink-window -k`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic floating `new-pane`/`newp`, basic `split-window -d`/`-P`, basic `resize-window`, basic `move-window`/renumber, and basic `respawn-pane`/`respawn-window -k` |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
-| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
+| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic client listing | Implemented for `list-clients`/`lsc` over attached gotmux clients with basic format fields; the probe covers tmux-compatible empty detached-server output |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | Basic command metadata | Implemented for `list-commands`/`lscm` over currently supported commands plus `start-server`; the probe covers formatted command-list fields and alias lookup |
@@ -50,6 +50,7 @@ manual verification note.
 | --- | --- |
 | Full command parser | Advanced tmux quoting, parse-time formats, command queues, `%if`, includes, and full target resolution are incomplete. |
 | Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
+| Full list filtering | Basic truthy filters over implemented format fields exist, but tmux's full format expression language for `-f` filters is incomplete. |
 | Full layout rendering | Pane geometry and basic redraw exist for a small subset, but full layout algorithms, complete floating pane behavior, tmux-style border cells, zoom, custom layouts, and pane movement are incomplete. |
 | Screen model | A basic grid, common CSI parser, alternate-screen switching, and a separate byte history ring exist, but full tmux-style scrollback grid, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
 | Copy mode | Not implemented. |

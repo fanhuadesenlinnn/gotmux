@@ -42,6 +42,11 @@ func formatString(template string, ctx formatContext) string {
 	return out
 }
 
+func formatTruthy(template string, ctx formatContext) bool {
+	value := strings.TrimSpace(formatString(template, ctx))
+	return value != "" && value != "0"
+}
+
 func formatValue(key string, ctx formatContext) string {
 	switch key {
 	case "session_name":

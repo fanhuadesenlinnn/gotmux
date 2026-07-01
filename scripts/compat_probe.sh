@@ -193,6 +193,9 @@ compare "display-message message" display-message -p -t compat "hello #{session_
 compare "list-windows all sessions" list-windows -a -F "#{session_name}:#{window_index}:#{window_name}"
 compare "list-panes session scope" list-panes -s -t lsta -F "#{session_name}:#{window_index}:#{pane_index}"
 compare "list-panes all sessions" list-panes -a -F "#{session_name}:#{window_index}:#{pane_index}"
+compare "list-windows active filter" list-windows -t lsta -f "#{window_active}" -F "#{window_index}:#{window_name}:#{window_active}"
+compare "list-panes active filter" list-panes -t lsta -f "#{pane_active}" -F "#{pane_index}:#{pane_active}"
+compare "list-sessions attached filter" list-sessions -f "#{session_attached}" -F "#{session_name}:#{session_attached}"
 
 "${tmux_cmd[@]}" new-session -d -s sendt -x 20 -y 4 /bin/sh
 "${tmux_cmd[@]}" split-window -t sendt -h /bin/sh

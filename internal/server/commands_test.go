@@ -94,6 +94,18 @@ func TestListWindowsAndPanesAllScopes(t *testing.T) {
 	if panes.Text != "lsta:0:0\nlsta:0:1\nlsta:1:0\nlstb:0:0" {
 		t.Fatalf("list-panes -a = %q", panes.Text)
 	}
+	windows = rt.execute([]string{"list-windows", "-t", "lsta", "-f", "#{window_active}", "-F", "#{window_index}:#{window_name}:#{window_active}"}, "", 80, 24)
+	if windows.Text != "1:second:1" {
+		t.Fatalf("list-windows -f active = %q", windows.Text)
+	}
+	panes = rt.execute([]string{"list-panes", "-t", "lsta", "-f", "#{pane_active}", "-F", "#{pane_index}:#{pane_active}"}, "", 80, 24)
+	if panes.Text != "0:1" {
+		t.Fatalf("list-panes -f active = %q", panes.Text)
+	}
+	sessions := rt.execute([]string{"list-sessions", "-f", "#{session_attached}", "-F", "#{session_name}:#{session_attached}"}, "", 80, 24)
+	if sessions.Text != "" {
+		t.Fatalf("list-sessions -f attached = %q", sessions.Text)
+	}
 	_ = rt.execute([]string{"kill-session", "-t", "lsta"}, "lsta", 80, 24)
 	_ = rt.execute([]string{"kill-session", "-t", "lstb"}, "lstb", 80, 24)
 }
