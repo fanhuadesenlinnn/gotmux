@@ -116,6 +116,23 @@ compare_key_line() {
   printf 'ok %s\n' "${name}"
 }
 
+compare_note_line() {
+  local name="$1"
+  local key="$2"
+  local tmux_output gotmux_output
+  tmux_output="$("${tmux_cmd[@]}" list-keys -N | sed -E 's/[[:space:]]+/ /g' | awk -v key="${key}" '$1 == "C-b" && $2 == key { print }')"
+  gotmux_output="$("${gotmux_cmd[@]}" list-keys -N | sed -E 's/[[:space:]]+/ /g' | awk -v key="${key}" '$1 == "C-b" && $2 == key { print }')"
+  if [[ "${tmux_output}" != "${gotmux_output}" ]]; then
+    echo "compat probe failed: ${name}" >&2
+    echo "--- tmux" >&2
+    printf '%s\n' "${tmux_output}" >&2
+    echo "--- gotmux" >&2
+    printf '%s\n' "${gotmux_output}" >&2
+    exit 1
+  fi
+  printf 'ok %s\n' "${name}"
+}
+
 wait_file_contains() {
   local file="$1"
   local needle="$2"
@@ -737,8 +754,11 @@ compare "untouched target window option" showw -t opttarget:0 -v mode-keys
 
 "${tmux_cmd[@]}" bind-key C-a send-prefix
 "${gotmux_cmd[@]}" bind-key C-a send-prefix >/dev/null
+"${tmux_cmd[@]}" bind-key -N "reload config" C-r source-file ~/.tmux.conf
+"${gotmux_cmd[@]}" bind-key -N "reload config" C-r source-file ~/.tmux.conf >/dev/null
 compare_key_line "default refresh binding" r
 compare_key_line "list custom key" C-a
+compare_note_line "list custom key note" C-r
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null

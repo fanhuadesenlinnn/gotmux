@@ -1626,6 +1626,9 @@ func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
 		}
 		return bindings[i].Table < bindings[j].Table
 	})
+	if hasAny(args, "-N") {
+		return ok(rt.listKeyNotes(bindings))
+	}
 	var lines []string
 	for _, binding := range bindings {
 		if len(filterKeys) > 0 && binding.Key != filterKeys[0] {
@@ -1641,6 +1644,27 @@ func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
 		}
 	}
 	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) listKeyNotes(bindings []model.KeyBinding) string {
+	prefix := "C-b"
+	if options, err := rt.state.OptionsTarget("global", "", 0, false, true); err == nil {
+		if value := options["prefix"]; value != "" {
+			prefix = value
+		}
+	}
+	lines := make([]string, 0)
+	for _, binding := range bindings {
+		if binding.Note == "" {
+			continue
+		}
+		key := binding.Key
+		if binding.Table == "prefix" {
+			key = prefix + " " + key
+		}
+		lines = append(lines, fmt.Sprintf("%-12s %s", key, binding.Note))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (rt *Runtime) cmdListCommands(args []string) protocol.Message {

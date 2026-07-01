@@ -317,9 +317,17 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if !msg.OK {
 		t.Fatalf("bind failed: %s", msg.Text)
 	}
+	msg = rt.execute([]string{"bind-key", "-N", "reload config", "C-r", "source-file", "~/.tmux.conf"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind note failed: %s", msg.Text)
+	}
 	msg = rt.execute([]string{"list-keys", "-T", "prefix"}, "", 80, 24)
 	if !strings.Contains(msg.Text, "C-a send-prefix") {
 		t.Fatalf("list-keys missing binding: %q", msg.Text)
+	}
+	msg = rt.execute([]string{"list-keys", "-N"}, "", 80, 24)
+	if !strings.Contains(msg.Text, "C-b C-r") || !strings.Contains(msg.Text, "reload config") {
+		t.Fatalf("list-keys -N missing note: %q", msg.Text)
 	}
 }
 
