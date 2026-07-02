@@ -81,13 +81,16 @@ returns tmux's single-link error. Basic `link-window` links a window into
 another session or index, supports `-d` and `-k` in the probed subset, and
 plain `unlink-window` now removes linked windows without killing the shared
 pane state. Basic `respawn-pane -k` and `respawn-window -k` restart targeted
-panes/windows.
+panes/windows. Pane process exit now follows tmux's default cleanup path for
+the probed subset: exited panes are removed, and an empty window/session is
+closed.
 Geometry is compared with tmux through `scripts/compat_probe.sh`;
 custom layout strings, old-layout restore, marked pane defaults, complete
 floating pane movement and mode behavior, target-index pane moves, join/move
 size and placement flags, tmux-style border
-rendering, zoom, full winlink/session-group semantics, and pane movement
-commands remain.
+rendering, zoom, `remain-on-exit`, pane-died hooks, automatic all-session server
+shutdown, full winlink/session-group semantics, and pane movement commands
+remain.
 
 ## Phase 5: Modes, Buffers, and Input
 

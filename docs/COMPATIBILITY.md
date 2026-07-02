@@ -15,6 +15,7 @@ manual verification note.
 | `new-session` output | Implemented for tmux-style quiet default and basic `-P`/`-F` print output |
 | Attach/detach | Implemented |
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, basic `link-window`/`linkw`, linked `unlink-window`, `unlink-window -k`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic floating `new-pane`/`newp`, basic `split-window -d`/`-P`, basic `resize-window`, basic `move-window`/renumber, and basic `respawn-pane`/`respawn-window -k` |
+| Basic pane process lifecycle | Implemented for tmux-style default cleanup when a pane process exits, including removing the exited pane and closing the window/session when it was the last pane; the probe covers multi-pane exit cleanup |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
 | Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
@@ -65,6 +66,7 @@ manual verification note.
 | Full environment semantics | `update-environment` integration and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
 | Status format language | Only a simple status line is implemented. |
+| Full pane process lifecycle | Basic process exit cleanup exists, but `remain-on-exit`, pane-died hooks, automatic server shutdown when all sessions disappear, and all edge-case notifications remain incomplete. |
 | Full hooks and jobs | Basic hook storage/display is implemented, but hook firing, hook context formats, after-hook ordering, and complete hook side effects remain incomplete; jobs are limited to the basic `run-shell` subset. |
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |
 | Message log | `show-messages` does not yet keep tmux-style timestamped command/message history. |

@@ -172,6 +172,15 @@ rm -f "${tmux_shell_opts_file}" "${gotmux_shell_opts_file}"
 compare "new-session detached output" new-session -d -s newsout -n first /bin/sh
 compare "new-session print output" new-session -d -P -F "#{session_name}:#{window_index}.#{pane_index}" -s newsp -n first /bin/sh
 
+"${tmux_cmd[@]}" new-session -d -s paneexit -x 80 -y 24 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s paneexit -x 80 -y 24 /bin/sh >/dev/null
+"${tmux_cmd[@]}" split-window -t paneexit -h /bin/sh -c "exit 0"
+"${gotmux_cmd[@]}" split-window -t paneexit -h /bin/sh -c "exit 0" >/dev/null
+sleep 0.3
+compare "pane exit removes pane" list-panes -t paneexit -F "#{pane_index}:#{pane_active}"
+"${tmux_cmd[@]}" kill-session -t paneexit
+"${gotmux_cmd[@]}" kill-session -t paneexit >/dev/null
+
 compare "list-sessions formats" list-sessions -F "#{session_name}:#{session_windows}:#{session_attached}"
 compare "list-windows formats" list-windows -t compat -F "#{window_index}:#{window_name}:#{window_panes}:#{window_active}"
 compare "list-panes formats" list-panes -t compat -F "#{pane_index}:#{pane_active}"

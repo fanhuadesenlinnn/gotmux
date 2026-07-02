@@ -135,6 +135,13 @@ type ServerAccess struct {
 	Write bool
 }
 
+type PaneExitResult struct {
+	Removed       bool
+	SessionName   string
+	SessionClosed bool
+	ClientIDs     []int64
+}
+
 type Hook struct {
 	Name     string
 	Commands []string
@@ -555,6 +562,30 @@ func (s *Server) KillPaneByID(paneID int) error {
 		}
 	}
 	return fmt.Errorf("can't find pane: %d", paneID)
+}
+
+func (s *Server) ClosePaneOnExit(paneID int, exitState string) PaneExitResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return PaneExitResult{}
+	}
+	result := PaneExitResult{
+		Removed:       true,
+		SessionName:   location.session.Name,
+		SessionClosed: len(location.session.Windows) == 1 && len(location.window.Panes) == 1,
+	}
+	for _, client := range s.Clients {
+		if client.SessionName == location.session.Name {
+			result.ClientIDs = append(result.ClientIDs, client.ID)
+		}
+	}
+	location.pane.Exited = true
+	location.pane.ExitState = exitState
+	s.killPaneAtLocked(location.session, location.window, location.paneIndex)
+	return result
 }
 
 func (s *Server) KillOtherPanesByID(paneID int) ([]int, error) {
@@ -3728,6 +3759,7 @@ func killPane(pane *Pane) {
 	if pane == nil {
 		return
 	}
+	pane.Generation++
 	if pane.PTY != nil {
 		_ = pane.PTY.Close()
 	}

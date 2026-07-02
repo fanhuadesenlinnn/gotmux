@@ -212,15 +212,35 @@ func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
 		if pane.Generation != generation {
 			return
 		}
+		exitState := "exited"
 		if err != nil {
-			pane.ExitState = err.Error()
-		} else {
-			pane.ExitState = "exited"
+			exitState = err.Error()
 		}
-		pane.Exited = true
-		rt.broadcastStatus()
+		rt.closePaneAfterExit(pane.ID, exitState)
 	}()
 	return nil
+}
+
+func (rt *Runtime) closePaneAfterExit(paneID int, exitState string) {
+	result := rt.state.ClosePaneOnExit(paneID, exitState)
+	if !result.Removed {
+		return
+	}
+	rt.screensMu.Lock()
+	delete(rt.screens, paneID)
+	rt.screensMu.Unlock()
+	rt.closePanePipe(paneID)
+	if result.SessionClosed {
+		for _, clientID := range result.ClientIDs {
+			rt.detachClient(clientID, "session closed")
+		}
+		return
+	}
+	rt.resizeSessionPanes(result.SessionName)
+	for _, clientID := range result.ClientIDs {
+		rt.redrawClient(clientID)
+	}
+	rt.broadcastStatus()
 }
 
 func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {

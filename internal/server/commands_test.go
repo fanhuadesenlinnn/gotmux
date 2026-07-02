@@ -1481,7 +1481,7 @@ func TestPaneEnvironmentOverrides(t *testing.T) {
 
 func TestShellCommandOptionsStayInTrailingCommand(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
-	shellCommand := []string{"/bin/sh", "-c", "sleep 0.1"}
+	shellCommand := []string{"/bin/sh", "-c", "sleep 1"}
 	msg := rt.execute(append([]string{"new-session", "-d", "-s", "shellopts"}, shellCommand...), "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("new-session shell command failed: %s", msg.Text)
@@ -1512,6 +1512,43 @@ func TestShellCommandOptionsStayInTrailingCommand(t *testing.T) {
 		t.Fatalf("run-shell trailing option output = %#v, want -c", msg)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "shellopts"}, "shellopts", 80, 24)
+}
+
+func TestPaneExitClosesPaneAndSession(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "exitclose", "/bin/sh", "-c", "exit 0"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session exit command failed: %s", msg.Text)
+	}
+	waitForTestCondition(t, time.Second, func() bool {
+		return !sessionExists(rt.state, "exitclose")
+	})
+
+	msg = rt.execute([]string{"new-session", "-d", "-s", "exitpane", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session live command failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"split-window", "-t", "exitpane", "-h", "/bin/sh", "-c", "exit 0"}, "exitpane", 80, 24)
+	if !msg.OK {
+		t.Fatalf("split-window exit command failed: %s", msg.Text)
+	}
+	waitForTestCondition(t, time.Second, func() bool {
+		panes := rt.execute([]string{"list-panes", "-t", "exitpane", "-F", "#{pane_index}:#{pane_active}"}, "exitpane", 80, 24)
+		return panes.OK && panes.Text == "0:1"
+	})
+	_ = rt.execute([]string{"kill-session", "-t", "exitpane"}, "exitpane", 80, 24)
+}
+
+func waitForTestCondition(t *testing.T, timeout time.Duration, fn func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("condition was not satisfied within %s", timeout)
 }
 
 func assertPaneCommand(t *testing.T, state *model.Server, command []string) {

@@ -25,6 +25,7 @@ This first implementation supports:
 - `kill-pane`, `kill-window`, `kill-session`, `kill-server`
 - interactive prefix key `C-b` for common window and pane operations
 - detached sessions with shell processes running in PTYs
+- tmux-style default pane cleanup when shell processes exit
 - basic tmux format expansion for `list-sessions`, `list-windows`,
   `list-panes`, and `display-message`
 - basic command sequences separated by `;`
@@ -86,6 +87,6 @@ scripts/compat_probe.sh
 
 The probe starts isolated tmux and gotmux servers, creates matching sessions,
 windows, and panes, then compares format-driven `list-*`, `display-message`,
-basic options, key bindings, `source-file`, and command sequence behavior.
+basic options, key bindings, shell exit pane cleanup, `source-file`, and command sequence behavior.
 It also checks the first pane geometry subset for split, resize, and layout
 commands.
