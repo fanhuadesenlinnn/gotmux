@@ -2008,6 +2008,44 @@ func TestAttachRedrawsContentStatusAndSplits(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "attachdraw"}, "attachdraw", 80, 24)
 }
 
+func TestAttachCanDetachOtherClients(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	if _, _, _, err := rt.state.NewSession("attachd", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	_, oldMessages := attachTestRuntimeClient(t, rt, "attachd")
+	serverConn, clientConn := net.Pipe()
+	defer clientConn.Close()
+	newProtocol := protocol.NewConn(clientConn)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		rt.handleAttach(protocol.NewConn(serverConn), protocol.Message{
+			Type:         protocol.TypeAttach,
+			Session:      "attachd",
+			Width:        40,
+			Height:       6,
+			DetachOthers: true,
+		})
+	}()
+	first, err := newProtocol.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Type != protocol.TypeResult || !first.OK {
+		t.Fatalf("new attach result = %#v", first)
+	}
+	waitForProtocolState(t, oldMessages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "detached"
+	})
+	_ = clientConn.Close()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("attach handler did not exit")
+	}
+}
+
 func TestCommandStopsServerWhenLastSessionRemoved(t *testing.T) {
 	var once sync.Once
 	stopped := make(chan struct{})

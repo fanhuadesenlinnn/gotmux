@@ -12,7 +12,7 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
-func Attach(socketPath, session string) error {
+func Attach(socketPath, session string, detachOthers bool) error {
 	conn, err := daemon.Dial(socketPath)
 	if err != nil {
 		return err
@@ -22,10 +22,11 @@ func Attach(socketPath, session string) error {
 	width, height := terminal.Size(int(os.Stdout.Fd()))
 	pc := protocol.NewConn(conn)
 	if err := pc.Write(protocol.Message{
-		Type:    protocol.TypeAttach,
-		Session: session,
-		Width:   width,
-		Height:  height,
+		Type:         protocol.TypeAttach,
+		Session:      session,
+		Width:        width,
+		Height:       height,
+		DetachOthers: detachOthers,
 	}); err != nil {
 		return err
 	}

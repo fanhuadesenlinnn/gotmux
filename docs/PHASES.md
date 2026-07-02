@@ -141,6 +141,8 @@ switching, `-n`/`-p` relative switching, `-l` last-session switching, and
 basic `-c client-N` target-client switching. Basic `detach-client` now covers
 no-current-client and missing-client errors, plus `-t client-N`,
 `-s target-session`, and `-a` detach-other-client behavior in regression tests.
+CLI attach now covers `attach-session -d` and `new-session -A -D` detaching
+other clients from the attached session.
 Full lock screens, bidirectional pipe lifecycle behavior, refresh offset/control
 behavior, full switch-client key-table/read-only/sorted-order behavior,
 detach-client `-E`/parent-signal behavior, hook execution ordering and context,

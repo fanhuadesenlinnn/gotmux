@@ -84,7 +84,7 @@ func run(args []string) int {
 			}
 			return 0
 		}
-		if err := client.Attach(socketPath, result.Session); err != nil {
+		if err := client.Attach(socketPath, result.Session, hasShortFlag(commands[0][1:], 'D')); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
@@ -95,7 +95,7 @@ func run(args []string) int {
 			return 1
 		}
 		target := optionValue(command[1:], "-t", "")
-		if err := client.Attach(socketPath, cleanTarget(target)); err != nil {
+		if err := client.Attach(socketPath, cleanTarget(target), hasShortFlag(command[1:], 'd')); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
@@ -178,11 +178,15 @@ func normalize(name string) string {
 }
 
 func detached(args []string) bool {
-	for _, arg := range args[1:] {
-		if arg == "-d" {
+	return hasShortFlag(args[1:], 'd')
+}
+
+func hasShortFlag(args []string, flag rune) bool {
+	for _, arg := range args {
+		if arg == "-"+string(flag) {
 			return true
 		}
-		if strings.HasPrefix(arg, "-") && strings.Contains(arg[1:], "d") {
+		if strings.HasPrefix(arg, "-") && strings.ContainsRune(arg[1:], flag) {
 			return true
 		}
 	}

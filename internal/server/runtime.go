@@ -120,6 +120,9 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 	rt.mu.Lock()
 	rt.clients[client.ID] = ac
 	rt.mu.Unlock()
+	if msg.DetachOthers {
+		rt.detachOtherSessionClients(session.Name, client.ID, "detached")
+	}
 	defer func() {
 		rt.mu.Lock()
 		delete(rt.clients, client.ID)
@@ -297,6 +300,15 @@ func (rt *Runtime) stopServerSoon(text string) {
 		return
 	}
 	time.AfterFunc(100*time.Millisecond, rt.stopServer)
+}
+
+func (rt *Runtime) detachOtherSessionClients(sessionName string, keepClientID int64, text string) {
+	for _, client := range rt.state.ListClients() {
+		if client.ID == keepClientID || client.SessionName != sessionName {
+			continue
+		}
+		rt.detachClient(client.ID, text)
+	}
 }
 
 func (rt *Runtime) hasSessions() bool {
