@@ -114,7 +114,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		_ = conn.Write(protocol.Message{Type: protocol.TypeError, Text: err.Error(), Code: 1})
 		return
 	}
-	rt.state.SetActiveWindowSize(session.Name, msg.Width, max(1, msg.Height-1))
+	rt.state.SetActiveWindowSize(session.Name, msg.Width, rt.clientContentHeight(client.ID))
 	ac := &attachedClient{id: client.ID, conn: conn, done: make(chan struct{})}
 	rt.mu.Lock()
 	rt.clients[client.ID] = ac
@@ -142,7 +142,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		case protocol.TypeResize:
 			rt.state.SetClientSize(client.ID, next.Width, next.Height)
 			sessionName := rt.state.ActiveSessionName(client.ID)
-			rt.state.SetActiveWindowSize(sessionName, next.Width, max(1, next.Height-1))
+			rt.state.SetActiveWindowSize(sessionName, next.Width, rt.clientContentHeight(client.ID))
 			rt.resizeSessionPanes(sessionName)
 			rt.redrawClient(client.ID)
 		case protocol.TypeDetach:
@@ -502,8 +502,8 @@ func (rt *Runtime) redrawClient(clientID int64) {
 }
 
 func (rt *Runtime) renderClientContent(clientID int64, client *attachedClient, panes []*model.Pane) {
-	width, height := rt.state.ClientSize(clientID)
-	contentHeight := max(1, height-1)
+	width, _ := rt.state.ClientSize(clientID)
+	contentHeight := rt.clientContentHeight(clientID)
 	sessionName := rt.state.ActiveSessionName(clientID)
 	rt.state.SetActiveWindowSize(sessionName, width, contentHeight)
 	panes = rt.state.ActiveWindowPanes(sessionName)
@@ -519,6 +519,9 @@ func (rt *Runtime) renderClientContent(clientID int64, client *attachedClient, p
 }
 
 func (rt *Runtime) redrawStatus(clientID int64) {
+	if !rt.statusEnabled(clientID) {
+		return
+	}
 	rt.mu.RLock()
 	client := rt.clients[clientID]
 	rt.mu.RUnlock()
@@ -665,7 +668,20 @@ func (rt *Runtime) clientHeight(id int64) int {
 }
 
 func (rt *Runtime) clientContentHeight(id int64) int {
-	return max(1, rt.clientHeight(id)-1)
+	height := rt.clientHeight(id)
+	if rt.statusEnabled(id) {
+		height--
+	}
+	return max(1, height)
+}
+
+func (rt *Runtime) statusEnabled(clientID int64) bool {
+	sessionName := rt.state.ActiveSessionName(clientID)
+	options, err := rt.state.Options("session", sessionName, true)
+	if err != nil {
+		return true
+	}
+	return options["status"] != "off"
 }
 
 func containsRuntimePane(panes []*model.Pane, paneID int) bool {

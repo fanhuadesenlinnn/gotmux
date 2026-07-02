@@ -1668,6 +1668,57 @@ func TestDisplayMessageBindingShowsStatus(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "displaybind"}, "displaybind", 80, 24)
 }
 
+func TestStatusOffSuppressesStatusLine(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	if _, _, _, err := rt.state.NewSession("statusoff", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	client, _, err := rt.state.AttachClient("statusoff", 40, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	clientProtocol := protocol.NewConn(clientConn)
+	messages := make(chan protocol.Message, 8)
+	go func() {
+		for {
+			msg, err := clientProtocol.Read()
+			if err != nil {
+				close(messages)
+				return
+			}
+			messages <- msg
+		}
+	}()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(serverConn), done: make(chan struct{})}
+	if got := rt.clientContentHeight(client.ID); got != 5 {
+		t.Fatalf("content height with status on = %d, want 5", got)
+	}
+	if msg := rt.execute([]string{"set", "-g", "status", "off"}, "statusoff", 80, 24); !msg.OK {
+		t.Fatalf("set status off failed: %s", msg.Text)
+	}
+	if got := rt.clientContentHeight(client.ID); got != 6 {
+		t.Fatalf("content height with status off = %d, want 6", got)
+	}
+	rt.redrawStatus(client.ID)
+	select {
+	case msg := <-messages:
+		t.Fatalf("unexpected status message with status off: %#v", msg)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if msg := rt.execute([]string{"set", "-g", "status", "on"}, "statusoff", 80, 24); !msg.OK {
+		t.Fatalf("set status on failed: %s", msg.Text)
+	}
+	rt.redrawStatus(client.ID)
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeStatus && bytes.Contains(next.Data, []byte("statusoff"))
+	})
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "statusoff"}, "statusoff", 80, 24)
+}
+
 func TestPrefixKeyBindingsDispatch(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "prefixkeys", "-n", "first", "/bin/sh"}, "", 80, 24)

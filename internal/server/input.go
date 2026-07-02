@@ -115,6 +115,9 @@ func (rt *Runtime) writeClientOutput(clientID int64, data []byte) {
 }
 
 func (rt *Runtime) writeClientStatusMessage(clientID int64, text string) {
+	if !rt.statusEnabled(clientID) {
+		return
+	}
 	rt.mu.RLock()
 	client := rt.clients[clientID]
 	rt.mu.RUnlock()
