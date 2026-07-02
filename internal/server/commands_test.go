@@ -8,6 +8,7 @@ import (
 	osuser "os/user"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1775,6 +1776,98 @@ func TestAttachRedrawsContentStatusAndSplits(t *testing.T) {
 		t.Fatal("attach handler did not exit")
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "attachdraw"}, "attachdraw", 80, 24)
+}
+
+func TestCommandStopsServerWhenLastSessionRemoved(t *testing.T) {
+	var once sync.Once
+	stopped := make(chan struct{})
+	rt := &Runtime{
+		state: model.NewServer("/tmp/gotmux-test.sock"),
+		stopServer: func() {
+			once.Do(func() { close(stopped) })
+		},
+	}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "last", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	done := make(chan struct{})
+	go func() {
+		rt.handleCommand(protocol.NewConn(serverConn), protocol.Message{
+			Type:    protocol.TypeCommand,
+			Command: []string{"kill-session", "-t", "last"},
+		})
+		close(done)
+	}()
+	result, err := protocol.NewConn(clientConn).Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("kill-session result = %#v", result)
+	}
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("server did not stop after last session was removed")
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("command handler did not finish")
+	}
+}
+
+func TestCommandDetachesClientsForRemovedSession(t *testing.T) {
+	rt := &Runtime{
+		state:   model.NewServer("/tmp/gotmux-test.sock"),
+		clients: make(map[int64]*attachedClient),
+	}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "removed", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("removed", 40, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attachedServerConn, attachedClientConn := net.Pipe()
+	defer attachedServerConn.Close()
+	defer attachedClientConn.Close()
+	attachedProtocol := protocol.NewConn(attachedClientConn)
+	messages := make(chan protocol.Message, 64)
+	go func() {
+		for {
+			msg, err := attachedProtocol.Read()
+			if err != nil {
+				close(messages)
+				return
+			}
+			messages <- msg
+		}
+	}()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(attachedServerConn), done: make(chan struct{})}
+
+	commandServerConn, commandClientConn := net.Pipe()
+	defer commandServerConn.Close()
+	defer commandClientConn.Close()
+	go rt.handleCommand(protocol.NewConn(commandServerConn), protocol.Message{
+		Type:    protocol.TypeCommand,
+		Command: []string{"kill-session", "-t", "removed"},
+	})
+	result, err := protocol.NewConn(commandClientConn).Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("kill-session result = %#v", result)
+	}
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "session closed"
+	})
 }
 
 func waitForProtocolState(t *testing.T, messages <-chan protocol.Message, timeout time.Duration, fn func(protocol.Message) bool) protocol.Message {

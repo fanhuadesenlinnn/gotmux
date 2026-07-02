@@ -28,6 +28,8 @@ type Runtime struct {
 	waitChans map[string]*waitChannel
 	pipeMu    sync.Mutex
 	pipes     map[int]*panePipe
+
+	stopServer func()
 }
 
 type attachedClient struct {
@@ -46,6 +48,8 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	if err := os.MkdirAll(parentDir(socketPath), 0o700); err != nil {
 		return err
 	}
+	runCtx, stopServer := context.WithCancel(ctx)
+	defer stopServer()
 	_ = os.Remove(socketPath)
 	ln, err := net.Listen("unix", socketPath)
 	if err != nil {
@@ -55,9 +59,10 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	_ = os.Chmod(socketPath, 0o600)
 
 	rt := &Runtime{
-		state:   model.NewServer(socketPath),
-		clients: make(map[int64]*attachedClient),
-		screens: make(map[int]*terminal.Screen),
+		state:      model.NewServer(socketPath),
+		clients:    make(map[int64]*attachedClient),
+		screens:    make(map[int]*terminal.Screen),
+		stopServer: stopServer,
 	}
 	for _, file := range configFiles {
 		result := rt.cmdSourceFile([]string{file}, "", 80, 24)
@@ -67,7 +72,7 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	}
 
 	go func() {
-		<-ctx.Done()
+		<-runCtx.Done()
 		_ = ln.Close()
 	}()
 
@@ -75,7 +80,7 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 		conn, err := ln.Accept()
 		if err != nil {
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return nil
 			default:
 				return err
@@ -145,7 +150,11 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 		case protocol.TypeCommand:
 			result := rt.executeMessageForClient(next, rt.state.ActiveSessionName(client.ID), client.ID)
 			rt.writeCommandResult(client.ID, result)
+			rt.afterCommandMessage(next)
 			if result.Type == protocol.TypeExit {
+				return
+			}
+			if !sessionExists(rt.state, rt.state.ActiveSessionName(client.ID)) {
 				return
 			}
 		}
@@ -155,6 +164,7 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 func (rt *Runtime) handleCommand(conn *protocol.Conn, msg protocol.Message) {
 	result := rt.executeMessage(msg, msg.Session)
 	_ = conn.Write(result)
+	rt.afterCommandMessage(msg)
 }
 
 func (rt *Runtime) startPane(pane *model.Pane, width, height int) error {
@@ -236,6 +246,7 @@ func (rt *Runtime) closePaneAfterExit(paneID int, exitState string) {
 		for _, clientID := range result.ClientIDs {
 			rt.detachClient(clientID, "session closed")
 		}
+		rt.stopIfEmptySoon()
 		return
 	}
 	rt.resizeSessionPanes(result.SessionName)
@@ -243,6 +254,55 @@ func (rt *Runtime) closePaneAfterExit(paneID int, exitState string) {
 		rt.redrawClient(clientID)
 	}
 	rt.broadcastStatus()
+}
+
+func (rt *Runtime) afterCommandMessage(msg protocol.Message) {
+	rt.detachOrphanedClients("session closed")
+	if commandMessageMayEmptyServer(msg) {
+		rt.stopIfEmptySoon()
+	}
+}
+
+func (rt *Runtime) detachOrphanedClients(text string) {
+	for _, client := range rt.state.ListClients() {
+		if !sessionExists(rt.state, client.SessionName) {
+			rt.detachClient(client.ID, text)
+		}
+	}
+}
+
+func (rt *Runtime) stopIfEmptySoon() {
+	if rt.stopServer == nil {
+		return
+	}
+	time.AfterFunc(100*time.Millisecond, func() {
+		if rt.hasSessions() {
+			return
+		}
+		rt.stopServer()
+	})
+}
+
+func (rt *Runtime) hasSessions() bool {
+	sessions, _ := rt.state.Snapshot()
+	return len(sessions) > 0
+}
+
+func commandMessageMayEmptyServer(msg protocol.Message) bool {
+	commands := msg.Commands
+	if len(commands) == 0 && len(msg.Command) > 0 {
+		commands = [][]string{msg.Command}
+	}
+	for _, argv := range commands {
+		if len(argv) == 0 {
+			continue
+		}
+		switch normalizeCommandName(argv[0]) {
+		case "kill-pane", "kill-session", "kill-window", "join-pane", "move-pane", "unlink-window":
+			return true
+		}
+	}
+	return false
 }
 
 func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {
