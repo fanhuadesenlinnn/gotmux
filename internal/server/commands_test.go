@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"net"
 	"os"
 	osuser "os/user"
 	"reflect"
@@ -1586,6 +1587,75 @@ func TestRootKeyBindingDispatch(t *testing.T) {
 	}
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
+}
+
+func TestPrefixKeyBindingsDispatch(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "prefixkeys", "-n", "first", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("prefixkeys", 80, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.handleInput(client.ID, []byte{0x02, 'c'})
+	windows := rt.execute([]string{"list-windows", "-t", "prefixkeys", "-F", "#{window_index}:#{window_active}"}, "prefixkeys", 80, 24)
+	if windows.Text != "0:0\n1:1" {
+		t.Fatalf("prefix c windows = %q", windows.Text)
+	}
+	rt.handleInput(client.ID, []byte{0x02, '%'})
+	panes := rt.execute([]string{"list-panes", "-t", "prefixkeys:1", "-F", "#{pane_index}:#{pane_active}"}, "prefixkeys", 80, 24)
+	if panes.Text != "0:0\n1:1" {
+		t.Fatalf("prefix %% panes = %q", panes.Text)
+	}
+	msg = rt.execute([]string{"set", "-g", "prefix", "C-a"}, "prefixkeys", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set prefix failed: %s", msg.Text)
+	}
+	rt.handleInput(client.ID, []byte{0x01, 'c'})
+	windows = rt.execute([]string{"list-windows", "-t", "prefixkeys", "-F", "#{window_index}:#{window_active}"}, "prefixkeys", 80, 24)
+	if windows.Text != "0:0\n1:0\n2:1" {
+		t.Fatalf("custom prefix c windows = %q", windows.Text)
+	}
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "prefixkeys"}, "prefixkeys", 80, 24)
+}
+
+func TestPrefixDetachBindingSendsExit(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "prefixdetach", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("prefixdetach", 80, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(serverConn), done: make(chan struct{})}
+	reader := protocol.NewConn(clientConn)
+	done := make(chan struct{})
+	go func() {
+		rt.handleInput(client.ID, []byte{0x02, 'd'})
+		close(done)
+	}()
+	result, err := reader.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exit, err := reader.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if result.Type != protocol.TypeResult || exit.Type != protocol.TypeExit {
+		t.Fatalf("detach messages = %#v %#v", result, exit)
+	}
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "prefixdetach"}, "prefixdetach", 80, 24)
 }
 
 func TestBufferCommands(t *testing.T) {
