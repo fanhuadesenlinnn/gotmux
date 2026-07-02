@@ -18,7 +18,7 @@ manual verification note.
 | Basic pane process lifecycle | Implemented for tmux-style default cleanup when a pane process exits, including removing the exited pane and closing the window/session when it was the last pane; the probe covers multi-pane exit cleanup |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
-| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
+| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, attached-client status messages from bindings, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic client listing | Implemented for `list-clients`/`lsc` over attached gotmux clients with basic format fields; the probe covers tmux-compatible empty detached-server output |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | Basic command metadata | Implemented for `list-commands`/`lscm` over all tmux command names in the local tmux command table; the probe covers formatted command-list fields and alias lookup |

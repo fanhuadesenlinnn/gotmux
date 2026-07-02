@@ -1590,6 +1590,44 @@ func TestRootKeyBindingDispatch(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
 }
 
+func TestDisplayMessageBindingShowsStatus(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "displaybind", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	client, _, err := rt.state.AttachClient("displaybind", 40, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	clientProtocol := protocol.NewConn(clientConn)
+	messages := make(chan protocol.Message, 64)
+	go func() {
+		for {
+			msg, err := clientProtocol.Read()
+			if err != nil {
+				close(messages)
+				return
+			}
+			messages <- msg
+		}
+	}()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(serverConn), done: make(chan struct{})}
+	msg = rt.execute([]string{"bind-key", "-n", "C-a", "display-message", "hello #{session_name}"}, "displaybind", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind-key failed: %s", msg.Text)
+	}
+	rt.handleInput(client.ID, []byte{0x01})
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeStatus && bytes.Contains(next.Data, []byte("hello displaybind"))
+	})
+	rt.state.DetachClient(client.ID)
+	_ = rt.execute([]string{"kill-session", "-t", "displaybind"}, "displaybind", 80, 24)
+}
+
 func TestPrefixKeyBindingsDispatch(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "prefixkeys", "-n", "first", "/bin/sh"}, "", 80, 24)

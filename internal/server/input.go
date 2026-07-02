@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
+	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func (rt *Runtime) handleInput(clientID int64, data []byte) {
@@ -78,10 +79,10 @@ func (rt *Runtime) writeCommandResult(clientID int64, result protocol.Message) {
 		rt.detachClient(clientID, result.Text)
 		return
 	}
-	if !result.OK && result.Text != "" {
-		rt.writeClientOutput(clientID, []byte(fmt.Sprintf("\r\n%s\r\n", result.Text)))
-	}
 	rt.redrawClient(clientID)
+	if result.Text != "" {
+		rt.writeClientStatusMessage(clientID, result.Text)
+	}
 }
 
 func (rt *Runtime) detachClient(clientID int64, text string) {
@@ -109,6 +110,20 @@ func (rt *Runtime) writeClientOutput(clientID int64, data []byte) {
 		return
 	}
 	_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: data})
+}
+
+func (rt *Runtime) writeClientStatusMessage(clientID int64, text string) {
+	rt.mu.RLock()
+	client := rt.clients[clientID]
+	rt.mu.RUnlock()
+	if client == nil || text == "" {
+		return
+	}
+	width, height := rt.state.ClientSize(clientID)
+	_ = client.conn.Write(protocol.Message{
+		Type: protocol.TypeStatus,
+		Data: terminal.StatusLine(width, height, text),
+	})
 }
 
 func (rt *Runtime) prefixByte() byte {
