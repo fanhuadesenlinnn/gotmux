@@ -535,6 +535,29 @@ func (s *Server) KillSession(name string) error {
 	return nil
 }
 
+func (s *Server) KillOtherSessions(keepName string) ([]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.Sessions[keepName] == nil {
+		return nil, fmt.Errorf("can't find session: %s", keepName)
+	}
+	var killedPanes []int
+	for name, session := range s.Sessions {
+		if name == keepName {
+			continue
+		}
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				killedPanes = append(killedPanes, pane.ID)
+				killPane(pane)
+			}
+		}
+		delete(s.Sessions, name)
+	}
+	return killedPanes, nil
+}
+
 func (s *Server) KillActivePane(sessionName string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

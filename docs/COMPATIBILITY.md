@@ -10,7 +10,7 @@ manual verification note.
 | --- | --- |
 | Client/server split over Unix socket | Implemented, including `kill-server` runtime shutdown and socket cleanup on server exit |
 | Server-owned PTYs | Implemented |
-| Sessions, windows, panes | Implemented |
+| Sessions, windows, panes | Implemented, including basic `kill-session -a` all-but-target cleanup |
 | Detached sessions | Implemented |
 | `new-session` output | Implemented for tmux-style quiet default, basic `-P`/`-F` print output, and basic `-A` attach-existing behavior |
 | Attach/detach | Implemented, including CLI `attach-session -d`, `new-session -A -D`, `detach-client` no-current-client errors, missing target-client errors, `-t client-N`, `-s target-session`, and basic `-a` detach-other-client behavior in the tested subset |

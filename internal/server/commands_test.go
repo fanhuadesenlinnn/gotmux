@@ -61,6 +61,29 @@ func TestNewSessionAttachExisting(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "work"}, "work", 80, 24)
 }
 
+func TestKillSessionAllButTarget(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	for _, name := range []string{"keep", "drop1", "drop2"} {
+		msg := rt.execute([]string{"new-session", "-d", "-s", name, "/bin/sh"}, "", 80, 24)
+		if !msg.OK {
+			t.Fatalf("new-session %s failed: %s", name, msg.Text)
+		}
+	}
+	msg := rt.execute([]string{"kill-session", "-a", "-t", "keep"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("kill-session -a = %#v", msg)
+	}
+	list := rt.execute([]string{"list-sessions", "-F", "#{session_name}"}, "", 80, 24)
+	if list.Text != "keep" {
+		t.Fatalf("remaining sessions = %q", list.Text)
+	}
+	msg = rt.execute([]string{"kill-session", "-a", "-t", "missing"}, "", 80, 24)
+	if msg.OK || msg.Text != "can't find session: missing" {
+		t.Fatalf("kill-session -a missing = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "keep"}, "keep", 80, 24)
+}
+
 func TestNewSessionPrintFlag(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "newsout", "-n", "first", "/bin/sh"}, "", 80, 24)

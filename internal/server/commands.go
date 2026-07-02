@@ -410,6 +410,18 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		if target == "" {
 			return fail("no current session")
 		}
+		if hasAny(args, "-a") {
+			killed, err := rt.state.KillOtherSessions(target)
+			if err != nil {
+				return fail(err.Error())
+			}
+			rt.screensMu.Lock()
+			for _, paneID := range killed {
+				delete(rt.screens, paneID)
+			}
+			rt.screensMu.Unlock()
+			return ok("")
+		}
 		if err := rt.state.KillSession(target); err != nil {
 			return fail(err.Error())
 		}

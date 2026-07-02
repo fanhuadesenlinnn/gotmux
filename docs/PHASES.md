@@ -13,7 +13,7 @@ specific as each area gets implemented.
 
 Status: complete for the current probe subset, including basic truthy
 `list-sessions`/`list-windows`/`list-panes -f` filters over implemented format
-fields.
+fields and basic `kill-session -a` all-but-target cleanup.
 
 ## Phase 2: Command Language and Configuration
 
