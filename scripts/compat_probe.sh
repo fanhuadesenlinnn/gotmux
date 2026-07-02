@@ -229,6 +229,8 @@ compare_status "lock-client no current client" lock-client
 compare_status "refresh-client no current client" refresh-client
 compare_status "switch-client no current client" switch-client -t compat
 compare_status "switch-client missing client" switch-client -c missing -t compat
+compare_status "detach-client no current client" detach-client
+compare_status "detach-client missing client" detach-client -t missing
 compare "clock-mode command" clock-mode
 compare "copy-mode command" copy-mode
 compare "choose-buffer command" choose-buffer

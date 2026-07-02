@@ -494,7 +494,7 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 	case "save-buffer":
 		return rt.cmdSaveBuffer(args)
 	case "detach-client":
-		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
+		return rt.cmdDetachClient(args, clientID)
 	case "version":
 		return ok(version.String)
 	default:
@@ -1025,6 +1025,74 @@ func (rt *Runtime) cmdSwitchClient(args []string, clientID int64) protocol.Messa
 		return fail(err.Error())
 	}
 	return ok("")
+}
+
+func (rt *Runtime) cmdDetachClient(args []string, clientID int64) protocol.Message {
+	targets, errText := rt.detachClientTargets(args, clientID)
+	if errText != "" {
+		return fail(errText)
+	}
+	currentTargeted := false
+	for _, target := range targets {
+		if target == clientID {
+			currentTargeted = true
+			continue
+		}
+		rt.detachClient(target, "detached")
+	}
+	if currentTargeted {
+		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
+	}
+	return ok("")
+}
+
+func (rt *Runtime) detachClientTargets(args []string, clientID int64) ([]int64, string) {
+	clients := rt.state.ListClients()
+	if targetClient := optionValue(args, "-t", ""); targetClient != "" {
+		targetID, ok := rt.resolveClientTarget(targetClient)
+		if !ok {
+			return nil, "can't find client: " + targetClient
+		}
+		if hasAny(args, "-a") {
+			targets := make([]int64, 0, len(clients))
+			for _, client := range clients {
+				if client.ID != targetID {
+					targets = append(targets, client.ID)
+				}
+			}
+			return targets, ""
+		}
+		return []int64{targetID}, ""
+	}
+	if targetSession := cleanSessionTarget(optionValue(args, "-s", "")); targetSession != "" {
+		targets := make([]int64, 0, len(clients))
+		for _, client := range clients {
+			if client.SessionName != targetSession {
+				continue
+			}
+			if hasAny(args, "-a") && clientID != 0 && client.ID == clientID {
+				continue
+			}
+			targets = append(targets, client.ID)
+		}
+		if len(targets) == 0 && len(clients) == 0 && clientID == 0 {
+			return nil, "no current client"
+		}
+		return targets, ""
+	}
+	if clientID == 0 {
+		return nil, "no current client"
+	}
+	if hasAny(args, "-a") {
+		targets := make([]int64, 0, len(clients))
+		for _, client := range clients {
+			if client.ID != clientID {
+				targets = append(targets, client.ID)
+			}
+		}
+		return targets, ""
+	}
+	return []int64{clientID}, ""
 }
 
 func (rt *Runtime) resolveClientTarget(target string) (int64, bool) {

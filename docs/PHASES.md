@@ -136,9 +136,12 @@ path in the compatibility probe. Full bidirectional pipe lifecycle behavior,
 entry points. Basic `switch-client` covers current-client requirements,
 missing `-c target-client` errors, attached-client `-t` target-session
 switching, `-n`/`-p` relative switching, `-l` last-session switching, and
-basic `-c client-N` target-client switching. Full lock screens, bidirectional
-pipe lifecycle behavior, refresh offset/control behavior, full switch-client
-key-table/read-only/sorted-order behavior, hook execution ordering and context,
+basic `-c client-N` target-client switching. Basic `detach-client` now covers
+no-current-client and missing-client errors, plus `-t client-N`,
+`-s target-session`, and `-a` detach-other-client behavior in regression tests.
+Full lock screens, bidirectional pipe lifecycle behavior, refresh offset/control
+behavior, full switch-client key-table/read-only/sorted-order behavior,
+detach-client `-E`/parent-signal behavior, hook execution ordering and context,
 control mode, popups, and linked windows remain.
 
 ## Completion Gate

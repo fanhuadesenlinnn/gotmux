@@ -707,6 +707,61 @@ func TestSwitchClientTargetsAndRelativeSessions(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "sw2"}, "sw2", 80, 24)
 }
 
+func TestDetachClientTargetsAndSessions(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	if _, _, _, err := rt.state.NewSession("detach1", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := rt.state.NewSession("detach2", "", "second", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	c1, c1Messages := attachTestRuntimeClient(t, rt, "detach1")
+	_, c2Messages := attachTestRuntimeClient(t, rt, "detach1")
+	_, c3Messages := attachTestRuntimeClient(t, rt, "detach2")
+
+	msg := rt.execute([]string{"detach-client"}, "", 80, 24)
+	if msg.OK || msg.Text != "no current client" {
+		t.Fatalf("detach-client without target = %#v", msg)
+	}
+	msg = rt.execute([]string{"detach-client", "-t", "missing"}, "", 80, 24)
+	if msg.OK || msg.Text != "can't find client: missing" {
+		t.Fatalf("detach-client missing target = %#v", msg)
+	}
+	msg = rt.execute([]string{"detach-client", "-a", "-t", clientName(c1)}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("detach-client -a -t = %#v", msg)
+	}
+	waitForProtocolState(t, c2Messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "detached"
+	})
+	waitForProtocolState(t, c3Messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "detached"
+	})
+	expectNoProtocolMessage(t, c1Messages)
+
+	rt = &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	if _, _, _, err := rt.state.NewSession("group1", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := rt.state.NewSession("group2", "", "second", []string{"/bin/sh"}); err != nil {
+		t.Fatal(err)
+	}
+	_, g1aMessages := attachTestRuntimeClient(t, rt, "group1")
+	_, g1bMessages := attachTestRuntimeClient(t, rt, "group1")
+	_, g2Messages := attachTestRuntimeClient(t, rt, "group2")
+	msg = rt.execute([]string{"detach-client", "-s", "group1"}, "", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("detach-client -s = %#v", msg)
+	}
+	waitForProtocolState(t, g1aMessages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "detached"
+	})
+	waitForProtocolState(t, g1bMessages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "detached"
+	})
+	expectNoProtocolMessage(t, g2Messages)
+}
+
 func TestListClients(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	format := "#{client_name}:#{session_name}:#{client_width}:#{client_height}:#{client_termname}"
@@ -2050,6 +2105,47 @@ func TestKillServerStopsRuntimeAndDetachesClients(t *testing.T) {
 	case <-stopped:
 	case <-time.After(time.Second):
 		t.Fatal("server did not stop after kill-server")
+	}
+}
+
+func attachTestRuntimeClient(t *testing.T, rt *Runtime, sessionName string) (model.Client, <-chan protocol.Message) {
+	t.Helper()
+	if rt.clients == nil {
+		rt.clients = make(map[int64]*attachedClient)
+	}
+	client, _, err := rt.state.AttachClient(sessionName, 80, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverConn, clientConn := net.Pipe()
+	clientProtocol := protocol.NewConn(clientConn)
+	messages := make(chan protocol.Message, 8)
+	go func() {
+		defer close(messages)
+		for {
+			msg, err := clientProtocol.Read()
+			if err != nil {
+				return
+			}
+			messages <- msg
+		}
+	}()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(serverConn), done: make(chan struct{})}
+	t.Cleanup(func() {
+		_ = serverConn.Close()
+		_ = clientConn.Close()
+		delete(rt.clients, client.ID)
+		rt.state.DetachClient(client.ID)
+	})
+	return *client, messages
+}
+
+func expectNoProtocolMessage(t *testing.T, messages <-chan protocol.Message) {
+	t.Helper()
+	select {
+	case msg := <-messages:
+		t.Fatalf("unexpected protocol message: %#v", msg)
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 

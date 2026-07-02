@@ -13,7 +13,7 @@ manual verification note.
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
 | `new-session` output | Implemented for tmux-style quiet default, basic `-P`/`-F` print output, and basic `-A` attach-existing behavior |
-| Attach/detach | Implemented |
+| Attach/detach | Implemented, including `detach-client` no-current-client errors, missing target-client errors, `-t client-N`, `-s target-session`, and basic `-a` detach-other-client behavior in the tested subset |
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, basic `link-window`/`linkw`, linked `unlink-window`, `unlink-window -k`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic floating `new-pane`/`newp`, basic `split-window -d`/`-P`, basic `resize-window`, basic `move-window`/renumber, and basic `respawn-pane`/`respawn-window -k` |
 | Basic pane process lifecycle | Implemented for tmux-style default cleanup when a pane process exits, including removing the exited pane, closing the window/session when it was the last pane, detaching orphaned clients, and stopping the server when destructive commands, key bindings, or pane exit leave no sessions; the probe covers multi-pane exit cleanup |
 | Common `C-b` prefix bindings | Implemented |
@@ -73,6 +73,7 @@ manual verification note.
 | Control mode | Not implemented. |
 | Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
 | Full `switch-client` semantics | Basic attached-client session switching exists, but key-table switching, read-only toggles, sorted session order, environment updates, pane-target active pane selection, and zoom handling remain incomplete. |
+| Full `detach-client` semantics | Basic target-client, target-session, and detach-other-client behavior exists, but `-E` shell commands, parent SIGHUP behavior, hooks, and all edge-case client flags remain incomplete. |
 | Full server ACL semantics | Basic `server-access` state is in-memory only; group ACLs, filesystem socket permissions, multi-user attach enforcement, and persisted server ACL edge cases remain incomplete. |
 | Lock screen behavior | Lock commands are recognized for the basic CLI subset, but gotmux does not yet provide tmux-style lock screens. |
 | Popups, menus, choose tree, command prompt | Prompt, popup, menu, and confirm command metadata plus no-current-client errors are recognized in the detached CLI subset, but interactive prompts, popups, menus, confirmations, and complete choose-tree UI remain incomplete. |
