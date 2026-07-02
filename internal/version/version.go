@@ -1,3 +1,3 @@
 package version
 
-const String = "gotmux 0.3.0"
+const String = "gotmux 0.3.1-dev"
