@@ -1314,6 +1314,34 @@ func TestEnvironmentCommands(t *testing.T) {
 	if msg.Text != `TARGET="yes"; export TARGET;` {
 		t.Fatalf("showenv target shell = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"setenv", "-h", "SECRET", "shh"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set hidden env failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "SECRET"}, "env", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("show hidden env without -h = %#v", msg)
+	}
+	msg = rt.execute([]string{"showenv", "-h", "SECRET"}, "env", 80, 24)
+	if msg.Text != "SECRET=shh" {
+		t.Fatalf("show hidden env = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-hs", "SECRET"}, "env", 80, 24)
+	if msg.Text != `SECRET="shh"; export SECRET;` {
+		t.Fatalf("show hidden env shell = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "-g", "-h", "GSECRET", "gshh"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set global hidden env failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-g", "GSECRET"}, "env", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("show global hidden env without -h = %#v", msg)
+	}
+	msg = rt.execute([]string{"showenv", "-gh", "GSECRET"}, "env", 80, 24)
+	if msg.Text != "GSECRET=gshh" {
+		t.Fatalf("show global hidden env = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"setenv", "-t", "missing", "TARGET", "no"}, "env", 80, 24)
 	if msg.OK || msg.Text != "no such session: missing" {
 		t.Fatalf("setenv missing target = %#v", msg)
@@ -1340,6 +1368,20 @@ func TestEnvironmentCommands(t *testing.T) {
 	if !found {
 		t.Fatalf("new pane did not inherit FOO=bar")
 	}
+	for _, session := range snapshotSessions(rt.state) {
+		if session.Name != "env" {
+			continue
+		}
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				for _, item := range pane.Env {
+					if item == "SECRET=shh" || item == "GSECRET=gshh" {
+						t.Fatalf("new pane inherited hidden environment: %s", item)
+					}
+				}
+			}
+		}
+	}
 	msg = rt.execute([]string{"setenv", "-u", "FOO"}, "env", 80, 24)
 	if !msg.OK {
 		t.Fatalf("setenv -u failed: %s", msg.Text)
@@ -1347,6 +1389,14 @@ func TestEnvironmentCommands(t *testing.T) {
 	msg = rt.execute([]string{"showenv", "FOO"}, "env", 80, 24)
 	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
 		t.Fatalf("showenv after unset = %#v", msg)
+	}
+	msg = rt.execute([]string{"setenv", "-u", "SECRET"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset hidden env failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-h", "SECRET"}, "env", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
+		t.Fatalf("show hidden env after unset = %#v", msg)
 	}
 	msg = rt.execute([]string{"setenv", "-t", "envtarget", "-u", "TARGET"}, "env", 80, 24)
 	if !msg.OK {

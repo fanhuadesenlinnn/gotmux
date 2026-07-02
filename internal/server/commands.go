@@ -1963,7 +1963,7 @@ func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) proto
 	if len(values) > 1 {
 		value = strings.Join(values[1:], " ")
 	}
-	if err := rt.state.SetEnvironment(scope, targetSession, name, value); err != nil {
+	if err := rt.state.SetEnvironment(scope, targetSession, name, value, hasAny(args, "-h")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1978,7 +1978,8 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 	if targetErr != "" {
 		return fail(targetErr)
 	}
-	env, err := rt.state.Environment(scope, targetSession)
+	showHidden := hasAny(args, "-h")
+	env, err := rt.state.Environment(scope, targetSession, showHidden)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -1987,6 +1988,12 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 	if len(names) > 0 {
 		value, exists := env[names[0]]
 		if !exists {
+			otherEnv, otherErr := rt.state.Environment(scope, targetSession, !showHidden)
+			if otherErr == nil {
+				if _, existsOther := otherEnv[names[0]]; existsOther {
+					return ok("")
+				}
+			}
 			return fail(fmt.Sprintf("unknown variable: %s", names[0]))
 		}
 		if shellFormat {

@@ -783,6 +783,18 @@ compare_status "set target environment missing session" setenv -t missing TARGET
 "${tmux_cmd[@]}" setenv -t envtarget -u TARGET
 "${gotmux_cmd[@]}" setenv -t envtarget -u TARGET >/dev/null
 compare_status "unset target environment" showenv -t envtarget TARGET
+"${tmux_cmd[@]}" setenv -h SECRET shh
+"${gotmux_cmd[@]}" setenv -h SECRET shh >/dev/null
+compare "show hidden environment without flag" showenv SECRET
+compare "show hidden environment" showenv -h SECRET
+compare "show hidden environment shell" showenv -hs SECRET
+"${tmux_cmd[@]}" setenv -g -h GSECRET gshh
+"${gotmux_cmd[@]}" setenv -g -h GSECRET gshh >/dev/null
+compare "show global hidden environment without flag" showenv -g GSECRET
+compare "show global hidden environment" showenv -gh GSECRET
+"${tmux_cmd[@]}" setenv -u SECRET
+"${gotmux_cmd[@]}" setenv -u SECRET >/dev/null
+compare_status "unset hidden environment" showenv -h SECRET
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null
