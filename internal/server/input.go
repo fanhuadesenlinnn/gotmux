@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
@@ -138,20 +139,149 @@ func (rt *Runtime) prefixByte() byte {
 }
 
 func inputKeyName(data []byte) (string, int) {
-	if len(data) >= 3 && data[0] == '\x1b' && data[1] == '[' {
-		switch data[2] {
-		case 'A':
-			return "Up", 3
-		case 'B':
-			return "Down", 3
-		case 'C':
-			return "Right", 3
-		case 'D':
-			return "Left", 3
+	if len(data) >= 3 && data[0] == '\x1b' {
+		switch data[1] {
+		case '[':
+			if key, consumed, ok := csiInputKeyName(data); ok {
+				return key, consumed
+			}
+		case 'O':
+			if key, ok := ss3InputKeyName(data[2]); ok {
+				return key, 3
+			}
 		}
 	}
 	if data[0] >= 1 && data[0] <= 26 {
 		return fmt.Sprintf("C-%c", data[0]+'a'-1), 1
 	}
 	return string(data[0]), 1
+}
+
+func csiInputKeyName(data []byte) (string, int, bool) {
+	for i := 2; i < len(data); i++ {
+		final := data[i]
+		if final < 0x40 || final > 0x7e {
+			continue
+		}
+		raw := data[2:i]
+		switch final {
+		case 'A', 'B', 'C', 'D', 'F', 'H':
+			base := map[byte]string{
+				'A': "Up",
+				'B': "Down",
+				'C': "Right",
+				'D': "Left",
+				'F': "End",
+				'H': "Home",
+			}[final]
+			return csiModifierPrefix(raw) + base, i + 1, true
+		case '~':
+			if key := tildeInputKeyName(csiBaseParam(raw)); key != "" {
+				return csiModifierPrefix(raw) + key, i + 1, true
+			}
+		}
+		return "", 0, false
+	}
+	return "", 0, false
+}
+
+func ss3InputKeyName(final byte) (string, bool) {
+	switch final {
+	case 'F':
+		return "End", true
+	case 'H':
+		return "Home", true
+	case 'P':
+		return "F1", true
+	case 'Q':
+		return "F2", true
+	case 'R':
+		return "F3", true
+	case 'S':
+		return "F4", true
+	default:
+		return "", false
+	}
+}
+
+func tildeInputKeyName(code string) string {
+	switch code {
+	case "1", "7":
+		return "Home"
+	case "2":
+		return "Insert"
+	case "3":
+		return "Delete"
+	case "4", "8":
+		return "End"
+	case "5":
+		return "PageUp"
+	case "6":
+		return "PageDown"
+	case "11":
+		return "F1"
+	case "12":
+		return "F2"
+	case "13":
+		return "F3"
+	case "14":
+		return "F4"
+	case "15":
+		return "F5"
+	case "17":
+		return "F6"
+	case "18":
+		return "F7"
+	case "19":
+		return "F8"
+	case "20":
+		return "F9"
+	case "21":
+		return "F10"
+	case "23":
+		return "F11"
+	case "24":
+		return "F12"
+	default:
+		return ""
+	}
+}
+
+func csiBaseParam(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	if idx := bytes.IndexAny(raw, ";:"); idx >= 0 {
+		raw = raw[:idx]
+	}
+	return string(raw)
+}
+
+func csiModifierPrefix(raw []byte) string {
+	idx := bytes.LastIndexAny(raw, ";:")
+	if idx < 0 || idx+1 >= len(raw) {
+		return ""
+	}
+	modifier, err := strconv.Atoi(string(raw[idx+1:]))
+	if err != nil {
+		return ""
+	}
+	switch modifier {
+	case 2:
+		return "S-"
+	case 3:
+		return "M-"
+	case 4:
+		return "M-S-"
+	case 5:
+		return "C-"
+	case 6:
+		return "C-S-"
+	case 7:
+		return "C-M-"
+	case 8:
+		return "C-M-S-"
+	default:
+		return ""
+	}
 }

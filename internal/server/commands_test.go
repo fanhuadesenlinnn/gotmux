@@ -1587,6 +1587,15 @@ func TestRootKeyBindingDispatch(t *testing.T) {
 	if !strings.Contains(msg.Text, "1:rooted") {
 		t.Fatalf("root binding did not create window: %q", msg.Text)
 	}
+	msg = rt.execute([]string{"bind-key", "-n", "F1", "new-window", "-n", "fkey", "/bin/sh"}, "root", 80, 24)
+	if !msg.OK {
+		t.Fatalf("bind-key F1 failed: %s", msg.Text)
+	}
+	rt.handleInput(client.ID, []byte("\x1bOP"))
+	msg = rt.execute([]string{"list-windows", "-t", "root", "-F", "#{window_index}:#{window_name}"}, "root", 80, 24)
+	if !strings.Contains(msg.Text, "2:fkey") {
+		t.Fatalf("F1 root binding did not create window: %q", msg.Text)
+	}
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "root"}, "root", 80, 24)
 }
