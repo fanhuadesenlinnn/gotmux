@@ -510,7 +510,7 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	windowName := optionValue(args, "-n", "")
 	cwd := optionValue(args, "-c", "")
 	command := trailingCommand(args, map[string]bool{
-		"-s": true, "-n": true, "-c": true, "-F": true, "-t": true, "-x": true, "-y": true,
+		"-s": true, "-n": true, "-c": true, "-e": true, "-F": true, "-t": true, "-x": true, "-y": true,
 	})
 	if hasAny(args, "-A") && name != "" && sessionExists(rt.state, name) {
 		text := ""
@@ -523,6 +523,7 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
 	rt.state.SetActiveWindowSize(session.Name, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
@@ -543,11 +544,12 @@ func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, hei
 	}
 	name := optionValue(args, "-n", "")
 	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-n": true, "-c": true, "-F": true, "-t": true})
+	command := trailingCommand(args, map[string]bool{"-n": true, "-c": true, "-e": true, "-F": true, "-t": true})
 	_, pane, err := rt.state.NewWindowDetached(currentSession, name, cwd, command, hasAny(args, "-d"))
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
 	rt.state.SetActiveWindowSize(currentSession, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
@@ -565,7 +567,7 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 		return fail("can't find window")
 	}
 	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-c": true, "-F": true, "-t": true, "-l": true, "-p": true})
+	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-F": true, "-t": true, "-l": true, "-p": true})
 	if !hasWindow {
 		rt.state.SetActiveWindowSize(sessionName, width, height)
 	}
@@ -583,6 +585,7 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
@@ -623,6 +626,7 @@ func (rt *Runtime) cmdNewPane(args []string, currentSession string, width, heigh
 	if err != nil {
 		return fail(err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
 	if err := rt.startPane(pane, pane.Width, pane.Height); err != nil {
 		return fail(err.Error())
 	}
@@ -720,6 +724,7 @@ func (rt *Runtime) cmdRespawnPane(args []string, currentSession string, width, h
 	if err != nil {
 		return fail("respawn pane failed: " + err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(respawned.ID, environmentOverrides(args))
 	rt.screensMu.Lock()
 	delete(rt.screens, respawned.ID)
 	rt.screensMu.Unlock()
@@ -740,6 +745,7 @@ func (rt *Runtime) cmdRespawnWindow(args []string, currentSession string, width,
 	if err != nil {
 		return fail("respawn window failed: " + err.Error())
 	}
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
 	rt.screensMu.Lock()
 	delete(rt.screens, pane.ID)
 	for _, paneID := range killed {
@@ -2605,6 +2611,32 @@ func commandSize(args []string, width, height int) (int, int) {
 	return width, height
 }
 
+func environmentOverrides(args []string) map[string]string {
+	overrides := make(map[string]string)
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		value := ""
+		switch {
+		case arg == "-e" && i+1 < len(args):
+			value = args[i+1]
+			i++
+		case strings.HasPrefix(arg, "-e") && len(arg) > 2:
+			value = arg[2:]
+		default:
+			continue
+		}
+		name, envValue, ok := strings.Cut(value, "=")
+		if !ok {
+			name = value
+			envValue = os.Getenv(value)
+		}
+		if name != "" {
+			overrides[name] = envValue
+		}
+	}
+	return overrides
+}
+
 func sizeOption(args []string, name string, total int, fallback int) int {
 	value := optionValue(args, name, "")
 	if value == "" || value == "-" {
@@ -2734,7 +2766,7 @@ func nonOptionArgs(args []string) []string {
 
 func optionOperands(args []string) []string {
 	valueFlags := map[string]bool{
-		"-b": true, "-c": true, "-d": true, "-E": true, "-F": true, "-f": true,
+		"-b": true, "-c": true, "-d": true, "-E": true, "-e": true, "-F": true, "-f": true,
 		"-N": true, "-S": true, "-T": true, "-t": true, "-x": true,
 		"-y": true,
 	}

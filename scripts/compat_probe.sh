@@ -809,6 +809,25 @@ compare_status "unset removed environment" showenv REMOVE_ME
 compare "show global removed environment" showenv -g GREMOVE
 compare "show global removed environment shell" showenv -gs GREMOVE
 
+"${tmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t envopt:0 'printf "<%s>\n" "$NEWS"' Enter
+"${gotmux_cmd[@]}" send-keys -t envopt:0 'printf "<%s>\n" "$NEWS"' Enter >/dev/null
+sleep 0.4
+compare "new-session environment option" capture-pane -p -t envopt:0 -S 0 -E 0
+"${tmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh
+"${gotmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t envopt:1 'printf "<%s>\n" "$WINENV"' Enter
+"${gotmux_cmd[@]}" send-keys -t envopt:1 'printf "<%s>\n" "$WINENV"' Enter >/dev/null
+sleep 0.4
+compare "new-window environment option" capture-pane -p -t envopt:1 -S 0 -E 0
+"${tmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh
+"${gotmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t envopt:1.1 'printf "<%s>\n" "$SPLITENV"' Enter
+"${gotmux_cmd[@]}" send-keys -t envopt:1.1 'printf "<%s>\n" "$SPLITENV"' Enter >/dev/null
+sleep 0.4
+compare "split-window environment option" capture-pane -p -t envopt:1.1 -S 0 -E 0
+
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null
 compare "show environment" showenv FOO

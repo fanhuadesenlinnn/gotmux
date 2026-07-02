@@ -2179,6 +2179,30 @@ func (s *Server) TargetPane(sessionName string, windowIndex int, hasWindow bool,
 	return window.ActivePane()
 }
 
+func (s *Server) ApplyPaneEnvironmentOverrides(paneID int, overrides map[string]string) {
+	if len(overrides) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, session := range s.Sessions {
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				if pane.ID != paneID {
+					continue
+				}
+				env := environmentMap(pane.Env)
+				for key, value := range overrides {
+					env[key] = value
+				}
+				pane.Env = environmentList(env)
+				return
+			}
+		}
+	}
+}
+
 func (s *Server) ActiveSessionName(clientID int64) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

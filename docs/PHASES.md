@@ -29,7 +29,7 @@ all local tmux command names, basic `list-clients`, string-backed options with
 global/local/server unset, string append, basic `-o` set-once behavior, `show-options -A`, basic
 `show-options -H`, `-s` server scope, and basic `-t` targets, basic
 `set-hook`/`show-hooks` hook option storage and display, basic environment
-commands with target resolution, hidden variables, and remove markers,
+commands with target resolution, hidden variables, remove markers, and pane creation overrides,
 prefix/root key bindings, basic key binding notes and table clearing/errors,
 `send-prefix`, basic `run-shell` shell
 execution, basic `if-shell` conditionals, and basic `wait-for` synchronization

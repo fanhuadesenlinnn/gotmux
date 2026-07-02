@@ -1442,6 +1442,42 @@ func TestEnvironmentCommands(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "envtarget"}, "envtarget", 80, 24)
 }
 
+func TestPaneEnvironmentOverrides(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "envopts", "-e", "NEWS=one", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session -e failed: %s", msg.Text)
+	}
+	assertPaneHasEnv := func(name, value string) {
+		t.Helper()
+		expected := name + "=" + value
+		for _, session := range snapshotSessions(rt.state) {
+			for _, window := range session.Windows {
+				for _, pane := range window.Panes {
+					for _, item := range pane.Env {
+						if item == expected {
+							return
+						}
+					}
+				}
+			}
+		}
+		t.Fatalf("missing pane env %s", expected)
+	}
+	assertPaneHasEnv("NEWS", "one")
+	msg = rt.execute([]string{"new-window", "-t", "envopts", "-n", "winenv", "-e", "WINENV=two", "/bin/sh"}, "envopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-window -e failed: %s", msg.Text)
+	}
+	assertPaneHasEnv("WINENV", "two")
+	msg = rt.execute([]string{"split-window", "-t", "envopts:1", "-h", "-e", "SPLITENV=three", "/bin/sh"}, "envopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("split-window -e failed: %s", msg.Text)
+	}
+	assertPaneHasEnv("SPLITENV", "three")
+	_ = rt.execute([]string{"kill-session", "-t", "envopts"}, "envopts", 80, 24)
+}
+
 func TestRootKeyBindingDispatch(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "root", "-n", "first", "/bin/sh"}, "", 80, 24)
