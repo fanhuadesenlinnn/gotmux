@@ -1963,7 +1963,7 @@ func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) proto
 	if len(values) > 1 {
 		value = strings.Join(values[1:], " ")
 	}
-	if err := rt.state.SetEnvironment(scope, targetSession, name, value, hasAny(args, "-h")); err != nil {
+	if err := rt.state.SetEnvironment(scope, targetSession, name, value, hasAny(args, "-h"), hasAny(args, "-r")); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1983,9 +1983,26 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 	if err != nil {
 		return fail(err.Error())
 	}
+	removals := make(map[string]bool)
+	if !showHidden {
+		var err error
+		removals, err = rt.state.EnvironmentRemovals(scope, targetSession)
+		if err != nil {
+			return fail(err.Error())
+		}
+		for name := range removals {
+			delete(env, name)
+		}
+	}
 	names := optionOperands(args)
 	shellFormat := hasAny(args, "-s")
 	if len(names) > 0 {
+		if removals[names[0]] {
+			if shellFormat {
+				return ok(fmt.Sprintf("unset %s;", names[0]))
+			}
+			return ok("-" + names[0])
+		}
 		value, exists := env[names[0]]
 		if !exists {
 			otherEnv, otherErr := rt.state.Environment(scope, targetSession, !showHidden)
@@ -2005,9 +2022,20 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 	for key := range env {
 		keys = append(keys, key)
 	}
+	for key := range removals {
+		keys = append(keys, key)
+	}
 	sort.Strings(keys)
 	lines := make([]string, 0, len(keys))
 	for _, key := range keys {
+		if removals[key] {
+			if shellFormat {
+				lines = append(lines, fmt.Sprintf("unset %s;", key))
+			} else {
+				lines = append(lines, "-"+key)
+			}
+			continue
+		}
 		if shellFormat {
 			lines = append(lines, fmt.Sprintf("%s=%s; export %s;", key, shellQuote(env[key]), key))
 		} else {

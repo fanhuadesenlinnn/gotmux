@@ -1342,6 +1342,30 @@ func TestEnvironmentCommands(t *testing.T) {
 	if msg.Text != "GSECRET=gshh" {
 		t.Fatalf("show global hidden env = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"setenv", "-g", "REMOVE_ME", "keep"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set global env for removal failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "-r", "REMOVE_ME"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set remove marker failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "REMOVE_ME"}, "env", 80, 24)
+	if msg.Text != "-REMOVE_ME" {
+		t.Fatalf("show remove marker = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-s", "REMOVE_ME"}, "env", 80, 24)
+	if msg.Text != "unset REMOVE_ME;" {
+		t.Fatalf("show remove marker shell = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "-g", "-r", "GREMOVE"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set global remove marker failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-g", "GREMOVE"}, "env", 80, 24)
+	if msg.Text != "-GREMOVE" {
+		t.Fatalf("show global remove marker = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"setenv", "-t", "missing", "TARGET", "no"}, "env", 80, 24)
 	if msg.OK || msg.Text != "no such session: missing" {
 		t.Fatalf("setenv missing target = %#v", msg)
@@ -1375,7 +1399,7 @@ func TestEnvironmentCommands(t *testing.T) {
 		for _, window := range session.Windows {
 			for _, pane := range window.Panes {
 				for _, item := range pane.Env {
-					if item == "SECRET=shh" || item == "GSECRET=gshh" {
+					if item == "SECRET=shh" || item == "GSECRET=gshh" || item == "REMOVE_ME=keep" {
 						t.Fatalf("new pane inherited hidden environment: %s", item)
 					}
 				}
@@ -1389,6 +1413,14 @@ func TestEnvironmentCommands(t *testing.T) {
 	msg = rt.execute([]string{"showenv", "FOO"}, "env", 80, 24)
 	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
 		t.Fatalf("showenv after unset = %#v", msg)
+	}
+	msg = rt.execute([]string{"setenv", "-u", "REMOVE_ME"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset remove marker failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "REMOVE_ME"}, "env", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
+		t.Fatalf("show remove marker after unset = %#v", msg)
 	}
 	msg = rt.execute([]string{"setenv", "-u", "SECRET"}, "env", 80, 24)
 	if !msg.OK {

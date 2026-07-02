@@ -795,6 +795,19 @@ compare "show global hidden environment" showenv -gh GSECRET
 "${tmux_cmd[@]}" setenv -u SECRET
 "${gotmux_cmd[@]}" setenv -u SECRET >/dev/null
 compare_status "unset hidden environment" showenv -h SECRET
+"${tmux_cmd[@]}" setenv -g REMOVE_ME keep
+"${gotmux_cmd[@]}" setenv -g REMOVE_ME keep >/dev/null
+"${tmux_cmd[@]}" setenv -r REMOVE_ME
+"${gotmux_cmd[@]}" setenv -r REMOVE_ME >/dev/null
+compare "show removed environment" showenv REMOVE_ME
+compare "show removed environment shell" showenv -s REMOVE_ME
+"${tmux_cmd[@]}" setenv -u REMOVE_ME
+"${gotmux_cmd[@]}" setenv -u REMOVE_ME >/dev/null
+compare_status "unset removed environment" showenv REMOVE_ME
+"${tmux_cmd[@]}" setenv -g -r GREMOVE
+"${gotmux_cmd[@]}" setenv -g -r GREMOVE >/dev/null
+compare "show global removed environment" showenv -g GREMOVE
+compare "show global removed environment shell" showenv -gs GREMOVE
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null

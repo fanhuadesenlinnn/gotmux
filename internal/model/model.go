@@ -26,6 +26,7 @@ type Server struct {
 	GlobalWindowOptions map[string]string
 	GlobalEnvironment   map[string]string
 	GlobalHiddenEnv     map[string]string
+	GlobalRemovedEnv    map[string]bool
 	GlobalHooks         map[string][]string
 	KeyBindings         map[string]map[string]KeyBinding
 	NextSessionID       int
@@ -51,6 +52,7 @@ type Session struct {
 	Options      map[string]string
 	Environment  map[string]string
 	HiddenEnv    map[string]string
+	RemovedEnv   map[string]bool
 	Hooks        map[string][]string
 }
 
@@ -220,6 +222,7 @@ func NewServer(socketPath string) *Server {
 		GlobalWindowOptions: defaultWindowOptions(),
 		GlobalEnvironment:   environmentMap(os.Environ()),
 		GlobalHiddenEnv:     make(map[string]string),
+		GlobalRemovedEnv:    make(map[string]bool),
 		GlobalHooks:         defaultHooks(),
 		KeyBindings:         defaultKeyBindings(),
 		NextClientID:        1,
@@ -2669,16 +2672,22 @@ func (s *Server) ListKeyBindings(table string) []KeyBinding {
 	return out
 }
 
-func (s *Server) SetEnvironment(scope, sessionName, name, value string, hidden bool) error {
+func (s *Server) SetEnvironment(scope, sessionName, name, value string, hidden, remove bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	switch scope {
 	case "global":
-		if hidden {
+		if remove {
+			delete(s.GlobalEnvironment, name)
+			delete(s.GlobalHiddenEnv, name)
+			s.GlobalRemovedEnv[name] = true
+		} else if hidden {
+			delete(s.GlobalRemovedEnv, name)
 			delete(s.GlobalEnvironment, name)
 			s.GlobalHiddenEnv[name] = value
 		} else {
+			delete(s.GlobalRemovedEnv, name)
 			delete(s.GlobalHiddenEnv, name)
 			s.GlobalEnvironment[name] = value
 		}
@@ -2687,13 +2696,22 @@ func (s *Server) SetEnvironment(scope, sessionName, name, value string, hidden b
 		if session == nil {
 			return fmt.Errorf("can't find session: %s", sessionName)
 		}
-		if hidden {
+		if remove {
+			delete(session.Environment, name)
+			delete(session.HiddenEnv, name)
+			if session.RemovedEnv == nil {
+				session.RemovedEnv = make(map[string]bool)
+			}
+			session.RemovedEnv[name] = true
+		} else if hidden {
+			delete(session.RemovedEnv, name)
 			delete(session.Environment, name)
 			if session.HiddenEnv == nil {
 				session.HiddenEnv = make(map[string]string)
 			}
 			session.HiddenEnv[name] = value
 		} else {
+			delete(session.RemovedEnv, name)
 			delete(session.HiddenEnv, name)
 			if session.Environment == nil {
 				session.Environment = make(map[string]string)
@@ -2714,6 +2732,7 @@ func (s *Server) UnsetEnvironment(scope, sessionName, name string) error {
 	case "global":
 		delete(s.GlobalEnvironment, name)
 		delete(s.GlobalHiddenEnv, name)
+		delete(s.GlobalRemovedEnv, name)
 	case "session":
 		session := s.Sessions[sessionName]
 		if session == nil {
@@ -2721,6 +2740,7 @@ func (s *Server) UnsetEnvironment(scope, sessionName, name string) error {
 		}
 		delete(session.Environment, name)
 		delete(session.HiddenEnv, name)
+		delete(session.RemovedEnv, name)
 	default:
 		return fmt.Errorf("unknown environment scope: %s", scope)
 	}
@@ -2850,10 +2870,10 @@ func (s *Server) Environment(scope, sessionName string, hidden bool) (map[string
 	if hidden {
 		globalEnv = s.GlobalHiddenEnv
 	}
-	for key, value := range globalEnv {
-		out[key] = value
-	}
 	if scope == "global" {
+		for key, value := range globalEnv {
+			out[key] = value
+		}
 		return out, nil
 	}
 	session := s.Sessions[sessionName]
@@ -2866,6 +2886,30 @@ func (s *Server) Environment(scope, sessionName string, hidden bool) (map[string
 	}
 	for key, value := range sessionEnv {
 		out[key] = value
+	}
+	return out, nil
+}
+
+func (s *Server) EnvironmentRemovals(scope, sessionName string) (map[string]bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make(map[string]bool)
+	switch scope {
+	case "global":
+		for key, value := range s.GlobalRemovedEnv {
+			out[key] = value
+		}
+	case "session":
+		session := s.Sessions[sessionName]
+		if session == nil {
+			return nil, fmt.Errorf("can't find session: %s", sessionName)
+		}
+		for key, value := range session.RemovedEnv {
+			out[key] = value
+		}
+	default:
+		return nil, fmt.Errorf("unknown environment scope: %s", scope)
 	}
 	return out, nil
 }
@@ -3283,6 +3327,9 @@ func (s *Server) environmentLocked(session *Session) []string {
 	}
 	for key, value := range session.Environment {
 		env[key] = value
+	}
+	for key := range session.RemovedEnv {
+		delete(env, key)
 	}
 	return environmentList(env)
 }
