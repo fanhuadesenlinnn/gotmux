@@ -841,24 +841,26 @@ compare_status "unset removed environment" showenv REMOVE_ME
 compare "show global removed environment" showenv -g GREMOVE
 compare "show global removed environment shell" showenv -gs GREMOVE
 
-"${tmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh
-"${gotmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh >/dev/null
-"${tmux_cmd[@]}" send-keys -t envopt:0 'printf "<%s>\n" "$NEWS"' Enter
-"${gotmux_cmd[@]}" send-keys -t envopt:0 'printf "<%s>\n" "$NEWS"' Enter >/dev/null
-sleep 0.4
-compare "new-session environment option" capture-pane -p -t envopt:0 -S 0 -E 0
-"${tmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh
-"${gotmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh >/dev/null
-"${tmux_cmd[@]}" send-keys -t envopt:1 'printf "<%s>\n" "$WINENV"' Enter
-"${gotmux_cmd[@]}" send-keys -t envopt:1 'printf "<%s>\n" "$WINENV"' Enter >/dev/null
-sleep 0.4
-compare "new-window environment option" capture-pane -p -t envopt:1 -S 0 -E 0
-"${tmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh
-"${gotmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh >/dev/null
-"${tmux_cmd[@]}" send-keys -t envopt:1.1 'printf "<%s>\n" "$SPLITENV"' Enter
-"${gotmux_cmd[@]}" send-keys -t envopt:1.1 'printf "<%s>\n" "$SPLITENV"' Enter >/dev/null
-sleep 0.4
-compare "split-window environment option" capture-pane -p -t envopt:1.1 -S 0 -E 0
+tmux_envopt_file="$(mktemp)"
+gotmux_envopt_file="$(mktemp)"
+"${tmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh -c "printf '<%s>\n' \"\$NEWS\" >> '${tmux_envopt_file}' && exec cat"
+"${gotmux_cmd[@]}" new-session -d -s envopt -x 80 -y 24 -n first -e NEWS=one /bin/sh -c "printf '<%s>\n' \"\$NEWS\" >> '${gotmux_envopt_file}' && exec cat" >/dev/null
+"${tmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh -c "printf '<%s>\n' \"\$WINENV\" >> '${tmux_envopt_file}' && exec cat"
+"${gotmux_cmd[@]}" new-window -t envopt -n winenv -e WINENV=two /bin/sh -c "printf '<%s>\n' \"\$WINENV\" >> '${gotmux_envopt_file}' && exec cat" >/dev/null
+"${tmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh -c "printf '<%s>\n' \"\$SPLITENV\" >> '${tmux_envopt_file}' && exec cat"
+"${gotmux_cmd[@]}" split-window -t envopt:1 -h -e SPLITENV=three /bin/sh -c "printf '<%s>\n' \"\$SPLITENV\" >> '${gotmux_envopt_file}' && exec cat" >/dev/null
+for marker in '<one>' '<two>' '<three>'; do
+  if ! wait_file_contains "${tmux_envopt_file}" "${marker}" || ! wait_file_contains "${gotmux_envopt_file}" "${marker}"; then
+    echo "compat probe failed: pane environment option ${marker}" >&2
+    echo "--- tmux" >&2
+    cat "${tmux_envopt_file}" >&2 || true
+    echo "--- gotmux" >&2
+    cat "${gotmux_envopt_file}" >&2 || true
+    exit 1
+  fi
+done
+printf 'ok pane environment options\n'
+rm -f "${tmux_envopt_file}" "${gotmux_envopt_file}"
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null

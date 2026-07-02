@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"io"
 	"net"
 	"os"
@@ -1656,6 +1657,111 @@ func TestPrefixDetachBindingSendsExit(t *testing.T) {
 	}
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "prefixdetach"}, "prefixdetach", 80, 24)
+}
+
+func TestAttachRedrawsContentStatusAndSplits(t *testing.T) {
+	rt := &Runtime{
+		state:   model.NewServer("/tmp/gotmux-test.sock"),
+		clients: make(map[int64]*attachedClient),
+		screens: make(map[int]*terminal.Screen),
+	}
+	msg := rt.execute([]string{"new-session", "-d", "-s", "attachdraw", "/bin/sh", "-c", "printf 'attached\n'; exec cat"}, "", 20, 6)
+	if !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	clientProtocol := protocol.NewConn(clientConn)
+	messages := make(chan protocol.Message, 64)
+	readErrs := make(chan error, 1)
+	go func() {
+		for {
+			msg, err := clientProtocol.Read()
+			if err != nil {
+				readErrs <- err
+				close(messages)
+				return
+			}
+			messages <- msg
+		}
+	}()
+	done := make(chan struct{})
+	go func() {
+		rt.handleAttach(protocol.NewConn(serverConn), protocol.Message{Type: protocol.TypeAttach, Session: "attachdraw", Width: 20, Height: 6})
+		close(done)
+	}()
+	first := waitForProtocolState(t, messages, time.Second, func(msg protocol.Message) bool {
+		return msg.Type == protocol.TypeResult
+	})
+	if first.Type != protocol.TypeResult || !first.OK {
+		t.Fatalf("attach result = %#v", first)
+	}
+	sawContent := false
+	sawStatus := false
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		if next.Type == protocol.TypeOutput && bytes.Contains(next.Data, []byte("attached")) {
+			sawContent = true
+		}
+		if next.Type == protocol.TypeStatus && bytes.Contains(next.Data, []byte("attachdraw")) {
+			sawStatus = true
+		}
+		return sawContent && sawStatus
+	})
+	if !sawContent || !sawStatus {
+		t.Fatalf("attach redraw content=%v status=%v", sawContent, sawStatus)
+	}
+	if err := clientProtocol.Write(protocol.Message{Type: protocol.TypeCommand, Command: []string{"split-window", "-h", "/bin/sh"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeOutput && bytes.Contains(next.Data, []byte("|"))
+	})
+	if err := clientProtocol.Write(protocol.Message{Type: protocol.TypeDetach}); err != nil {
+		t.Fatal(err)
+	}
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit
+	})
+	select {
+	case <-done:
+	case err := <-readErrs:
+		t.Fatal(err)
+	case <-time.After(time.Second):
+		t.Fatal("attach handler did not exit")
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "attachdraw"}, "attachdraw", 80, 24)
+}
+
+func waitForProtocolState(t *testing.T, messages <-chan protocol.Message, timeout time.Duration, fn func(protocol.Message) bool) protocol.Message {
+	t.Helper()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	for {
+		select {
+		case msg, ok := <-messages:
+			if !ok {
+				t.Fatal("protocol stream closed")
+			}
+			if fn(msg) {
+				return msg
+			}
+		case <-timer.C:
+			t.Fatalf("protocol condition was not satisfied within %s", timeout)
+		}
+	}
+}
+
+func readProtocolMessage(t *testing.T, conn net.Conn, reader *protocol.Conn) protocol.Message {
+	t.Helper()
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	msg, err := reader.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return msg
 }
 
 func TestBufferCommands(t *testing.T) {
