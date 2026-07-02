@@ -350,8 +350,8 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 		t.Fatalf("unbind table failed: %s", msg.Text)
 	}
 	msg = rt.execute([]string{"list-keys", "-T", "prefix"}, "", 80, 24)
-	if msg.Text != "" {
-		t.Fatalf("prefix table after unbind -a = %q", msg.Text)
+	if msg.OK || msg.Text != "table prefix doesn't exist" {
+		t.Fatalf("prefix table after unbind -a = %#v", msg)
 	}
 	msg = rt.execute([]string{"bind-key", "-T", "root", "F1", "display-message", "root"}, "", 80, 24)
 	if !msg.OK {
@@ -362,8 +362,8 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 		t.Fatalf("unbind root table failed: %s", msg.Text)
 	}
 	msg = rt.execute([]string{"list-keys", "-T", "root"}, "", 80, 24)
-	if msg.Text != "" {
-		t.Fatalf("root table after unbind -a = %q", msg.Text)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("root table after unbind -a = %#v", msg)
 	}
 }
 

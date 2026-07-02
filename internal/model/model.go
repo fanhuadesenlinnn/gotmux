@@ -264,6 +264,7 @@ func defaultHooks() map[string][]string {
 
 func defaultKeyBindings() map[string]map[string]KeyBinding {
 	bindings := make(map[string]map[string]KeyBinding)
+	bindings["root"] = make(map[string]KeyBinding)
 	add := func(table, key string, command ...string) {
 		if bindings[table] == nil {
 			bindings[table] = make(map[string]KeyBinding)
@@ -2615,6 +2616,10 @@ func (s *Server) UnbindKeyTable(table string) {
 	if table == "" {
 		table = "prefix"
 	}
+	if table == "root" {
+		s.KeyBindings[table] = make(map[string]KeyBinding)
+		return
+	}
 	delete(s.KeyBindings, table)
 }
 
@@ -2627,6 +2632,17 @@ func (s *Server) KeyBinding(table, key string) (KeyBinding, bool) {
 	}
 	binding, ok := s.KeyBindings[table][key]
 	return binding, ok
+}
+
+func (s *Server) KeyTableExists(table string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if table == "" {
+		table = "prefix"
+	}
+	_, ok := s.KeyBindings[table]
+	return ok
 }
 
 func (s *Server) ListKeyBindings(table string) []KeyBinding {

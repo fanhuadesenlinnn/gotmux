@@ -1623,6 +1623,9 @@ func (rt *Runtime) cmdListKeys(args []string) protocol.Message {
 	table := optionValue(args, "-T", "")
 	format := optionValue(args, "-F", "")
 	filterKeys := optionOperands(args)
+	if table != "" && !rt.state.KeyTableExists(table) {
+		return fail(fmt.Sprintf("table %s doesn't exist", table))
+	}
 	bindings := rt.state.ListKeyBindings(table)
 	sort.Slice(bindings, func(i, j int) bool {
 		if bindings[i].Table == bindings[j].Table {

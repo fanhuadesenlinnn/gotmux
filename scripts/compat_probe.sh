@@ -766,9 +766,11 @@ compare_key_line "unbound custom key" C-a
 "${tmux_cmd[@]}" bind-key C-c send-prefix
 "${gotmux_cmd[@]}" bind-key C-c send-prefix >/dev/null
 compare "unbind prefix table command" unbind-key -a
+compare_status "list removed prefix table" list-keys -T prefix
 "${tmux_cmd[@]}" bind-key -T root F1 display-message root
 "${gotmux_cmd[@]}" bind-key -T root F1 display-message root >/dev/null
 compare "unbind root table command" unbind-key -a -T root
+compare_status "list removed root table" list-keys -T root
 
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null
