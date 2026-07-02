@@ -737,6 +737,8 @@ compare "select-window last flag windows" list-windows -t lastw -F "#{window_ind
 "${gotmux_cmd[@]}" set -g status off >/dev/null
 compare "show global option" show -g status
 compare "show global option value" show -gqv status
+compare "show default status-left" show -gqv status-left
+compare "show default status-right" show -gqv status-right
 compare_status "set-once global option already set" set -go status on
 compare "show server option value" show -sqv escape-time
 "${tmux_cmd[@]}" set -s escape-time 123

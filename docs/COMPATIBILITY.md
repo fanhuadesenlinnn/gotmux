@@ -35,7 +35,7 @@ manual verification note.
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
-| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw`, including global/local/server `-u`, string `-a`, basic `-o` set-once behavior, `show-options -A`, basic `show-options -H` hook output, basic `-s` server scope, basic `-t` session/window targets, and `status off` hiding the attached-client status line in the tested subset |
+| Basic options | Implemented for string-backed `set-option`, `set-window-option`, `show-options`, and `show-window-options`/`showw`, including global/local/server `-u`, string `-a`, basic `-o` set-once behavior, `show-options -A`, basic `show-options -H` hook output, basic `-s` server scope, basic `-t` session/window targets, `status off` hiding the attached-client status line, and default `status-left`/`status-right` option values in the tested subset |
 | Basic hook options | Implemented for `set-hook` and `show-hooks` command metadata, global/session/window/pane hook storage, `-g`/`-w`/`-p`, `-a` append, `-u` unset, tmux-style `hook[index] command` display, empty global built-in hook names, and invalid hook errors in the probe subset |
 | Basic environment commands | Implemented for `set-environment`, `show-environment`, `-g`, `-t`, `-u`, `-s`, basic hidden `-h` variables, basic remove-marker `-r` variables, and basic pane-creation `-e` environment overrides in the probe subset |
 | Basic key bindings | Implemented for `bind-key`, `bind-key -N` notes, `unbind-key`, basic `unbind-key -a` table clearing, `list-keys`, missing-table `list-keys -T` errors, basic `list-keys -N` note output, prefix dispatch, root table dispatch for simple keys, common arrow/navigation/function-key input sequences, and `send-prefix` |
@@ -65,7 +65,7 @@ manual verification note.
 | Full option semantics | Only a small string-backed subset exists. Most documented options, option type validation, array option semantics, and option side effects are not implemented; hook storage exists but hook firing side effects are incomplete. |
 | Full environment semantics | `update-environment` integration and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
-| Status format language | Only a simple status line is implemented. |
+| Status format language | Basic status-left/status-right formatting and an active-window list are implemented, but tmux's full style, condition, width, and interval behavior is incomplete. |
 | Full pane process lifecycle | Basic process exit cleanup and default empty-server shutdown exist, but `remain-on-exit`, pane-died hooks, `exit-empty` option semantics, and all edge-case notifications remain incomplete. |
 | Full hooks and jobs | Basic hook storage/display is implemented, but hook firing, hook context formats, after-hook ordering, and complete hook side effects remain incomplete; jobs are limited to the basic `run-shell` subset. |
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |

@@ -1,8 +1,10 @@
 package server
 
 import (
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 )
@@ -36,6 +38,8 @@ func formatString(template string, ctx formatContext) string {
 		{"#I", formatValue("window_index", ctx)},
 		{"#W", formatValue("window_name", ctx)},
 		{"#P", formatValue("pane_index", ctx)},
+		{"#H", formatValue("host", ctx)},
+		{"#h", formatValue("host_short", ctx)},
 	} {
 		out = strings.ReplaceAll(out, alias.key, alias.value)
 	}
@@ -65,6 +69,16 @@ func formatValue(key string, ctx formatContext) string {
 		if ctx.session != nil {
 			return strconv.Itoa(ctx.session.Attached)
 		}
+	case "host":
+		return hostName()
+	case "host_short":
+		host := hostName()
+		if idx := strings.Index(host, "."); idx > 0 {
+			return host[:idx]
+		}
+		return host
+	case "time":
+		return strconv.FormatInt(time.Now().Unix(), 10)
 	case "window_id":
 		if ctx.window != nil {
 			return "@" + strconv.Itoa(ctx.window.ID)
@@ -133,8 +147,20 @@ func formatValue(key string, ctx formatContext) string {
 		if ctx.pane != nil {
 			return currentCommandName(ctx.pane.Command)
 		}
+	case "pane_title":
+		if ctx.pane != nil {
+			return currentCommandName(ctx.pane.Command)
+		}
 	}
 	return ""
+}
+
+func hostName() string {
+	host, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return host
 }
 
 func currentCommandName(command []string) string {

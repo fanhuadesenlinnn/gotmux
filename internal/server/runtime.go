@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -568,22 +569,96 @@ func (rt *Runtime) statusText(clientID int64) string {
 		if window == nil {
 			return fmt.Sprintf("[%s]", session.Name)
 		}
-		pane := window.ActivePane()
-		paneText := ""
-		if pane != nil {
-			paneText = fmt.Sprintf(" pane %d/%d", pane.Index, len(window.Panes))
-			if pane.Exited {
-				paneText += " exited"
-			}
+		options, err := rt.state.Options("session", session.Name, true)
+		if err != nil {
+			options = map[string]string{}
 		}
-		prefix := rt.state.GlobalOption("prefix")
-		if prefix == "" {
-			prefix = "C-b"
+		ctx := formatContext{session: session, window: window, pane: window.ActivePane()}
+		left := formatStatusString(optionOr(options, "status-left", model.DefaultStatusLeft), ctx)
+		right := formatStatusRight(optionOr(options, "status-right", model.DefaultStatusRight), ctx)
+		middle := statusWindowList(session)
+		text := strings.TrimRight(left+middle, " ")
+		if right == "" {
+			return text
 		}
-		return fmt.Sprintf("[%s] %d:%s*%s | %d windows | prefix %s",
-			session.Name, window.Index, window.Name, paneText, len(session.Windows), prefix)
+		width := rt.clientWidth(clientID)
+		if gap := width - len(text) - len(right); gap > 0 {
+			return text + strings.Repeat(" ", gap) + right
+		}
+		return text + " " + right
 	}
 	return "[gotmux]"
+}
+
+func optionOr(options map[string]string, name, fallback string) string {
+	if value, ok := options[name]; ok {
+		return value
+	}
+	return fallback
+}
+
+func formatStatusRight(template string, ctx formatContext) string {
+	if template == model.DefaultStatusRight {
+		return time.Now().Format("15:04 02-Jan-06")
+	}
+	return formatStatusString(template, ctx)
+}
+
+func formatStatusString(template string, ctx formatContext) string {
+	return expandStatusTime(stripStatusStyles(formatString(template, ctx)), time.Now())
+}
+
+func stripStatusStyles(text string) string {
+	for {
+		start := strings.Index(text, "#[")
+		if start == -1 {
+			return text
+		}
+		end := strings.Index(text[start:], "]")
+		if end == -1 {
+			return text[:start]
+		}
+		text = text[:start] + text[start+end+1:]
+	}
+}
+
+func expandStatusTime(text string, now time.Time) string {
+	const percentPlaceholder = "\x00"
+	replacer := strings.NewReplacer(
+		"%%", percentPlaceholder,
+		"%H", now.Format("15"),
+		"%M", now.Format("04"),
+		"%S", now.Format("05"),
+		"%d", now.Format("02"),
+		"%b", now.Format("Jan"),
+		"%m", now.Format("01"),
+		"%y", now.Format("06"),
+		"%Y", now.Format("2006"),
+	)
+	return strings.ReplaceAll(replacer.Replace(text), percentPlaceholder, "%")
+}
+
+func statusWindowList(session *model.Session) string {
+	if session == nil {
+		return ""
+	}
+	windows := make([]*model.Window, len(session.Windows))
+	copy(windows, session.Windows)
+	sort.Slice(windows, func(i, j int) bool {
+		return windows[i].Index < windows[j].Index
+	})
+	parts := make([]string, 0, len(windows))
+	for _, window := range windows {
+		marker := ""
+		if active := session.ActiveWindow(); active != nil && active.ID == window.ID {
+			marker = "*"
+		}
+		parts = append(parts, fmt.Sprintf("%d:%s%s", window.Index, window.Name, marker))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " ") + " "
 }
 
 func (rt *Runtime) resizeActivePane(clientID int64) {

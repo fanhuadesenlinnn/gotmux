@@ -151,6 +151,14 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "off" {
 		t.Fatalf("show status = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-gqv", "status-left"}, "", 80, 24)
+	if msg.Text != model.DefaultStatusLeft {
+		t.Fatalf("show status-left = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"show", "-gqv", "status-right"}, "", 80, 24)
+	if msg.Text != model.DefaultStatusRight {
+		t.Fatalf("show status-right = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"set", "-go", "status", "on"}, "", 80, 24)
 	if msg.OK || msg.Text != "already set: status" {
 		t.Fatalf("set-once global status = %#v", msg)
@@ -1772,6 +1780,37 @@ func TestStatusOffSuppressesStatusLine(t *testing.T) {
 	})
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "statusoff"}, "statusoff", 80, 24)
+}
+
+func TestStatusLineUsesConfiguredFormats(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
+	if _, _, _, err := rt.state.NewSession("statusfmt", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	if _, _, err := rt.state.NewWindow("statusfmt", "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-window failed: %s", err)
+	}
+	if msg := rt.execute([]string{"set", "-g", "status-left", "#[bold]#S "}, "statusfmt", 80, 24); !msg.OK {
+		t.Fatalf("set status-left failed: %s", msg.Text)
+	}
+	if msg := rt.execute([]string{"set", "-g", "status-right", "#h #{session_windows}w"}, "statusfmt", 80, 24); !msg.OK {
+		t.Fatalf("set status-right failed: %s", msg.Text)
+	}
+	client, messages := attachTestRuntimeClient(t, rt, "statusfmt")
+	rt.redrawStatus(client.ID)
+	status := waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeStatus
+	})
+	host, _ := os.Hostname()
+	if idx := strings.Index(host, "."); idx > 0 {
+		host = host[:idx]
+	}
+	text := string(status.Data)
+	for _, want := range []string{"statusfmt 0:first 1:second*", host + " 2w"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("status line missing %q in %q", want, text)
+		}
+	}
 }
 
 func TestPrefixKeyBindingsDispatch(t *testing.T) {
