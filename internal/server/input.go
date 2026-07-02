@@ -29,7 +29,7 @@ func (rt *Runtime) handleInput(clientID int64, data []byte) {
 			data = data[consumed:]
 			continue
 		}
-		idx := bytes.IndexByte(data, rt.prefixByte())
+		idx := rt.prefixIndex(data)
 		if idx == -1 {
 			rt.writeActivePane(clientID, data)
 			return
@@ -51,8 +51,8 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 		rt.showKeys(clientID)
 		return consumed
 	}
-	if key == rt.state.GlobalOption("prefix") {
-		rt.writeActivePane(clientID, []byte{rt.prefixByte()})
+	if prefixByte, ok := rt.prefixKeyByte(key); ok {
+		rt.writeActivePane(clientID, []byte{prefixByte})
 		return consumed
 	}
 	if binding, ok := rt.state.KeyBinding("prefix", key); ok {
@@ -132,14 +132,61 @@ func (rt *Runtime) writeClientStatusMessage(clientID int64, text string) {
 }
 
 func (rt *Runtime) prefixByte() byte {
-	prefix := rt.state.GlobalOption("prefix")
-	if len(prefix) == 3 && prefix[0] == 'C' && prefix[1] == '-' {
-		return prefix[2] & 0x1f
-	}
-	if len(prefix) == 1 {
-		return prefix[0]
+	prefixByte, ok := keyByte(rt.state.GlobalOption("prefix"))
+	if ok {
+		return prefixByte
 	}
 	return 0x02
+}
+
+func (rt *Runtime) prefix2Byte() (byte, bool) {
+	return keyByte(rt.state.GlobalOption("prefix2"))
+}
+
+func (rt *Runtime) prefixIndex(data []byte) int {
+	index := -1
+	for _, prefix := range rt.prefixBytes() {
+		next := bytes.IndexByte(data, prefix)
+		if next == -1 {
+			continue
+		}
+		if index == -1 || next < index {
+			index = next
+		}
+	}
+	return index
+}
+
+func (rt *Runtime) prefixBytes() []byte {
+	primary := rt.prefixByte()
+	out := []byte{primary}
+	if secondary, ok := rt.prefix2Byte(); ok && secondary != primary {
+		out = append(out, secondary)
+	}
+	return out
+}
+
+func (rt *Runtime) prefixKeyByte(key string) (byte, bool) {
+	if key == rt.state.GlobalOption("prefix") {
+		return rt.prefixByte(), true
+	}
+	if key == rt.state.GlobalOption("prefix2") {
+		return rt.prefix2Byte()
+	}
+	return 0, false
+}
+
+func keyByte(key string) (byte, bool) {
+	if key == "" || key == "None" {
+		return 0, false
+	}
+	if len(key) == 3 && key[0] == 'C' && key[1] == '-' {
+		return key[2] & 0x1f, true
+	}
+	if len(key) == 1 {
+		return key[0], true
+	}
+	return 0, false
 }
 
 func inputKeyName(data []byte) (string, int) {

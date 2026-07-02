@@ -32,8 +32,8 @@ targets, default `status-left`/`status-right` values, basic status-left/right
 rendering with an active-window list, basic `set-hook`/`show-hooks` hook option
 storage and display, basic environment
 commands with target resolution, hidden variables, remove markers, and pane creation overrides,
-prefix/root key bindings, basic key binding notes and table clearing/errors,
-`send-prefix`, basic `run-shell` shell
+prefix/root key bindings, `prefix2` dispatch, basic key binding notes and table
+clearing/errors, `send-prefix`, `send-prefix -2`, basic `run-shell` shell
 execution, basic `if-shell` conditionals, and basic `wait-for` synchronization
 are implemented and covered by `scripts/compat_probe.sh`. Basic empty prompt
 history commands are also covered. Full tmux syntax, hook firing side effects,

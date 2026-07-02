@@ -203,6 +203,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "C-b" {
 		t.Fatalf("global prefix after server set = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-gqv", "prefix2"}, "", 80, 24)
+	if msg.Text != "None" {
+		t.Fatalf("default prefix2 = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"set", "-gu", "status"}, "", 80, 24)
 	if !msg.OK {
 		t.Fatalf("unset global status failed: %s", msg.Text)
@@ -1841,6 +1845,15 @@ func TestPrefixKeyBindingsDispatch(t *testing.T) {
 	windows = rt.execute([]string{"list-windows", "-t", "prefixkeys", "-F", "#{window_index}:#{window_active}"}, "prefixkeys", 80, 24)
 	if windows.Text != "0:0\n1:0\n2:1" {
 		t.Fatalf("custom prefix c windows = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"set", "-g", "prefix2", "C-z"}, "prefixkeys", 80, 24)
+	if !msg.OK {
+		t.Fatalf("set prefix2 failed: %s", msg.Text)
+	}
+	rt.handleInput(client.ID, []byte{0x1a, 'c'})
+	windows = rt.execute([]string{"list-windows", "-t", "prefixkeys", "-F", "#{window_index}:#{window_active}"}, "prefixkeys", 80, 24)
+	if windows.Text != "0:0\n1:0\n2:0\n3:1" {
+		t.Fatalf("prefix2 c windows = %q", windows.Text)
 	}
 	rt.state.DetachClient(client.ID)
 	_ = rt.execute([]string{"kill-session", "-t", "prefixkeys"}, "prefixkeys", 80, 24)

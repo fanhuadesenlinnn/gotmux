@@ -248,6 +248,7 @@ func defaultOptions() map[string]string {
 		"default-command": "",
 		"default-shell":   DefaultShell(),
 		"prefix":          "C-b",
+		"prefix2":         "None",
 		"status":          "on",
 		"status-left":     DefaultStatusLeft,
 		"status-right":    DefaultStatusRight,

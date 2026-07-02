@@ -753,6 +753,7 @@ compare "unset server option value" show -sqv escape-time
 compare "server-specific option value" show -sqv prefix
 compare_status "set-once server option already set" set -so prefix C-c
 compare "server set leaves global option" show -gqv prefix
+compare "show default prefix2" show -gqv prefix2
 "${tmux_cmd[@]}" new-session -d -s optonce -x 80 -y 24 -n first /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s optonce -x 80 -y 24 -n first /bin/sh >/dev/null
 compare "set-once local option" set -o -t optonce status off

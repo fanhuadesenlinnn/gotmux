@@ -2154,7 +2154,15 @@ func (rt *Runtime) cmdSendPrefix(args []string, currentSession string) protocol.
 	if pane == nil || pane.PTY == nil {
 		return ok("")
 	}
-	_, _ = pane.PTY.Write([]byte{rt.prefixByte()})
+	prefix := rt.prefixByte()
+	if hasAny(args, "-2") {
+		var found bool
+		prefix, found = rt.prefix2Byte()
+		if !found {
+			return ok("")
+		}
+	}
+	_, _ = pane.PTY.Write([]byte{prefix})
 	return ok("")
 }
 
