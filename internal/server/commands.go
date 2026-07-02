@@ -2122,18 +2122,96 @@ func sendKeysToPane(pane *model.Pane, keys []string, literal bool) {
 			continue
 		}
 		switch key {
-		case "Enter", "C-m":
-			_, _ = pane.PTY.Write([]byte{'\r'})
-		case "Space":
-			_, _ = pane.PTY.Write([]byte(" "))
-		case "Tab":
-			_, _ = pane.PTY.Write([]byte{'\t'})
-		case "BSpace", "Backspace":
-			_, _ = pane.PTY.Write([]byte{0x7f})
+		case "":
+			continue
 		default:
-			_, _ = pane.PTY.Write([]byte(key))
+			_, _ = pane.PTY.Write(sendKeyBytes(key))
 		}
 	}
+}
+
+func sendKeyBytes(key string) []byte {
+	switch key {
+	case "Enter", "C-m":
+		return []byte{'\r'}
+	case "Escape", "Esc", "C-[":
+		return []byte{0x1b}
+	case "Space":
+		return []byte(" ")
+	case "Tab", "C-i":
+		return []byte{'\t'}
+	case "BSpace", "Backspace", "C-?":
+		return []byte{0x7f}
+	case "Up":
+		return []byte("\x1b[A")
+	case "Down":
+		return []byte("\x1b[B")
+	case "Right":
+		return []byte("\x1b[C")
+	case "Left":
+		return []byte("\x1b[D")
+	case "Home":
+		return []byte("\x1b[H")
+	case "End":
+		return []byte("\x1b[F")
+	case "Insert", "IC":
+		return []byte("\x1b[2~")
+	case "Delete", "DC":
+		return []byte("\x1b[3~")
+	case "PageUp", "PPage":
+		return []byte("\x1b[5~")
+	case "PageDown", "NPage":
+		return []byte("\x1b[6~")
+	case "F1":
+		return []byte("\x1bOP")
+	case "F2":
+		return []byte("\x1bOQ")
+	case "F3":
+		return []byte("\x1bOR")
+	case "F4":
+		return []byte("\x1bOS")
+	case "F5":
+		return []byte("\x1b[15~")
+	case "F6":
+		return []byte("\x1b[17~")
+	case "F7":
+		return []byte("\x1b[18~")
+	case "F8":
+		return []byte("\x1b[19~")
+	case "F9":
+		return []byte("\x1b[20~")
+	case "F10":
+		return []byte("\x1b[21~")
+	case "F11":
+		return []byte("\x1b[23~")
+	case "F12":
+		return []byte("\x1b[24~")
+	}
+	if strings.HasPrefix(key, "M-") && len(key) > 2 {
+		return append([]byte{0x1b}, sendKeyBytes(key[2:])...)
+	}
+	if strings.HasPrefix(key, "C-") && len(key) == 3 {
+		r := key[2]
+		if r >= 'a' && r <= 'z' {
+			return []byte{r - 'a' + 1}
+		}
+		if r >= 'A' && r <= 'Z' {
+			return []byte{r - 'A' + 1}
+		}
+		switch r {
+		case '@', ' ':
+			return []byte{0}
+		case '\\':
+			return []byte{0x1c}
+		case ']':
+			return []byte{0x1d}
+		case '^':
+			return []byte{0x1e}
+		case '_':
+			return []byte{0x1f}
+		}
+	}
+	return []byte(key)
 }
 
 func shellQuote(value string) string {

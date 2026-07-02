@@ -901,6 +901,10 @@ func TestSendKeysTargetsPaneAndRepeats(t *testing.T) {
 	if !msg.OK {
 		t.Fatalf("send-keys failed: %s", msg.Text)
 	}
+	msg = rt.execute([]string{"send-keys", "-t", "sendt:.1", "C-c", "Up", "Delete", "F1", "Escape"}, session.Name, 80, 24)
+	if !msg.OK {
+		t.Fatalf("send-keys special keys failed: %s", msg.Text)
+	}
 	_ = firstWrite.Close()
 	_ = secondWrite.Close()
 	firstData, _ := io.ReadAll(firstRead)
@@ -908,8 +912,8 @@ func TestSendKeysTargetsPaneAndRepeats(t *testing.T) {
 	if string(firstData) != "A\rA\r" {
 		t.Fatalf("target pane data = %q, want repeated A enter", firstData)
 	}
-	if string(secondData) != "" {
-		t.Fatalf("non-target pane data = %q, want empty", secondData)
+	if string(secondData) != "\x03\x1b[A\x1b[3~\x1bOP\x1b" {
+		t.Fatalf("special key pane data = %q", secondData)
 	}
 	_ = firstRead.Close()
 	_ = secondRead.Close()
