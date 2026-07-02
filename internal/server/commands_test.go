@@ -1282,6 +1282,10 @@ func TestEnvironmentCommands(t *testing.T) {
 	if !msg.OK {
 		t.Fatalf("new-session failed: %s", msg.Text)
 	}
+	msg = rt.execute([]string{"new-session", "-d", "-s", "envtarget", "/bin/sh"}, "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session envtarget failed: %s", msg.Text)
+	}
 	msg = rt.execute([]string{"setenv", "FOO", "bar"}, "env", 80, 24)
 	if !msg.OK {
 		t.Fatalf("setenv failed: %s", msg.Text)
@@ -1293,6 +1297,26 @@ func TestEnvironmentCommands(t *testing.T) {
 	msg = rt.execute([]string{"showenv", "-s", "FOO"}, "env", 80, 24)
 	if msg.Text != `FOO="bar"; export FOO;` {
 		t.Fatalf("showenv -s = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "-t", "envtarget", "TARGET", "yes"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("setenv target failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-t", "envtarget", "TARGET"}, "env", 80, 24)
+	if msg.Text != "TARGET=yes" {
+		t.Fatalf("showenv target = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-t", "env", "TARGET"}, "env", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
+		t.Fatalf("showenv untouched target = %#v", msg)
+	}
+	msg = rt.execute([]string{"showenv", "-t", "envtarget", "-s", "TARGET"}, "env", 80, 24)
+	if msg.Text != `TARGET="yes"; export TARGET;` {
+		t.Fatalf("showenv target shell = %q", msg.Text)
+	}
+	msg = rt.execute([]string{"setenv", "-t", "missing", "TARGET", "no"}, "env", 80, 24)
+	if msg.OK || msg.Text != "no such session: missing" {
+		t.Fatalf("setenv missing target = %#v", msg)
 	}
 	msg = rt.execute([]string{"new-window", "-t", "env", "-n", "usesenv", "/bin/sh"}, "env", 80, 24)
 	if !msg.OK {
@@ -1324,7 +1348,16 @@ func TestEnvironmentCommands(t *testing.T) {
 	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
 		t.Fatalf("showenv after unset = %#v", msg)
 	}
+	msg = rt.execute([]string{"setenv", "-t", "envtarget", "-u", "TARGET"}, "env", 80, 24)
+	if !msg.OK {
+		t.Fatalf("unset target env failed: %s", msg.Text)
+	}
+	msg = rt.execute([]string{"showenv", "-t", "envtarget", "TARGET"}, "env", 80, 24)
+	if msg.OK || !strings.Contains(msg.Text, "unknown variable") {
+		t.Fatalf("showenv target after unset = %#v", msg)
+	}
 	_ = rt.execute([]string{"kill-session", "-t", "env"}, "env", 80, 24)
+	_ = rt.execute([]string{"kill-session", "-t", "envtarget"}, "envtarget", 80, 24)
 }
 
 func TestRootKeyBindingDispatch(t *testing.T) {

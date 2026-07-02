@@ -1948,12 +1948,13 @@ func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) proto
 	if hasAny(args, "-g") {
 		scope = "global"
 	}
-	if currentSession == "" {
-		currentSession = firstSessionName(rt.state)
+	targetSession, targetErr := rt.environmentCommandTarget(args, currentSession, scope)
+	if targetErr != "" {
+		return fail(targetErr)
 	}
 	name := values[0]
 	if hasAny(args, "-u") {
-		if err := rt.state.UnsetEnvironment(scope, currentSession, name); err != nil {
+		if err := rt.state.UnsetEnvironment(scope, targetSession, name); err != nil {
 			return fail(err.Error())
 		}
 		return ok("")
@@ -1962,7 +1963,7 @@ func (rt *Runtime) cmdSetEnvironment(args []string, currentSession string) proto
 	if len(values) > 1 {
 		value = strings.Join(values[1:], " ")
 	}
-	if err := rt.state.SetEnvironment(scope, currentSession, name, value); err != nil {
+	if err := rt.state.SetEnvironment(scope, targetSession, name, value); err != nil {
 		return fail(err.Error())
 	}
 	return ok("")
@@ -1973,10 +1974,11 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 	if hasAny(args, "-g") {
 		scope = "global"
 	}
-	if currentSession == "" {
-		currentSession = firstSessionName(rt.state)
+	targetSession, targetErr := rt.environmentCommandTarget(args, currentSession, scope)
+	if targetErr != "" {
+		return fail(targetErr)
 	}
-	env, err := rt.state.Environment(scope, currentSession)
+	env, err := rt.state.Environment(scope, targetSession)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -2006,6 +2008,24 @@ func (rt *Runtime) cmdShowEnvironment(args []string, currentSession string) prot
 		}
 	}
 	return ok(strings.Join(lines, "\n"))
+}
+
+func (rt *Runtime) environmentCommandTarget(args []string, currentSession string, scope string) (string, string) {
+	if scope == "global" {
+		return "", ""
+	}
+	target := optionValue(args, "-t", currentSession)
+	sessionName, _, _, _, _ := parsePaneTarget(target)
+	if sessionName == "" {
+		sessionName = currentSession
+	}
+	if sessionName == "" {
+		sessionName = firstSessionName(rt.state)
+	}
+	if !sessionExists(rt.state, sessionName) {
+		return "", fmt.Sprintf("no such session: %s", sessionName)
+	}
+	return sessionName, ""
 }
 
 func (rt *Runtime) cmdSendPrefix(args []string, currentSession string) protocol.Message {

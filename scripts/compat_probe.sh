@@ -772,6 +772,18 @@ compare_status "list removed prefix table" list-keys -T prefix
 compare "unbind root table command" unbind-key -a -T root
 compare_status "list removed root table" list-keys -T root
 
+"${tmux_cmd[@]}" new-session -d -s envtarget -x 80 -y 24 -n first /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s envtarget -x 80 -y 24 -n first /bin/sh >/dev/null
+"${tmux_cmd[@]}" setenv -t envtarget TARGET yes
+"${gotmux_cmd[@]}" setenv -t envtarget TARGET yes >/dev/null
+compare "show target environment" showenv -t envtarget TARGET
+compare "show target environment shell" showenv -t envtarget -s TARGET
+compare_status "target environment absent elsewhere" showenv -t compat TARGET
+compare_status "set target environment missing session" setenv -t missing TARGET no
+"${tmux_cmd[@]}" setenv -t envtarget -u TARGET
+"${gotmux_cmd[@]}" setenv -t envtarget -u TARGET >/dev/null
+compare_status "unset target environment" showenv -t envtarget TARGET
+
 "${tmux_cmd[@]}" setenv FOO bar
 "${gotmux_cmd[@]}" setenv FOO bar >/dev/null
 compare "show environment" showenv FOO
