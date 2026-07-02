@@ -1755,7 +1755,13 @@ func TestAttachRedrawsContentStatusAndSplits(t *testing.T) {
 	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
 		return next.Type == protocol.TypeOutput && bytes.Contains(next.Data, []byte("|"))
 	})
-	if err := clientProtocol.Write(protocol.Message{Type: protocol.TypeDetach}); err != nil {
+	if err := clientProtocol.Write(protocol.Message{Type: protocol.TypeCommand, Command: []string{"display-message", "command #{session_name}"}}); err != nil {
+		t.Fatal(err)
+	}
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeStatus && bytes.Contains(next.Data, []byte("command attachdraw"))
+	})
+	if err := clientProtocol.Write(protocol.Message{Type: protocol.TypeCommand, Command: []string{"detach-client"}}); err != nil {
 		t.Fatal(err)
 	}
 	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {

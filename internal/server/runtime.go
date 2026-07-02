@@ -144,8 +144,10 @@ func (rt *Runtime) handleAttach(conn *protocol.Conn, msg protocol.Message) {
 			return
 		case protocol.TypeCommand:
 			result := rt.executeMessageForClient(next, rt.state.ActiveSessionName(client.ID), client.ID)
-			_ = conn.Write(result)
-			rt.redrawClient(client.ID)
+			rt.writeCommandResult(client.ID, result)
+			if result.Type == protocol.TypeExit {
+				return
+			}
 		}
 	}
 }
