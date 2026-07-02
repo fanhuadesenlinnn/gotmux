@@ -258,8 +258,12 @@ func (rt *Runtime) closePaneAfterExit(paneID int, exitState string) {
 }
 
 func (rt *Runtime) afterCommandMessage(msg protocol.Message) {
+	rt.afterCommandList(messageCommandList(msg))
+}
+
+func (rt *Runtime) afterCommandList(commands [][]string) {
 	rt.detachOrphanedClients("session closed")
-	if commandMessageMayEmptyServer(msg) {
+	if commandListMayEmptyServer(commands) {
 		rt.stopIfEmptySoon()
 	}
 }
@@ -289,11 +293,15 @@ func (rt *Runtime) hasSessions() bool {
 	return len(sessions) > 0
 }
 
-func commandMessageMayEmptyServer(msg protocol.Message) bool {
+func messageCommandList(msg protocol.Message) [][]string {
 	commands := msg.Commands
 	if len(commands) == 0 && len(msg.Command) > 0 {
 		commands = [][]string{msg.Command}
 	}
+	return commands
+}
+
+func commandListMayEmptyServer(commands [][]string) bool {
 	for _, argv := range commands {
 		if len(argv) == 0 {
 			continue

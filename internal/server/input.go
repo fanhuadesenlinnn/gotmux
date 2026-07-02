@@ -65,6 +65,7 @@ func (rt *Runtime) executeBinding(clientID int64, command []string) {
 	session := rt.state.ActiveSessionName(clientID)
 	result := rt.executeWithClient(command, session, rt.clientWidth(clientID), rt.clientContentHeight(clientID), clientID)
 	rt.writeCommandResult(clientID, result)
+	rt.afterCommandList([][]string{command})
 }
 
 func (rt *Runtime) writeActivePane(clientID int64, data []byte) {
