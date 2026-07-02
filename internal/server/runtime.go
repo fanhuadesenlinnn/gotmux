@@ -55,6 +55,7 @@ func Run(ctx context.Context, socketPath string, configFiles []string) error {
 	if err != nil {
 		return err
 	}
+	defer func() { _ = os.Remove(socketPath) }()
 	defer ln.Close()
 	_ = os.Chmod(socketPath, 0o600)
 
