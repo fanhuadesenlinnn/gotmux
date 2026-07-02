@@ -794,6 +794,7 @@ compare "untouched target window option" showw -t opttarget:0 -v mode-keys
 "${tmux_cmd[@]}" bind-key -N "reload config" C-r source-file ~/.tmux.conf
 "${gotmux_cmd[@]}" bind-key -N "reload config" C-r source-file ~/.tmux.conf >/dev/null
 compare_key_line "default refresh binding" r
+compare_key_line "default display-panes binding" q
 compare_key_line "list custom key" C-a
 compare_note_line "list custom key note" C-r
 compare "unbind custom key command" unbind-key C-a

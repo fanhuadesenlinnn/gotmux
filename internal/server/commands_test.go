@@ -1837,6 +1837,10 @@ func TestPrefixKeyBindingsDispatch(t *testing.T) {
 	if panes.Text != "0:0\n1:1" {
 		t.Fatalf("prefix %% panes = %q", panes.Text)
 	}
+	msg = rt.executeWithClient([]string{"display-panes"}, "prefixkeys", 80, 24, client.ID)
+	if !msg.OK || msg.Text != "panes: 0 1" {
+		t.Fatalf("display-panes = %#v", msg)
+	}
 	msg = rt.execute([]string{"set", "-g", "prefix", "C-a"}, "prefixkeys", 80, 24)
 	if !msg.OK {
 		t.Fatalf("set prefix failed: %s", msg.Text)

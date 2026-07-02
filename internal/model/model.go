@@ -302,6 +302,7 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "l", "last-window")
 	add("prefix", "n", "next-window")
 	add("prefix", "p", "previous-window")
+	add("prefix", "q", "display-panes")
 	add("prefix", "o", "select-pane", "-t", ":.+")
 	add("prefix", "r", "refresh-client")
 	add("prefix", "s", "choose-tree", "-s")

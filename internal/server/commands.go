@@ -200,11 +200,16 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 		return ok("")
 	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "choose-tree", "customize-mode", "find-window":
 		return ok("")
-	case "command-prompt", "confirm-before", "display-menu", "display-panes", "display-popup", "suspend-client":
+	case "command-prompt", "confirm-before", "display-menu", "display-popup", "suspend-client":
 		if clientID == 0 {
 			return fail("no current client")
 		}
 		return ok("")
+	case "display-panes":
+		if clientID == 0 {
+			return fail("no current client")
+		}
+		return rt.cmdDisplayPanes(clientID)
 	case "list-sessions":
 		return ok(listSessionsCommand(rt.state, args))
 	case "list-windows":
@@ -1243,6 +1248,19 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 		ctx = formatContextForPaneID(rt.state, pane.ID)
 	}
 	return ok(formatString(template, ctx))
+}
+
+func (rt *Runtime) cmdDisplayPanes(clientID int64) protocol.Message {
+	sessionName := rt.state.ActiveSessionName(clientID)
+	panes := rt.state.ActiveWindowPanes(sessionName)
+	if len(panes) == 0 {
+		return ok("")
+	}
+	labels := make([]string, 0, len(panes))
+	for _, pane := range panes {
+		labels = append(labels, strconv.Itoa(pane.Index))
+	}
+	return ok("panes: " + strings.Join(labels, " "))
 }
 
 func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {
