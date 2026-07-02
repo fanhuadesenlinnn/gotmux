@@ -4,7 +4,7 @@ This file is the release gate for claiming tmux compatibility. A feature is not
 considered compatible until it has an implementation and a regression test or a
 manual verification note.
 
-## Implemented in v0.1.1
+## Implemented on current main
 
 | Area | Status |
 | --- | --- |

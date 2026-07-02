@@ -14,7 +14,7 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
-const version = "gotmux 0.1.1"
+const version = "gotmux 0.1.3-dev"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
