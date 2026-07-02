@@ -12,7 +12,7 @@ manual verification note.
 | Server-owned PTYs | Implemented |
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |
-| `new-session` output | Implemented for tmux-style quiet default and basic `-P`/`-F` print output |
+| `new-session` output | Implemented for tmux-style quiet default, basic `-P`/`-F` print output, and basic `-A` attach-existing behavior |
 | Attach/detach | Implemented |
 | Common window and pane commands | Implemented, including basic targeted `select-window -t`, `select-window -n/-p/-l`, `last-window`, `next-window -t`, `previous-window -t`, `select-pane -t`, `select-pane -L/-R/-U/-D`, `select-pane -l`, `last-pane`, `kill-pane -t`/`-a`, `kill-window -t`/`-a`, basic `link-window`/`linkw`, linked `unlink-window`, `unlink-window -k`, `rename-window -t`, explicit-target `swap-window`, basic `new-window -d`/`-P`, basic floating `new-pane`/`newp`, basic `split-window -d`/`-P`, basic `resize-window`, basic `move-window`/renumber, and basic `respawn-pane`/`respawn-window -k` |
 | Basic pane process lifecycle | Implemented for tmux-style default cleanup when a pane process exits, including removing the exited pane, closing the window/session when it was the last pane, detaching orphaned clients, and stopping the server when destructive commands, key bindings, or pane exit leave no sessions; the probe covers multi-pane exit cleanup |

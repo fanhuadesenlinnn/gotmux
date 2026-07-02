@@ -15,6 +15,7 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
+	"github.com/fanhuadesenlinnn/gotmux/internal/version"
 )
 
 func TestCommandCreatesAndListsSession(t *testing.T) {
@@ -43,6 +44,23 @@ func TestCommandRejectsDuplicateSession(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "work"}, "work", 80, 24)
 }
 
+func TestNewSessionAttachExisting(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	first := rt.execute([]string{"new-session", "-d", "-s", "work", "/bin/sh"}, "", 80, 24)
+	if !first.OK {
+		t.Fatalf("new-session failed: %s", first.Text)
+	}
+	second := rt.execute([]string{"new-session", "-A", "-d", "-P", "-F", "#{session_name}:#{session_windows}", "-s", "work", "/bin/sh"}, "", 80, 24)
+	if !second.OK || second.Session != "work" || second.Text != "work:1" {
+		t.Fatalf("new-session -A existing = %#v", second)
+	}
+	list := rt.execute([]string{"list-sessions", "-F", "#{session_name}:#{session_windows}"}, "", 80, 24)
+	if list.Text != "work:1" {
+		t.Fatalf("new-session -A created extra session/window: %q", list.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "work"}, "work", 80, 24)
+}
+
 func TestNewSessionPrintFlag(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	msg := rt.execute([]string{"new-session", "-d", "-s", "newsout", "-n", "first", "/bin/sh"}, "", 80, 24)
@@ -55,6 +73,14 @@ func TestNewSessionPrintFlag(t *testing.T) {
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "newsout"}, "newsout", 80, 24)
 	_ = rt.execute([]string{"kill-session", "-t", "newsp"}, "newsp", 80, 24)
+}
+
+func TestVersionCommandUsesSharedVersion(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.execute([]string{"version"}, "", 80, 24)
+	if !msg.OK || msg.Text != version.String {
+		t.Fatalf("version command = %#v, want %q", msg, version.String)
+	}
 }
 
 func TestCommandSequence(t *testing.T) {

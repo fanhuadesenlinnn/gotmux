@@ -12,9 +12,8 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/daemon"
 	"github.com/fanhuadesenlinnn/gotmux/internal/server"
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
+	"github.com/fanhuadesenlinnn/gotmux/internal/version"
 )
-
-const version = "gotmux 0.1.3-dev"
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -32,7 +31,7 @@ func run(args []string) int {
 		return 1
 	}
 	if global.version {
-		fmt.Println(version)
+		fmt.Println(version.String)
 		return 0
 	}
 	if global.help {

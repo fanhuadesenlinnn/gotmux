@@ -13,6 +13,7 @@ import (
 	"github.com/fanhuadesenlinnn/gotmux/internal/command"
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
+	"github.com/fanhuadesenlinnn/gotmux/internal/version"
 )
 
 type commandInfo struct {
@@ -498,7 +499,7 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 	case "detach-client":
 		return protocol.Message{Type: protocol.TypeExit, OK: true, Text: "detached"}
 	case "version":
-		return ok("gotmux 0.1.1")
+		return ok(version.String)
 	default:
 		return fail(fmt.Sprintf("unknown command: %s", argv[0]))
 	}
