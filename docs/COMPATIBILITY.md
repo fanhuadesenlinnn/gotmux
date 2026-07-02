@@ -8,7 +8,7 @@ manual verification note.
 
 | Area | Status |
 | --- | --- |
-| Client/server split over Unix socket | Implemented, including socket cleanup on server exit |
+| Client/server split over Unix socket | Implemented, including `kill-server` runtime shutdown and socket cleanup on server exit |
 | Server-owned PTYs | Implemented |
 | Sessions, windows, panes | Implemented |
 | Detached sessions | Implemented |

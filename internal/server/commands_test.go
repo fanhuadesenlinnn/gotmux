@@ -2006,6 +2006,53 @@ func TestCommandDetachesClientsForRemovedSession(t *testing.T) {
 	})
 }
 
+func TestKillServerStopsRuntimeAndDetachesClients(t *testing.T) {
+	var once sync.Once
+	stopped := make(chan struct{})
+	rt := &Runtime{
+		state:   model.NewServer("/tmp/gotmux-test.sock"),
+		clients: make(map[int64]*attachedClient),
+		stopServer: func() {
+			once.Do(func() { close(stopped) })
+		},
+	}
+	if _, _, _, err := rt.state.NewSession("killserver", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	client, _, err := rt.state.AttachClient("killserver", 40, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+	clientProtocol := protocol.NewConn(clientConn)
+	messages := make(chan protocol.Message, 8)
+	go func() {
+		for {
+			msg, err := clientProtocol.Read()
+			if err != nil {
+				close(messages)
+				return
+			}
+			messages <- msg
+		}
+	}()
+	rt.clients[client.ID] = &attachedClient{id: client.ID, conn: protocol.NewConn(serverConn), done: make(chan struct{})}
+	msg := rt.execute([]string{"kill-server"}, "killserver", 80, 24)
+	if !msg.OK || msg.Text != "" {
+		t.Fatalf("kill-server result = %#v", msg)
+	}
+	waitForProtocolState(t, messages, time.Second, func(next protocol.Message) bool {
+		return next.Type == protocol.TypeExit && next.Text == "server exited"
+	})
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("server did not stop after kill-server")
+	}
+}
+
 func waitForProtocolState(t *testing.T, messages <-chan protocol.Message, timeout time.Duration, fn func(protocol.Message) bool) protocol.Message {
 	t.Helper()
 	timer := time.NewTimer(timeout)

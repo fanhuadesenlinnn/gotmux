@@ -412,11 +412,8 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 	case "start-server":
 		return ok("")
 	case "kill-server":
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			os.Exit(0)
-		}()
-		return ok("server exited")
+		rt.stopServerSoon("server exited")
+		return ok("")
 	case "lock-server":
 		return ok("")
 	case "lock-session":

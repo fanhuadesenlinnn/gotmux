@@ -288,6 +288,16 @@ func (rt *Runtime) stopIfEmptySoon() {
 	})
 }
 
+func (rt *Runtime) stopServerSoon(text string) {
+	for _, client := range rt.state.ListClients() {
+		rt.detachClient(client.ID, text)
+	}
+	if rt.stopServer == nil {
+		return
+	}
+	time.AfterFunc(100*time.Millisecond, rt.stopServer)
+}
+
 func (rt *Runtime) hasSessions() bool {
 	sessions, _ := rt.state.Snapshot()
 	return len(sessions) > 0
