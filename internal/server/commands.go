@@ -505,17 +505,19 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 }
 
 func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Message {
-	width, height = commandSize(args, width, height)
-	name := optionValue(args, "-s", "")
-	windowName := optionValue(args, "-n", "")
-	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{
+	valueOptions := map[string]bool{
 		"-s": true, "-n": true, "-c": true, "-e": true, "-F": true, "-t": true, "-x": true, "-y": true,
-	})
-	if hasAny(args, "-A") && name != "" && sessionExists(rt.state, name) {
+	}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	width, height = commandSize(optionArgs, width, height)
+	name := optionValue(optionArgs, "-s", "")
+	windowName := optionValue(optionArgs, "-n", "")
+	cwd := optionValue(optionArgs, "-c", "")
+	command := trailingCommand(args, valueOptions)
+	if hasAny(optionArgs, "-A") && name != "" && sessionExists(rt.state, name) {
 		text := ""
-		if hasAny(args, "-P") {
-			text = formatString(optionValue(args, "-F", "#{session_name}:"), activeFormatContext(rt.state, name))
+		if hasAny(optionArgs, "-P") {
+			text = formatString(optionValue(optionArgs, "-F", "#{session_name}:"), activeFormatContext(rt.state, name))
 		}
 		return protocol.Message{Type: protocol.TypeResult, OK: true, Text: text, Session: name}
 	}
@@ -523,94 +525,100 @@ func (rt *Runtime) cmdNewSession(args []string, width, height int) protocol.Mess
 	if err != nil {
 		return fail(err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(optionArgs))
 	rt.state.SetActiveWindowSize(session.Name, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
 	text := ""
-	if hasAny(args, "-P") {
-		text = formatString(optionValue(args, "-F", "#{session_name}:"), activeFormatContext(rt.state, session.Name))
+	if hasAny(optionArgs, "-P") {
+		text = formatString(optionValue(optionArgs, "-F", "#{session_name}:"), activeFormatContext(rt.state, session.Name))
 	}
 	return protocol.Message{Type: protocol.TypeResult, OK: true, Text: text, Session: session.Name}
 }
 
 func (rt *Runtime) cmdNewWindow(args []string, currentSession string, width, height int) protocol.Message {
-	if target := targetSession(args, currentSession); target != "" {
+	valueOptions := map[string]bool{"-n": true, "-c": true, "-e": true, "-F": true, "-t": true}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	if target := targetSession(optionArgs, currentSession); target != "" {
 		currentSession = target
 	}
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
-	name := optionValue(args, "-n", "")
-	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-n": true, "-c": true, "-e": true, "-F": true, "-t": true})
-	_, pane, err := rt.state.NewWindowDetached(currentSession, name, cwd, command, hasAny(args, "-d"))
+	name := optionValue(optionArgs, "-n", "")
+	cwd := optionValue(optionArgs, "-c", "")
+	command := trailingCommand(args, valueOptions)
+	_, pane, err := rt.state.NewWindowDetached(currentSession, name, cwd, command, hasAny(optionArgs, "-d"))
 	if err != nil {
 		return fail(err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(optionArgs))
 	rt.state.SetActiveWindowSize(currentSession, width, height)
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
-	if hasAny(args, "-P") {
-		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+	if hasAny(optionArgs, "-P") {
+		template := optionValue(optionArgs, "-F", "#{session_name}:#{window_index}.#{pane_index}")
 		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
 	}
 	return ok("")
 }
 
 func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, height int) protocol.Message {
-	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	valueOptions := map[string]bool{"-c": true, "-e": true, "-F": true, "-t": true, "-l": true, "-p": true}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(optionArgs, "-t", currentSession), currentSession)
 	if !found {
 		return fail("can't find window")
 	}
-	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-F": true, "-t": true, "-l": true, "-p": true})
+	cwd := optionValue(optionArgs, "-c", "")
+	command := trailingCommand(args, valueOptions)
 	if !hasWindow {
 		rt.state.SetActiveWindowSize(sessionName, width, height)
 	}
 	orientation := "vertical"
-	if hasAny(args, "-h") {
+	if hasAny(optionArgs, "-h") {
 		orientation = "horizontal"
 	}
 	var pane *model.Pane
 	var err error
 	if hasWindow {
-		pane, err = rt.state.SplitPaneWithLayoutByIndexDetached(sessionName, windowIndex, cwd, command, orientation, hasAny(args, "-d"))
+		pane, err = rt.state.SplitPaneWithLayoutByIndexDetached(sessionName, windowIndex, cwd, command, orientation, hasAny(optionArgs, "-d"))
 	} else {
-		pane, err = rt.state.SplitPaneWithLayoutDetached(sessionName, cwd, command, orientation, hasAny(args, "-d"))
+		pane, err = rt.state.SplitPaneWithLayoutDetached(sessionName, cwd, command, orientation, hasAny(optionArgs, "-d"))
 	}
 	if err != nil {
 		return fail(err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(optionArgs))
 	if err := rt.startPane(pane, width, height); err != nil {
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
-	if hasAny(args, "-P") {
-		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+	if hasAny(optionArgs, "-P") {
+		template := optionValue(optionArgs, "-F", "#{session_name}:#{window_index}.#{pane_index}")
 		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
 	}
 	return ok("")
 }
 
 func (rt *Runtime) cmdNewPane(args []string, currentSession string, width, height int) protocol.Message {
-	if hasAny(args, "-L") {
-		return rt.cmdSplitWindow(args, currentSession, width, height)
-	}
-	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
-	if !found {
-		return fail("can't find pane")
-	}
-	cwd := optionValue(args, "-c", "")
-	command := trailingCommand(args, map[string]bool{
+	valueOptions := map[string]bool{
 		"-B": true, "-c": true, "-e": true, "-F": true, "-l": true,
 		"-m": true, "-p": true, "-s": true, "-S": true, "-R": true,
 		"-t": true, "-T": true, "-x": true, "-X": true, "-y": true, "-Y": true,
-	})
+	}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	if hasAny(optionArgs, "-L") {
+		return rt.cmdSplitWindow(args, currentSession, width, height)
+	}
+	sessionName, windowIndex, hasWindow, _, found := rt.targetWindowInfo(optionValue(optionArgs, "-t", currentSession), currentSession)
+	if !found {
+		return fail("can't find pane")
+	}
+	cwd := optionValue(optionArgs, "-c", "")
+	command := trailingCommand(args, valueOptions)
 	windowWidth, windowHeight := rt.windowSize(sessionName, windowIndex)
 	if windowWidth <= 0 {
 		windowWidth = width
@@ -618,21 +626,21 @@ func (rt *Runtime) cmdNewPane(args []string, currentSession string, width, heigh
 	if windowHeight <= 0 {
 		windowHeight = height
 	}
-	paneWidth := sizeOption(args, "-x", windowWidth, max(1, windowWidth/2))
-	paneHeight := sizeOption(args, "-y", windowHeight, max(1, windowHeight/4))
-	left := positionOption(args, "-X", windowWidth, 4)
-	top := positionOption(args, "-Y", windowHeight, 2)
-	pane, err := rt.state.NewFloatingPaneDetached(sessionName, windowIndex, hasWindow, cwd, command, hasAny(args, "-d"), left, top, paneWidth, paneHeight)
+	paneWidth := sizeOption(optionArgs, "-x", windowWidth, max(1, windowWidth/2))
+	paneHeight := sizeOption(optionArgs, "-y", windowHeight, max(1, windowHeight/4))
+	left := positionOption(optionArgs, "-X", windowWidth, 4)
+	top := positionOption(optionArgs, "-Y", windowHeight, 2)
+	pane, err := rt.state.NewFloatingPaneDetached(sessionName, windowIndex, hasWindow, cwd, command, hasAny(optionArgs, "-d"), left, top, paneWidth, paneHeight)
 	if err != nil {
 		return fail(err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(optionArgs))
 	if err := rt.startPane(pane, pane.Width, pane.Height); err != nil {
 		return fail(err.Error())
 	}
 	rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
-	if hasAny(args, "-P") {
-		template := optionValue(args, "-F", "#{session_name}:#{window_index}.#{pane_index}")
+	if hasAny(optionArgs, "-P") {
+		template := optionValue(optionArgs, "-F", "#{session_name}:#{window_index}.#{pane_index}")
 		return ok(formatString(template, formatContextForPaneID(rt.state, pane.ID)))
 	}
 	return ok("")
@@ -715,16 +723,18 @@ func (rt *Runtime) cmdResizeWindow(args []string, currentSession string) protoco
 }
 
 func (rt *Runtime) cmdRespawnPane(args []string, currentSession string, width, height int) protocol.Message {
-	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	valueOptions := map[string]bool{"-c": true, "-e": true, "-t": true}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	pane := rt.targetPane(optionValue(optionArgs, "-t", currentSession), currentSession)
 	if pane == nil {
 		return fail("can't find pane")
 	}
-	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-t": true})
-	respawned, err := rt.state.RespawnPaneByID(pane.ID, optionValue(args, "-c", ""), command, hasAny(args, "-k"))
+	command := trailingCommand(args, valueOptions)
+	respawned, err := rt.state.RespawnPaneByID(pane.ID, optionValue(optionArgs, "-c", ""), command, hasAny(optionArgs, "-k"))
 	if err != nil {
 		return fail("respawn pane failed: " + err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(respawned.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(respawned.ID, environmentOverrides(optionArgs))
 	rt.screensMu.Lock()
 	delete(rt.screens, respawned.ID)
 	rt.screensMu.Unlock()
@@ -736,16 +746,18 @@ func (rt *Runtime) cmdRespawnPane(args []string, currentSession string, width, h
 }
 
 func (rt *Runtime) cmdRespawnWindow(args []string, currentSession string, width, height int) protocol.Message {
-	sessionName, windowIndex, _, _, found := rt.targetWindowInfo(optionValue(args, "-t", currentSession), currentSession)
+	valueOptions := map[string]bool{"-c": true, "-e": true, "-t": true}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	sessionName, windowIndex, _, _, found := rt.targetWindowInfo(optionValue(optionArgs, "-t", currentSession), currentSession)
 	if !found {
 		return fail("can't find window")
 	}
-	command := trailingCommand(args, map[string]bool{"-c": true, "-e": true, "-t": true})
-	pane, killed, err := rt.state.RespawnWindowByIndex(sessionName, windowIndex, optionValue(args, "-c", ""), command, hasAny(args, "-k"))
+	command := trailingCommand(args, valueOptions)
+	pane, killed, err := rt.state.RespawnWindowByIndex(sessionName, windowIndex, optionValue(optionArgs, "-c", ""), command, hasAny(optionArgs, "-k"))
 	if err != nil {
 		return fail("respawn window failed: " + err.Error())
 	}
-	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(args))
+	rt.state.ApplyPaneEnvironmentOverrides(pane.ID, environmentOverrides(optionArgs))
 	rt.screensMu.Lock()
 	delete(rt.screens, pane.ID)
 	for _, paneID := range killed {
@@ -1905,16 +1917,18 @@ func (rt *Runtime) cmdWaitFor(args []string) protocol.Message {
 }
 
 func (rt *Runtime) cmdRunShell(args []string, currentSession string, width, height int) protocol.Message {
-	delay, err := runShellDelay(args)
+	valueOptions := map[string]bool{"-c": true, "-d": true, "-t": true}
+	optionArgs := commandOptionArgs(args, valueOptions)
+	delay, err := runShellDelay(optionArgs)
 	if err != nil {
 		return fail(err.Error())
 	}
-	values := runShellOperands(args)
+	values := trailingCommand(args, valueOptions)
 	if len(values) == 0 {
 		return ok("")
 	}
 	shellCommand := strings.Join(values, " ")
-	if hasAny(args, "-C") {
+	if hasAny(optionArgs, "-C") {
 		if delay > 0 {
 			time.Sleep(delay)
 		}
@@ -1924,9 +1938,9 @@ func (rt *Runtime) cmdRunShell(args []string, currentSession string, width, heig
 		}
 		return rt.executeCommands(commands, currentSession, width, height)
 	}
-	cwd := expandPath(optionValue(args, "-c", ""))
-	showStderr := hasAny(args, "-E")
-	if hasAny(args, "-b") {
+	cwd := expandPath(optionValue(optionArgs, "-c", ""))
+	showStderr := hasAny(optionArgs, "-E")
+	if hasAny(optionArgs, "-b") {
 		go func() {
 			if delay > 0 {
 				time.Sleep(delay)
@@ -2145,27 +2159,7 @@ func runShellDelay(args []string) (time.Duration, error) {
 }
 
 func runShellOperands(args []string) []string {
-	valueFlags := map[string]bool{
-		"-c": true,
-		"-d": true,
-		"-t": true,
-	}
-	var out []string
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--" {
-			out = append(out, args[i+1:]...)
-			break
-		}
-		if strings.HasPrefix(arg, "-") && arg != "-" {
-			if valueFlags[arg] && i+1 < len(args) {
-				i++
-			}
-			continue
-		}
-		out = append(out, arg)
-	}
-	return out
+	return trailingCommand(args, map[string]bool{"-c": true, "-d": true, "-t": true})
 }
 
 func ifShellOperands(args []string) []string {
@@ -2797,10 +2791,23 @@ func lastNonOption(args []string) string {
 }
 
 func trailingCommand(args []string, optionsWithValues map[string]bool) []string {
+	_, commandStart := splitCommandArgs(args, optionsWithValues)
+	if commandStart < 0 {
+		return nil
+	}
+	return append([]string(nil), args[commandStart:]...)
+}
+
+func commandOptionArgs(args []string, optionsWithValues map[string]bool) []string {
+	optionsEnd, _ := splitCommandArgs(args, optionsWithValues)
+	return args[:optionsEnd]
+}
+
+func splitCommandArgs(args []string, optionsWithValues map[string]bool) (int, int) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" {
-			return append([]string(nil), args[i+1:]...)
+			return i, i + 1
 		}
 		if strings.HasPrefix(arg, "-") {
 			if optionsWithValues[arg] && i+1 < len(args) {
@@ -2808,9 +2815,9 @@ func trailingCommand(args []string, optionsWithValues map[string]bool) []string 
 			}
 			continue
 		}
-		return append([]string(nil), args[i:]...)
+		return i, i
 	}
-	return nil
+	return len(args), -1
 }
 
 func listSessions(state *model.Server) string {

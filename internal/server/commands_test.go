@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	osuser "os/user"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1476,6 +1477,55 @@ func TestPaneEnvironmentOverrides(t *testing.T) {
 	}
 	assertPaneHasEnv("SPLITENV", "three")
 	_ = rt.execute([]string{"kill-session", "-t", "envopts"}, "envopts", 80, 24)
+}
+
+func TestShellCommandOptionsStayInTrailingCommand(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	shellCommand := []string{"/bin/sh", "-c", "sleep 0.1"}
+	msg := rt.execute(append([]string{"new-session", "-d", "-s", "shellopts"}, shellCommand...), "", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-session shell command failed: %s", msg.Text)
+	}
+	assertPaneCommand(t, rt.state, shellCommand)
+	msg = rt.execute(append([]string{"new-window", "-t", "shellopts", "-n", "second"}, shellCommand...), "shellopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("new-window shell command failed: %s", msg.Text)
+	}
+	assertPaneCommand(t, rt.state, shellCommand)
+	msg = rt.execute(append([]string{"split-window", "-t", "shellopts:1", "-h"}, shellCommand...), "shellopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("split-window shell command failed: %s", msg.Text)
+	}
+	assertPaneCommand(t, rt.state, shellCommand)
+	msg = rt.execute(append([]string{"respawn-pane", "-k", "-t", "shellopts:0.0"}, shellCommand...), "shellopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("respawn-pane shell command failed: %s", msg.Text)
+	}
+	assertPaneCommand(t, rt.state, shellCommand)
+	msg = rt.execute(append([]string{"respawn-window", "-k", "-t", "shellopts:1"}, shellCommand...), "shellopts", 80, 24)
+	if !msg.OK {
+		t.Fatalf("respawn-window shell command failed: %s", msg.Text)
+	}
+	assertPaneCommand(t, rt.state, shellCommand)
+	msg = rt.execute([]string{"run-shell", "printf", "%s", "-c"}, "shellopts", 80, 24)
+	if !msg.OK || msg.Text != "-c" {
+		t.Fatalf("run-shell trailing option output = %#v, want -c", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "shellopts"}, "shellopts", 80, 24)
+}
+
+func assertPaneCommand(t *testing.T, state *model.Server, command []string) {
+	t.Helper()
+	for _, session := range snapshotSessions(state) {
+		for _, window := range session.Windows {
+			for _, pane := range window.Panes {
+				if reflect.DeepEqual(pane.Command, command) {
+					return
+				}
+			}
+		}
+	}
+	t.Fatalf("missing pane command %#v", command)
 }
 
 func TestRootKeyBindingDispatch(t *testing.T) {

@@ -146,6 +146,29 @@ wait_file_contains() {
   return 1
 }
 
+tmux_shell_opts_file="$(mktemp)"
+gotmux_shell_opts_file="$(mktemp)"
+"${tmux_cmd[@]}" new-session -d -s shellopts -x 80 -y 24 /bin/sh -c "printf 'new-session\n' >> '${tmux_shell_opts_file}' && exec cat"
+"${gotmux_cmd[@]}" new-session -d -s shellopts -x 80 -y 24 /bin/sh -c "printf 'new-session\n' >> '${gotmux_shell_opts_file}' && exec cat" >/dev/null
+"${tmux_cmd[@]}" new-window -t shellopts /bin/sh -c "printf 'new-window\n' >> '${tmux_shell_opts_file}' && exec cat"
+"${gotmux_cmd[@]}" new-window -t shellopts /bin/sh -c "printf 'new-window\n' >> '${gotmux_shell_opts_file}' && exec cat" >/dev/null
+"${tmux_cmd[@]}" split-window -t shellopts -h /bin/sh -c "printf 'split-window\n' >> '${tmux_shell_opts_file}' && exec cat"
+"${gotmux_cmd[@]}" split-window -t shellopts -h /bin/sh -c "printf 'split-window\n' >> '${gotmux_shell_opts_file}' && exec cat" >/dev/null
+for marker in new-session new-window split-window; do
+  if ! wait_file_contains "${tmux_shell_opts_file}" "${marker}" || ! wait_file_contains "${gotmux_shell_opts_file}" "${marker}"; then
+    echo "compat probe failed: shell command option boundary ${marker}" >&2
+    echo "--- tmux" >&2
+    cat "${tmux_shell_opts_file}" >&2 || true
+    echo "--- gotmux" >&2
+    cat "${gotmux_shell_opts_file}" >&2 || true
+    exit 1
+  fi
+done
+printf 'ok shell command option boundary\n'
+"${tmux_cmd[@]}" kill-session -t shellopts
+"${gotmux_cmd[@]}" kill-session -t shellopts >/dev/null
+rm -f "${tmux_shell_opts_file}" "${gotmux_shell_opts_file}"
+
 compare "new-session detached output" new-session -d -s newsout -n first /bin/sh
 compare "new-session print output" new-session -d -P -F "#{session_name}:#{window_index}.#{pane_index}" -s newsp -n first /bin/sh
 
