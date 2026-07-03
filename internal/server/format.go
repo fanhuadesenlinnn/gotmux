@@ -232,6 +232,8 @@ func formatValueLookup(key string, ctx formatContext) (string, bool) {
 			}
 		}
 		return "0", true
+	case "window_flags":
+		return windowFlags(ctx.session, ctx.window), true
 	case "window_zoomed_flag":
 		if ctx.window != nil && ctx.window.Zoomed {
 			return "1", true

@@ -661,16 +661,28 @@ func statusWindowList(session *model.Session) string {
 	})
 	parts := make([]string, 0, len(windows))
 	for _, window := range windows {
-		marker := ""
-		if active := session.ActiveWindow(); active != nil && active.ID == window.ID {
-			marker = "*"
-		}
-		parts = append(parts, fmt.Sprintf("%d:%s%s", window.Index, window.Name, marker))
+		parts = append(parts, fmt.Sprintf("%d:%s%s", window.Index, window.Name, windowFlags(session, window)))
 	}
 	if len(parts) == 0 {
 		return ""
 	}
 	return strings.Join(parts, " ") + " "
+}
+
+func windowFlags(session *model.Session, window *model.Window) string {
+	if window == nil {
+		return ""
+	}
+	var flags strings.Builder
+	if session != nil {
+		if active := session.ActiveWindow(); active != nil && active.ID == window.ID {
+			flags.WriteByte('*')
+		}
+	}
+	if window.Zoomed {
+		flags.WriteByte('Z')
+	}
+	return flags.String()
 }
 
 func (rt *Runtime) resizeActivePane(clientID int64) {

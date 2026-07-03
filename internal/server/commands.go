@@ -3117,16 +3117,11 @@ func listWindowsForSession(session *model.Session, format string, filter string,
 			lines = append(lines, formatString(format, ctx))
 			continue
 		}
-		mark := ""
-		active := session.ActiveWindow()
-		if active == window {
-			mark = "*"
-		}
 		prefix := ""
 		if includeSession {
 			prefix = session.Name + ":"
 		}
-		lines = append(lines, fmt.Sprintf("%s%d: %s%s (%d panes)", prefix, window.Index, window.Name, mark, len(window.Panes)))
+		lines = append(lines, fmt.Sprintf("%s%d: %s%s (%d panes)", prefix, window.Index, window.Name, windowFlags(session, window), len(window.Panes)))
 	}
 	return lines
 }

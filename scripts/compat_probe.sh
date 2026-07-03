@@ -471,8 +471,10 @@ compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane
 "${gotmux_cmd[@]}" split-window -t layzoom -h /bin/sh >/dev/null
 compare "resize-pane zoom command" resize-pane -Z -t layzoom:.0
 compare "resize-pane zoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+compare "resize-pane zoom window flags" list-windows -t layzoom -F "#{window_index}:#{window_flags}:#{window_zoomed_flag}"
 compare "resize-pane unzoom command" resize-pane -Z -t layzoom:.0
 compare "resize-pane unzoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+compare "resize-pane unzoom window flags" list-windows -t layzoom -F "#{window_index}:#{window_flags}:#{window_zoomed_flag}"
 
 "${tmux_cmd[@]}" new-session -d -s resizew -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t resizew -h /bin/sh

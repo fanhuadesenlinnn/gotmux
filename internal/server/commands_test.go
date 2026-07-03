@@ -2782,6 +2782,10 @@ func TestResizePaneZoomTogglesWindowZoom(t *testing.T) {
 	if got.Text != "0:0:0:20:6:1:1\n1:11:0:9:6:0:1" {
 		t.Fatalf("panes after zoom = %q", got.Text)
 	}
+	windows := rt.execute([]string{"list-windows", "-t", "zoom", "-F", "#{window_index}:#{window_flags}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if windows.Text != "0:*Z:1" {
+		t.Fatalf("windows after zoom = %q", windows.Text)
+	}
 	panes := rt.state.ActiveWindowPanes(session.Name)
 	if len(panes) != 1 || panes[0].Index != 0 {
 		t.Fatalf("visible panes after zoom = %#v", panes)
@@ -2793,6 +2797,10 @@ func TestResizePaneZoomTogglesWindowZoom(t *testing.T) {
 	got = rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
 	if got.Text != "0:0:0:10:6:1:0\n1:11:0:9:6:0:0" {
 		t.Fatalf("panes after unzoom = %q", got.Text)
+	}
+	windows = rt.execute([]string{"list-windows", "-t", "zoom", "-F", "#{window_index}:#{window_flags}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if windows.Text != "0:*:0" {
+		t.Fatalf("windows after unzoom = %q", windows.Text)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "zoom"}, "zoom", 80, 24)
 }

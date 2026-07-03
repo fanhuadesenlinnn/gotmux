@@ -62,7 +62,7 @@ terminal capability negotiation remain.
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
 Status: in progress. Basic split geometry, nested split geometry, targeted
-`resize-pane -t`, basic `resize-pane -Z` zoom/unzoom, targeted `select-layout -t` for tmux built-in layouts, basic
+`resize-pane -t`, basic `resize-pane -Z` zoom/unzoom with window zoom flags, targeted `select-layout -t` for tmux built-in layouts, basic
 next/previous layout cycling, basic same-window `swap-pane`, basic
 `rotate-window`, basic non-floating `break-pane`, basic tiled `join-pane` and
 `move-pane`, and screen-backed multi-pane redraw with simple borders are
