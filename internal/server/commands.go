@@ -213,7 +213,12 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 			return fail(fmt.Sprintf("can't find session: %s", target))
 		}
 		return ok("")
-	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "choose-tree", "customize-mode", "find-window":
+	case "choose-tree":
+		if clientID == 0 {
+			return ok("")
+		}
+		return rt.cmdChooseTree(args, currentSession)
+	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "customize-mode", "find-window":
 		return ok("")
 	case "command-prompt", "confirm-before", "display-menu", "display-popup", "suspend-client":
 		if clientID == 0 {
@@ -1296,6 +1301,41 @@ func (rt *Runtime) cmdDisplayPanes(clientID int64) protocol.Message {
 		labels = append(labels, strconv.Itoa(pane.Index))
 	}
 	return ok("panes: " + strings.Join(labels, " "))
+}
+
+func (rt *Runtime) cmdChooseTree(args []string, currentSession string) protocol.Message {
+	sessions, _ := rt.state.Snapshot()
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].ID < sessions[j].ID
+	})
+	sessionOnly := hasAny(args, "-s")
+	parts := make([]string, 0)
+	for _, session := range sessions {
+		sessionMark := ""
+		if session.Name == currentSession {
+			sessionMark = "*"
+		}
+		if sessionOnly {
+			parts = append(parts, session.Name+sessionMark)
+			continue
+		}
+		windows := make([]*model.Window, len(session.Windows))
+		copy(windows, session.Windows)
+		sort.Slice(windows, func(i, j int) bool {
+			return windows[i].Index < windows[j].Index
+		})
+		if len(windows) == 0 {
+			parts = append(parts, session.Name+sessionMark)
+			continue
+		}
+		for _, window := range windows {
+			parts = append(parts, fmt.Sprintf("%s:%d:%s%s", session.Name, window.Index, window.Name, windowFlags(session, window)))
+		}
+	}
+	if len(parts) == 0 {
+		return status("choose-tree: empty")
+	}
+	return status("choose-tree: " + strings.Join(parts, " "))
 }
 
 func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {

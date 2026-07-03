@@ -1824,6 +1824,29 @@ func TestDisplayMessageBindingShowsStatus(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "displaybind"}, "displaybind", 80, 24)
 }
 
+func TestChooseTreeAttachedStatus(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if _, _, _, err := rt.state.NewSession("choosetree", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	if _, _, err := rt.state.NewWindow("choosetree", "second", "", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-window failed: %s", err)
+	}
+	msg := rt.execute([]string{"choose-tree"}, "choosetree", 80, 24)
+	if !msg.OK || msg.Text != "" || msg.StatusText != "" {
+		t.Fatalf("detached choose-tree = %#v", msg)
+	}
+	msg = rt.executeWithClient([]string{"choose-tree"}, "choosetree", 80, 24, 1)
+	if !msg.OK || msg.Text != "" || msg.StatusText != "choose-tree: choosetree:0:first choosetree:1:second*" {
+		t.Fatalf("attached choose-tree = %#v", msg)
+	}
+	msg = rt.executeWithClient([]string{"choose-tree", "-s"}, "choosetree", 80, 24, 1)
+	if !msg.OK || msg.StatusText != "choose-tree: choosetree*" {
+		t.Fatalf("attached choose-tree sessions = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "choosetree"}, "choosetree", 80, 24)
+}
+
 func TestStatusOffSuppressesStatusLine(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
 	if _, _, _, err := rt.state.NewSession("statusoff", "", "first", []string{"/bin/sh"}); err != nil {

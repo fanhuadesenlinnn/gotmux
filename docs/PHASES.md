@@ -119,7 +119,8 @@ metadata, empty `-J`/`-T` jobs/terminal output, and basic timestamped
 command/key message log output. Basic mode entry commands
 now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
 `choose-tree`, `customize-mode`, and `find-window` with tmux-compatible empty
-CLI success in the probed subset; `command-prompt`, `display-panes`, and
+CLI success in the probed subset and attached `choose-tree` summary feedback;
+`command-prompt`, `display-panes`, and
 `suspend-client` match detached CLI no-current-client errors. `display-menu`,
 `display-popup`, and `confirm-before` now match the same detached-client error
 shape. Basic `server-access` covers owner listing and in-memory user ACL
