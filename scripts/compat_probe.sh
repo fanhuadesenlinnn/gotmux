@@ -472,7 +472,11 @@ compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane
 compare "resize-pane zoom command" resize-pane -Z -t layzoom:.0
 compare "resize-pane zoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
 compare "resize-pane zoom window flags" list-windows -t layzoom -F "#{window_index}:#{window_flags}:#{window_zoomed_flag}"
-compare "resize-pane unzoom command" resize-pane -Z -t layzoom:.0
+compare "resize-pane zoom other-target unzoom command" resize-pane -Z -t layzoom:.1
+compare "resize-pane zoom other-target unzoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+compare "resize-pane zoom second pane command" resize-pane -Z -t layzoom:.1
+compare "resize-pane zoom second pane geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+compare "resize-pane unzoom command" resize-pane -Z -t layzoom:.1
 compare "resize-pane unzoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
 compare "resize-pane unzoom window flags" list-windows -t layzoom -F "#{window_index}:#{window_flags}:#{window_zoomed_flag}"
 

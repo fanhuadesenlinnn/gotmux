@@ -2790,17 +2790,33 @@ func TestResizePaneZoomTogglesWindowZoom(t *testing.T) {
 	if len(panes) != 1 || panes[0].Index != 0 {
 		t.Fatalf("visible panes after zoom = %#v", panes)
 	}
-	msg = rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.0"}, session.Name, 20, 6)
+	msg = rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.1"}, session.Name, 20, 6)
 	if !msg.OK {
-		t.Fatalf("second resize-pane -Z failed: %s", msg.Text)
+		t.Fatalf("resize-pane -Z other target failed: %s", msg.Text)
 	}
 	got = rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
 	if got.Text != "0:0:0:10:6:1:0\n1:11:0:9:6:0:0" {
-		t.Fatalf("panes after unzoom = %q", got.Text)
+		t.Fatalf("panes after other-target unzoom = %q", got.Text)
 	}
 	windows = rt.execute([]string{"list-windows", "-t", "zoom", "-F", "#{window_index}:#{window_flags}:#{window_zoomed_flag}"}, session.Name, 20, 6)
 	if windows.Text != "0:*:0" {
-		t.Fatalf("windows after unzoom = %q", windows.Text)
+		t.Fatalf("windows after other-target unzoom = %q", windows.Text)
+	}
+	msg = rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.1"}, session.Name, 20, 6)
+	if !msg.OK {
+		t.Fatalf("resize-pane -Z second pane failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if got.Text != "0:0:0:10:6:0:1\n1:0:0:20:6:1:1" {
+		t.Fatalf("panes after zoom second pane = %q", got.Text)
+	}
+	msg = rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.1"}, session.Name, 20, 6)
+	if !msg.OK {
+		t.Fatalf("resize-pane -Z unzoom second pane failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if got.Text != "0:0:0:10:6:0:0\n1:11:0:9:6:1:0" {
+		t.Fatalf("panes after unzoom second pane = %q", got.Text)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "zoom"}, "zoom", 80, 24)
 }

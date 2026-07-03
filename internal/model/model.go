@@ -1534,7 +1534,7 @@ func (s *Server) TogglePaneZoom(paneID int) error {
 	if !ok {
 		return fmt.Errorf("can't find pane: %d", paneID)
 	}
-	if location.window.Zoomed && location.window.ZoomedPaneID == paneID {
+	if location.window.Zoomed {
 		location.window.Zoomed = false
 		location.window.ZoomedPaneID = -1
 		location.window.recalculateLayout()
