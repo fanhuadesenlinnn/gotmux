@@ -2764,6 +2764,39 @@ func TestSelectPaneDirectionsAndLastPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "selpdir"}, "selpdir", 80, 24)
 }
 
+func TestResizePaneZoomTogglesWindowZoom(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	session, _, _, err := rt.state.NewSession("zoom", "", "first", []string{"/bin/sh"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.state.SetActiveWindowSize(session.Name, 20, 6)
+	if _, err := rt.state.SplitPaneWithLayout(session.Name, "", []string{"/bin/sh"}, "horizontal"); err != nil {
+		t.Fatal(err)
+	}
+	msg := rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.0"}, session.Name, 20, 6)
+	if !msg.OK {
+		t.Fatalf("resize-pane -Z failed: %s", msg.Text)
+	}
+	got := rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if got.Text != "0:0:0:20:6:1:1\n1:11:0:9:6:0:1" {
+		t.Fatalf("panes after zoom = %q", got.Text)
+	}
+	panes := rt.state.ActiveWindowPanes(session.Name)
+	if len(panes) != 1 || panes[0].Index != 0 {
+		t.Fatalf("visible panes after zoom = %#v", panes)
+	}
+	msg = rt.execute([]string{"resize-pane", "-Z", "-t", "zoom:.0"}, session.Name, 20, 6)
+	if !msg.OK {
+		t.Fatalf("second resize-pane -Z failed: %s", msg.Text)
+	}
+	got = rt.execute([]string{"list-panes", "-t", "zoom", "-F", "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"}, session.Name, 20, 6)
+	if got.Text != "0:0:0:10:6:1:0\n1:11:0:9:6:0:0" {
+		t.Fatalf("panes after unzoom = %q", got.Text)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "zoom"}, "zoom", 80, 24)
+}
+
 func TestResizePaneTargetsPane(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, first, err := rt.state.NewSession("resize", "", "first", []string{"/bin/sh"})

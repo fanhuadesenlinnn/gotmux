@@ -35,7 +35,7 @@ tmux-style `display-message` stdout/status separation, `message-limit`, basic `s
 hook option storage and display, basic environment
 commands with target resolution, hidden variables, remove markers, and pane creation overrides,
 prefix/root key bindings, `prefix2` dispatch, default `prefix q`
-display-panes status feedback, basic key binding notes and table
+display-panes status feedback, default `prefix z` pane zoom, basic key binding notes and table
 clearing/errors, `send-prefix`, `send-prefix -2`, basic `run-shell` shell
 execution, basic `if-shell` conditionals, and basic `wait-for` synchronization
 are implemented and covered by `scripts/compat_probe.sh`. Basic empty prompt
@@ -62,7 +62,7 @@ terminal capability negotiation remain.
   commands, zoom, select-layout, rotate/swap/join/break pane behavior.
 
 Status: in progress. Basic split geometry, nested split geometry, targeted
-`resize-pane -t`, targeted `select-layout -t` for tmux built-in layouts, basic
+`resize-pane -t`, basic `resize-pane -Z` zoom/unzoom, targeted `select-layout -t` for tmux built-in layouts, basic
 next/previous layout cycling, basic same-window `swap-pane`, basic
 `rotate-window`, basic non-floating `break-pane`, basic tiled `join-pane` and
 `move-pane`, and screen-backed multi-pane redraw with simple borders are

@@ -465,6 +465,15 @@ compare "resize pane geometry" list-panes -t layresize -F "#{pane_index}:#{pane_
 "${gotmux_cmd[@]}" resize-pane -t layresizetarget:.0 -R 5 >/dev/null
 compare "targeted resize pane geometry" list-panes -t layresizetarget -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 
+"${tmux_cmd[@]}" new-session -d -s layzoom -x 20 -y 6 -n first /bin/sh
+"${tmux_cmd[@]}" split-window -t layzoom -h /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s layzoom -x 20 -y 6 -n first /bin/sh >/dev/null
+"${gotmux_cmd[@]}" split-window -t layzoom -h /bin/sh >/dev/null
+compare "resize-pane zoom command" resize-pane -Z -t layzoom:.0
+compare "resize-pane zoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+compare "resize-pane unzoom command" resize-pane -Z -t layzoom:.0
+compare "resize-pane unzoom geometry" list-panes -t layzoom -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}:#{window_zoomed_flag}"
+
 "${tmux_cmd[@]}" new-session -d -s resizew -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" split-window -t resizew -h /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s resizew -x 80 -y 24 -n first /bin/sh >/dev/null
@@ -800,6 +809,7 @@ compare "untouched target window option" showw -t opttarget:0 -v mode-keys
 "${gotmux_cmd[@]}" bind-key -N "reload config" C-r source-file ~/.tmux.conf >/dev/null
 compare_key_line "default refresh binding" r
 compare_key_line "default display-panes binding" q
+compare_key_line "default zoom binding" z
 compare_key_line "list custom key" C-a
 compare_note_line "list custom key note" C-r
 compare "unbind custom key command" unbind-key C-a

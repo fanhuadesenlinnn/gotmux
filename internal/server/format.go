@@ -232,6 +232,11 @@ func formatValueLookup(key string, ctx formatContext) (string, bool) {
 			}
 		}
 		return "0", true
+	case "window_zoomed_flag":
+		if ctx.window != nil && ctx.window.Zoomed {
+			return "1", true
+		}
+		return "0", true
 	case "pane_id":
 		if ctx.pane != nil {
 			return "%" + strconv.Itoa(ctx.pane.ID), true

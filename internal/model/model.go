@@ -69,20 +69,22 @@ type Session struct {
 }
 
 type Window struct {
-	ID         int
-	Index      int
-	Name       string
-	CreatedAt  time.Time
-	Activity   time.Time
-	Panes      []*Pane
-	Active     int
-	LastPaneID int
-	Width      int
-	Height     int
-	Layout     *LayoutNode
-	LastLayout string
-	Options    map[string]string
-	Hooks      map[string][]string
+	ID           int
+	Index        int
+	Name         string
+	CreatedAt    time.Time
+	Activity     time.Time
+	Panes        []*Pane
+	Active       int
+	LastPaneID   int
+	Width        int
+	Height       int
+	Layout       *LayoutNode
+	LastLayout   string
+	Zoomed       bool
+	ZoomedPaneID int
+	Options      map[string]string
+	Hooks        map[string][]string
 }
 
 type Pane struct {
@@ -318,6 +320,7 @@ func defaultKeyBindings() map[string]map[string]KeyBinding {
 	add("prefix", "t", "clock-mode")
 	add("prefix", "w", "choose-tree", "-Zw")
 	add("prefix", "x", "kill-pane")
+	add("prefix", "z", "resize-pane", "-Z")
 	for i := 0; i <= 9; i++ {
 		key := fmt.Sprintf("%d", i)
 		add("prefix", key, "select-window", "-t", ":"+key)
@@ -1466,6 +1469,11 @@ func (s *Server) ActiveWindowPanes(sessionName string) []*Pane {
 	if window == nil {
 		return nil
 	}
+	if window.Zoomed {
+		if pane := window.paneByID(window.ZoomedPaneID); pane != nil {
+			return []*Pane{pane}
+		}
+	}
 	out := make([]*Pane, len(window.Panes))
 	copy(out, window.Panes)
 	return out
@@ -1516,6 +1524,29 @@ func (s *Server) ResizePaneByID(paneID int, direction string, amount int) error 
 		}
 	}
 	return fmt.Errorf("can't find pane: %d", paneID)
+}
+
+func (s *Server) TogglePaneZoom(paneID int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	location, ok := s.paneLocationLocked(paneID)
+	if !ok {
+		return fmt.Errorf("can't find pane: %d", paneID)
+	}
+	if location.window.Zoomed && location.window.ZoomedPaneID == paneID {
+		location.window.Zoomed = false
+		location.window.ZoomedPaneID = -1
+		location.window.recalculateLayout()
+	} else {
+		selectPaneIndex(location.window, location.paneIndex)
+		location.window.Zoomed = true
+		location.window.ZoomedPaneID = paneID
+		location.window.recalculateLayout()
+	}
+	location.window.Activity = time.Now()
+	location.session.Activity = time.Now()
+	return nil
 }
 
 func (s *Server) SwapPanesByID(sourceID int, targetID int, detached bool) error {
@@ -1616,6 +1647,11 @@ func (s *Server) WindowPanesContainingPane(paneID int) []*Pane {
 		for _, window := range session.Windows {
 			for _, pane := range window.Panes {
 				if pane.ID == paneID {
+					if window.Zoomed {
+						if zoomed := window.paneByID(window.ZoomedPaneID); zoomed != nil {
+							return []*Pane{zoomed}
+						}
+					}
 					out := make([]*Pane, len(window.Panes))
 					copy(out, window.Panes)
 					return out
@@ -3400,14 +3436,15 @@ func (s *Server) newWindowLocked(session *Session, name string) *Window {
 		name = DefaultShellName()
 	}
 	window := &Window{
-		ID:         s.NextWindowID,
-		Index:      len(session.Windows),
-		Name:       name,
-		LastPaneID: -1,
-		Width:      80,
-		Height:     24,
-		CreatedAt:  time.Now(),
-		Activity:   time.Now(),
+		ID:           s.NextWindowID,
+		Index:        len(session.Windows),
+		Name:         name,
+		LastPaneID:   -1,
+		ZoomedPaneID: -1,
+		Width:        80,
+		Height:       24,
+		CreatedAt:    time.Now(),
+		Activity:     time.Now(),
 	}
 	s.NextWindowID++
 	session.Windows = append(session.Windows, window)
@@ -3495,6 +3532,10 @@ func splitLeaf(node *LayoutNode, oldPaneID, newPaneID int, orientation string) *
 }
 
 func (w *Window) removePaneFromLayout(paneID int) {
+	if w.Zoomed && w.ZoomedPaneID == paneID {
+		w.Zoomed = false
+		w.ZoomedPaneID = -1
+	}
 	w.Layout = removeLayoutPane(w.Layout, paneID)
 	if w.Layout == nil && len(w.Panes) > 0 {
 		w.Layout = &LayoutNode{PaneID: w.Panes[0].ID}
@@ -3594,6 +3635,7 @@ func (w *Window) recalculateLayout() {
 		w.Layout = &LayoutNode{PaneID: w.Panes[0].ID}
 	}
 	w.applyLayout(w.Layout, 0, 0, w.Width, w.Height)
+	w.applyZoomedGeometry()
 }
 
 func (w *Window) resizeTo(width, height int) {
@@ -3704,6 +3746,22 @@ func (w *Window) paneByID(id int) *Pane {
 		}
 	}
 	return nil
+}
+
+func (w *Window) applyZoomedGeometry() {
+	if !w.Zoomed {
+		return
+	}
+	pane := w.paneByID(w.ZoomedPaneID)
+	if pane == nil {
+		w.Zoomed = false
+		w.ZoomedPaneID = -1
+		return
+	}
+	pane.Left = 0
+	pane.Top = 0
+	pane.Width = w.Width
+	pane.Height = w.Height
 }
 
 func (n *LayoutNode) isLeaf() bool {

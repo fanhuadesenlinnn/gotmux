@@ -604,9 +604,6 @@ func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, h
 	}
 	cwd := optionValue(optionArgs, "-c", "")
 	command := trailingCommand(args, valueOptions)
-	if !hasWindow {
-		rt.state.SetActiveWindowSize(sessionName, width, height)
-	}
 	orientation := "vertical"
 	if hasAny(optionArgs, "-h") {
 		orientation = "horizontal"
@@ -680,6 +677,17 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 	if currentSession == "" {
 		currentSession = firstSessionName(rt.state)
 	}
+	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
+	if pane == nil {
+		return fail("can't find pane")
+	}
+	if hasAny(args, "-Z") {
+		if err := rt.state.TogglePaneZoom(pane.ID); err != nil {
+			return fail(err.Error())
+		}
+		rt.resizePanes(rt.state.WindowPanesContainingPane(pane.ID))
+		return ok("")
+	}
 	direction := "R"
 	switch {
 	case hasAny(args, "-L"):
@@ -697,10 +705,6 @@ func (rt *Runtime) cmdResizePane(args []string, currentSession string) protocol.
 			amount = parsed
 			break
 		}
-	}
-	pane := rt.targetPane(optionValue(args, "-t", currentSession), currentSession)
-	if pane == nil {
-		return fail("can't find pane")
 	}
 	if err := rt.state.ResizePaneByID(pane.ID, direction, amount); err != nil {
 		return fail(err.Error())
