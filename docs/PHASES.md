@@ -9,7 +9,8 @@ specific as each area gets implemented.
 - Build a repeatable tmux/gotmux comparison probe.
 - Match basic session/window/pane lifecycle commands.
 - Match simple format output for `list-sessions`, `list-windows`,
-  `list-panes`, and `display-message`.
+  `list-panes`, and `display-message`, including basic conditionals and
+  simple width trimming.
 
 Status: complete for the current probe subset, including basic truthy
 `list-sessions`/`list-windows`/`list-panes -f` filters over implemented format
@@ -29,7 +30,8 @@ all local tmux command names, basic `list-clients`, string-backed options with
 global/local/server unset, string append, basic `-o` set-once behavior,
 `show-options -A`, basic `show-options -H`, `-s` server scope, basic `-t`
 targets, default `status-left`/`status-right` values, basic status-left/right
-rendering with an active-window list, `message-limit`, basic `set-hook`/`show-hooks`
+rendering with an active-window list and simple format condition/trimming,
+`message-limit`, basic `set-hook`/`show-hooks`
 hook option storage and display, basic environment
 commands with target resolution, hidden variables, remove markers, and pane creation overrides,
 prefix/root key bindings, `prefix2` dispatch, default `prefix q`

@@ -289,6 +289,9 @@ compare "display-message formats" display-message -p -t compat -F "#{session_nam
 compare "display-message alias" display -p -t compat -F "#{session_name}:#{window_index}:#{window_name}:#{pane_index}"
 compare "display-message target pane" display-message -p -t compat:.0 -F "#{pane_index}:#{pane_active}"
 compare "display-message message" display-message -p -t compat "hello #{session_name}"
+compare "display-message conditional format" display-message -p -t compat -F "#{?pane_active,Y,N}"
+compare "display-message nested conditional format" display-message -p -t compat -F "#{?#{pane_active},#S,N}"
+compare "display-message trim format" display-message -p -t compat -F "#{=3:session_name}"
 
 "${tmux_cmd[@]}" new-session -d -s lsta -x 80 -y 24 -n first /bin/sh
 "${tmux_cmd[@]}" new-window -t lsta -n second /bin/sh

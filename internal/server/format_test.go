@@ -34,3 +34,50 @@ func TestFormatShorthandFields(t *testing.T) {
 		t.Fatalf("formatString() = %q", got)
 	}
 }
+
+func TestFormatConditionals(t *testing.T) {
+	session := &model.Session{Name: "work"}
+	window := &model.Window{Active: 0}
+	active := &model.Pane{ID: 1, Index: 1}
+	inactive := &model.Pane{ID: 2, Index: 2}
+	window.Panes = []*model.Pane{active, inactive}
+	ctx := formatContext{session: session, window: window, pane: active}
+
+	tests := map[string]string{
+		"#{?pane_active,Y,N}":                   "Y",
+		"#{?#{pane_active},#S,N}":               "work",
+		"#{?pane_active,#{session_name},no}":    "work",
+		"#{?1,Y,N}":                             "N",
+		"#{?missing,Y,N}":                       "N",
+		"#{?pane_active,#{pane_index},missing}": "1",
+	}
+	for template, want := range tests {
+		if got := formatString(template, ctx); got != want {
+			t.Fatalf("formatString(%q) = %q, want %q", template, got, want)
+		}
+	}
+
+	inactiveCtx := formatContext{session: session, window: window, pane: inactive}
+	if got := formatString("#{?pane_active,Y,N}", inactiveCtx); got != "N" {
+		t.Fatalf("inactive pane conditional = %q", got)
+	}
+}
+
+func TestFormatTrimModifier(t *testing.T) {
+	session := &model.Session{Name: "work"}
+	pane := &model.Pane{Command: []string{"/usr/bin/python3"}}
+	ctx := formatContext{session: session, pane: pane}
+
+	tests := map[string]string{
+		"#{=2:session_name}":         "wo",
+		"#{=4:#{session_name}}":      "work",
+		"#{=6:pane_current_command}": "python",
+		"#{=4:unknown_format}":       "",
+		"#{=2;...:#{session_name}}":  "",
+	}
+	for template, want := range tests {
+		if got := formatString(template, ctx); got != want {
+			t.Fatalf("formatString(%q) = %q, want %q", template, got, want)
+		}
+	}
+}

@@ -18,7 +18,7 @@ manual verification note.
 | Basic pane process lifecycle | Implemented for tmux-style default cleanup when a pane process exits, including removing the exited pane, closing the window/session when it was the last pane, detaching orphaned clients, and stopping the server when destructive commands, key bindings, or pane exit leave no sessions; the probe covers multi-pane exit cleanup |
 | Common `C-b` prefix bindings | Implemented |
 | Common command aliases | Implemented for covered commands, including `display`, `rename`, `renamew`, `send`, and `detach` |
-| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, attached-client status messages from bindings and command requests, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
+| Basic format expansion for `list-*` and `display-message` | Implemented for the fields, basic `#{?...}` conditionals, basic `#{=N:...}` trimming, basic `list-windows -a`, `list-panes -a/-s`, `list-panes -t session:window`, basic `list-sessions`/`list-windows`/`list-panes -f` truthy filters, basic `display-message -p message`, attached-client status messages from bindings and command requests, and basic `display-message -t pane` targets covered by `scripts/compat_probe.sh` |
 | Basic client listing | Implemented for `list-clients`/`lsc` over attached gotmux clients with basic format fields; the probe covers tmux-compatible empty detached-server output |
 | Basic command sequences | Implemented for semicolon-separated command sequences covered by `scripts/compat_probe.sh` |
 | Basic command metadata | Implemented for `list-commands`/`lscm` over all tmux command names in the local tmux command table; the probe covers formatted command-list fields and alias lookup |
@@ -54,7 +54,7 @@ manual verification note.
 | Area | Gap |
 | --- | --- |
 | Full command parser | Advanced tmux quoting, parse-time formats, command queues, `%if`, includes, and full target resolution are incomplete. |
-| Full format language | Only a small set of session/window/pane fields is implemented. Modifiers, conditionals, expressions, time formats, loops, and style expansion are not implemented. |
+| Full format language | Only a small set of session/window/pane fields, basic conditionals, and simple width trimming are implemented. Advanced modifiers, expressions, time formats, loops, and style expansion are not implemented. |
 | Full list filtering | Basic truthy filters over implemented format fields exist, but tmux's full format expression language for `-f` filters is incomplete. |
 | Full layout rendering | Pane geometry and basic redraw exist for a small subset, but full layout algorithms, complete floating pane behavior, tmux-style border cells, zoom, custom layouts, and pane movement are incomplete. |
 | Screen model | A basic grid, common CSI parser, alternate-screen switching, and a separate byte history ring exist, but full tmux-style scrollback grid, styles/colors, wide-character handling, redraw diffing, and terminal capability negotiation are incomplete. |
@@ -65,7 +65,7 @@ manual verification note.
 | Full option semantics | Only a small string-backed subset exists. Most documented options, option type validation, array option semantics, and option side effects are not implemented; hook storage exists but hook firing side effects are incomplete. |
 | Full environment semantics | `update-environment` integration and complete session/global behavior are incomplete. |
 | Key tables and custom bindings | Prefix/root table dispatch exists for simple bindings, but full key tables, repeat behavior, notes, mode tables, and robust multi-command bindings are incomplete. |
-| Status format language | Basic status-left/status-right formatting and an active-window list are implemented, but tmux's full style, condition, width, and interval behavior is incomplete. |
+| Status format language | Basic status-left/status-right formatting, simple conditions/trimming, and an active-window list are implemented, but tmux's full style, expression, width, and interval behavior is incomplete. |
 | Full pane process lifecycle | Basic process exit cleanup and default empty-server shutdown exist, but `remain-on-exit`, pane-died hooks, `exit-empty` option semantics, and all edge-case notifications remain incomplete. |
 | Full hooks and jobs | Basic hook storage/display is implemented, but hook firing, hook context formats, after-hook ordering, and complete hook side effects remain incomplete; jobs are limited to the basic `run-shell` subset. |
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |
