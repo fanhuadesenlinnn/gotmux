@@ -1043,6 +1043,22 @@ func TestDisplayMessageTargetsPane(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "displayt"}, "displayt", 80, 24)
 }
 
+func TestDisplayMessagePrintFlagControlsCommandOutput(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if msg := rt.execute([]string{"new-session", "-d", "-s", "displayout", "-n", "first", "/bin/sh"}, "", 80, 24); !msg.OK {
+		t.Fatalf("new-session failed: %s", msg.Text)
+	}
+	msg := rt.execute([]string{"display-message", "hello #{session_name}"}, "displayout", 80, 24)
+	if !msg.OK || msg.Text != "" || msg.StatusText != "hello displayout" {
+		t.Fatalf("display-message default output = %#v", msg)
+	}
+	msg = rt.execute([]string{"display-message", "-p", "hello #{session_name}"}, "displayout", 80, 24)
+	if !msg.OK || msg.Text != "hello displayout" || msg.StatusText != "" {
+		t.Fatalf("display-message -p output = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "displayout"}, "displayout", 80, 24)
+}
+
 func TestSendKeysTargetsPaneAndRepeats(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
 	session, _, first, err := rt.state.NewSession("sendt", "", "first", []string{"/bin/sh"})

@@ -84,8 +84,12 @@ func (rt *Runtime) writeCommandResult(clientID int64, result protocol.Message) {
 		return
 	}
 	rt.redrawClient(clientID)
-	if result.Text != "" {
-		rt.writeClientStatusMessage(clientID, result.Text)
+	statusText := result.StatusText
+	if statusText == "" {
+		statusText = result.Text
+	}
+	if statusText != "" {
+		rt.writeClientStatusMessage(clientID, statusText)
 	}
 }
 

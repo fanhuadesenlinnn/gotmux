@@ -31,7 +31,7 @@ global/local/server unset, string append, basic `-o` set-once behavior,
 `show-options -A`, basic `show-options -H`, `-s` server scope, basic `-t`
 targets, default `status-left`/`status-right` values, basic status-left/right
 rendering with an active-window list and simple format condition/trimming,
-`message-limit`, basic `set-hook`/`show-hooks`
+tmux-style `display-message` stdout/status separation, `message-limit`, basic `set-hook`/`show-hooks`
 hook option storage and display, basic environment
 commands with target resolution, hidden variables, remove markers, and pane creation overrides,
 prefix/root key bindings, `prefix2` dispatch, default `prefix q`

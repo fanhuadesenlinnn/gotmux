@@ -31,6 +31,7 @@ type Message struct {
 	Height       int        `json:"height,omitempty"`
 	Data         []byte     `json:"data,omitempty"`
 	Text         string     `json:"text,omitempty"`
+	StatusText   string     `json:"statusText,omitempty"`
 	OK           bool       `json:"ok,omitempty"`
 	Code         int        `json:"code,omitempty"`
 	DetachOthers bool       `json:"detachOthers,omitempty"`

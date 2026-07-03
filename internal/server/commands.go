@@ -1274,7 +1274,11 @@ func (rt *Runtime) cmdDisplayMessage(args []string, currentSession string) proto
 		}
 		ctx = formatContextForPaneID(rt.state, pane.ID)
 	}
-	return ok(formatString(template, ctx))
+	text := formatString(template, ctx)
+	if hasAny(args, "-p") {
+		return ok(text)
+	}
+	return status(text)
 }
 
 func (rt *Runtime) cmdDisplayPanes(clientID int64) protocol.Message {
@@ -2778,6 +2782,10 @@ func findCommandInfo(query string) (commandInfo, error) {
 
 func ok(text string) protocol.Message {
 	return protocol.Message{Type: protocol.TypeResult, OK: true, Text: text}
+}
+
+func status(text string) protocol.Message {
+	return protocol.Message{Type: protocol.TypeResult, OK: true, StatusText: text}
 }
 
 func fail(text string) protocol.Message {
