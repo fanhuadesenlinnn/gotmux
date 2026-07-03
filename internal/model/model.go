@@ -24,6 +24,7 @@ type Server struct {
 	Sessions            map[string]*Session
 	Clients             map[int64]*Client
 	Buffers             map[string]*Buffer
+	Messages            []Message
 	Access              map[string]ServerAccess
 	ServerOptions       map[string]string
 	GlobalOptions       map[string]string
@@ -39,8 +40,15 @@ type Server struct {
 	NextClientID        int64
 	NextBufferID        int
 	NextBufferOrder     int64
+	NextMessageNumber   int64
 	SocketPath          string
 	StartedAt           time.Time
+}
+
+type Message struct {
+	Number int64
+	Time   time.Time
+	Text   string
 }
 
 type Session struct {
@@ -257,7 +265,8 @@ func defaultOptions() map[string]string {
 
 func defaultServerOptions() map[string]string {
 	return map[string]string{
-		"escape-time": "10",
+		"escape-time":   "10",
+		"message-limit": "1000",
 	}
 }
 
@@ -2831,6 +2840,39 @@ func (s *Server) UnsetEnvironment(scope, sessionName, name string) error {
 		return fmt.Errorf("unknown environment scope: %s", scope)
 	}
 	return nil
+}
+
+func (s *Server) AddMessage(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	limit := 1000
+	if value := s.ServerOptions["message-limit"]; value != "" {
+		if parsed, err := strconv.Atoi(value); err == nil && parsed >= 0 {
+			limit = parsed
+		}
+	}
+	s.NextMessageNumber++
+	if limit == 0 {
+		return
+	}
+	s.Messages = append(s.Messages, Message{
+		Number: s.NextMessageNumber,
+		Time:   time.Now(),
+		Text:   text,
+	})
+	if len(s.Messages) > limit {
+		s.Messages = append([]Message(nil), s.Messages[len(s.Messages)-limit:]...)
+	}
+}
+
+func (s *Server) MessageLog() []Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]Message, len(s.Messages))
+	copy(out, s.Messages)
+	return out
 }
 
 func (s *Server) SetBuffer(name, data string, appendData bool) Buffer {

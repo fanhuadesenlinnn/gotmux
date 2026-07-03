@@ -29,8 +29,8 @@ all local tmux command names, basic `list-clients`, string-backed options with
 global/local/server unset, string append, basic `-o` set-once behavior,
 `show-options -A`, basic `show-options -H`, `-s` server scope, basic `-t`
 targets, default `status-left`/`status-right` values, basic status-left/right
-rendering with an active-window list, basic `set-hook`/`show-hooks` hook option
-storage and display, basic environment
+rendering with an active-window list, `message-limit`, basic `set-hook`/`show-hooks`
+hook option storage and display, basic environment
 commands with target resolution, hidden variables, remove markers, and pane creation overrides,
 prefix/root key bindings, `prefix2` dispatch, default `prefix q`
 display-panes status feedback, basic key binding notes and table
@@ -113,7 +113,8 @@ now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `-f` filters and `-O name`/`-O size` sort orders in the probed subset. Basic
 `clear-history` clears gotmux's pane history ring. Prompt-history commands expose
 the tmux-compatible empty-history shape, and `show-messages` covers command
-metadata plus empty `-J`/`-T` jobs/terminal output. Basic mode entry commands
+metadata, empty `-J`/`-T` jobs/terminal output, and basic timestamped command
+message log output. Basic mode entry commands
 now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
 `choose-tree`, `customize-mode`, and `find-window` with tmux-compatible empty
 CLI success in the probed subset; `command-prompt`, `display-panes`, and

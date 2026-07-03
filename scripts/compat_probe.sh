@@ -745,6 +745,7 @@ compare "show server option value" show -sqv escape-time
 "${gotmux_cmd[@]}" set -s escape-time 123 >/dev/null
 compare "set server option value" show -sqv escape-time
 compare "server option visible globally" show -gqv escape-time
+compare "show default message limit" show -sqv message-limit
 "${tmux_cmd[@]}" set -su escape-time
 "${gotmux_cmd[@]}" set -su escape-time >/dev/null
 compare "unset server option value" show -sqv escape-time

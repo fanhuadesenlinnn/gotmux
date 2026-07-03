@@ -190,6 +190,10 @@ func TestOptionsAndKeyBindings(t *testing.T) {
 	if msg.Text != "10" {
 		t.Fatalf("show server escape-time = %q", msg.Text)
 	}
+	msg = rt.execute([]string{"show", "-sqv", "message-limit"}, "", 80, 24)
+	if msg.Text != "1000" {
+		t.Fatalf("show server message-limit = %q", msg.Text)
+	}
 	msg = rt.execute([]string{"show", "-gqv", "escape-time"}, "", 80, 24)
 	if msg.Text != "10" {
 		t.Fatalf("show global escape-time = %q", msg.Text)
@@ -972,6 +976,52 @@ func TestShowMessagesEmptyJobsAndTerminals(t *testing.T) {
 			t.Fatalf("%v = %#v", args, msg)
 		}
 	}
+}
+
+func TestShowMessagesCommandLog(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	msg := rt.executeMessage(protocol.Message{Command: []string{"new-session", "-d", "-s", "msglog", "/bin/sh"}}, "")
+	if !msg.OK {
+		t.Fatalf("new-session = %#v", msg)
+	}
+	msg = rt.executeMessage(protocol.Message{Command: []string{"display-message", "-p", "hello"}}, "msglog")
+	if !msg.OK || msg.Text != "hello" {
+		t.Fatalf("display-message = %#v", msg)
+	}
+	msg = rt.executeMessage(protocol.Message{Command: []string{"show-messages"}}, "msglog")
+	if !msg.OK {
+		t.Fatalf("show-messages = %#v", msg)
+	}
+	lines := strings.Split(msg.Text, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("show-messages lines = %q", msg.Text)
+	}
+	for _, line := range lines[:3] {
+		if len(line) < len("15:04: command: x") || line[2] != ':' || line[5] != ':' {
+			t.Fatalf("message line time shape = %q", line)
+		}
+	}
+	for index, want := range []string{
+		"command: show-messages",
+		"command: display-message -p hello",
+		"command: new-session -d -s msglog /bin/sh",
+	} {
+		if !strings.Contains(lines[index], want) {
+			t.Fatalf("message line %d = %q, want %q", index, lines[index], want)
+		}
+	}
+
+	if msg := rt.execute([]string{"set", "-s", "message-limit", "2"}, "msglog", 80, 24); !msg.OK {
+		t.Fatalf("set message-limit = %#v", msg)
+	}
+	rt.state.AddMessage("manual-one")
+	rt.state.AddMessage("manual-two")
+	rt.state.AddMessage("manual-three")
+	msg = rt.execute([]string{"show-messages"}, "msglog", 80, 24)
+	if !msg.OK || !strings.Contains(msg.Text, "manual-three") || !strings.Contains(msg.Text, "manual-two") || strings.Contains(msg.Text, "manual-one") {
+		t.Fatalf("message-limit output = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "msglog"}, "msglog", 80, 24)
 }
 
 func TestDisplayMessageTargetsPane(t *testing.T) {

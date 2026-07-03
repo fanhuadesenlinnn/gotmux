@@ -136,6 +136,7 @@ func (rt *Runtime) executeMessageForClient(msg protocol.Message, currentSession 
 			return fail(err.Error())
 		}
 	}
+	rt.addCommandMessages(commands, clientID)
 	return rt.executeCommandsForClient(commands, currentSession, msg.Width, msg.Height, clientID)
 }
 
@@ -171,6 +172,20 @@ func (rt *Runtime) executeCommandsForClient(commands [][]string, currentSession 
 		last.Session = activeSession
 	}
 	return last
+}
+
+func (rt *Runtime) addCommandMessages(commands [][]string, clientID int64) {
+	for _, argv := range commands {
+		if len(argv) == 0 {
+			continue
+		}
+		commandText := model.CommandString(argv)
+		if clientID != 0 {
+			rt.state.AddMessage(fmt.Sprintf("client-%d command: %s", clientID, commandText))
+			continue
+		}
+		rt.state.AddMessage("command: " + commandText)
+	}
 }
 
 func (rt *Runtime) execute(argv []string, currentSession string, width, height int) protocol.Message {
@@ -1308,7 +1323,16 @@ func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protoco
 }
 
 func (rt *Runtime) cmdShowMessages(args []string) protocol.Message {
-	return ok("")
+	if hasAny(args, "-J") || hasAny(args, "-T") {
+		return ok("")
+	}
+	messages := rt.state.MessageLog()
+	lines := make([]string, 0, len(messages))
+	for i := len(messages) - 1; i >= 0; i-- {
+		msg := messages[i]
+		lines = append(lines, fmt.Sprintf("%s: %s", msg.Time.Format("15:04"), msg.Text))
+	}
+	return ok(strings.Join(lines, "\n"))
 }
 
 func (rt *Runtime) cmdShowPromptHistory(args []string) protocol.Message {
