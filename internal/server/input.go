@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
 	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
@@ -22,7 +23,7 @@ func (rt *Runtime) handleInput(clientID int64, data []byte) {
 		}
 		key, consumed := inputKeyName(data)
 		if binding, ok := rt.state.KeyBinding("root", key); ok {
-			rt.executeBinding(clientID, binding.Command)
+			rt.executeBinding(clientID, key, binding.Command)
 			if consumed <= 0 {
 				consumed = 1
 			}
@@ -56,12 +57,13 @@ func (rt *Runtime) handlePrefixKey(clientID int64, data []byte) int {
 		return consumed
 	}
 	if binding, ok := rt.state.KeyBinding("prefix", key); ok {
-		rt.executeBinding(clientID, binding.Command)
+		rt.executeBinding(clientID, key, binding.Command)
 	}
 	return consumed
 }
 
-func (rt *Runtime) executeBinding(clientID int64, command []string) {
+func (rt *Runtime) executeBinding(clientID int64, key string, command []string) {
+	rt.state.AddMessage(fmt.Sprintf("client-%d key %s: %s", clientID, key, model.CommandString(command)))
 	session := rt.state.ActiveSessionName(clientID)
 	result := rt.executeWithClient(command, session, rt.clientWidth(clientID), rt.clientContentHeight(clientID), clientID)
 	rt.writeCommandResult(clientID, result)

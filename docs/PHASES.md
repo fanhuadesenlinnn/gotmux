@@ -113,8 +113,8 @@ now cover `set-buffer`, `show-buffer`, `list-buffers`, `delete-buffer`,
 `-f` filters and `-O name`/`-O size` sort orders in the probed subset. Basic
 `clear-history` clears gotmux's pane history ring. Prompt-history commands expose
 the tmux-compatible empty-history shape, and `show-messages` covers command
-metadata, empty `-J`/`-T` jobs/terminal output, and basic timestamped command
-message log output. Basic mode entry commands
+metadata, empty `-J`/`-T` jobs/terminal output, and basic timestamped
+command/key message log output. Basic mode entry commands
 now recognize `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`,
 `choose-tree`, `customize-mode`, and `find-window` with tmux-compatible empty
 CLI success in the probed subset; `command-prompt`, `display-panes`, and

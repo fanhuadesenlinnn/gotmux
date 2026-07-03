@@ -1905,6 +1905,10 @@ func TestPrefixKeyBindingsDispatch(t *testing.T) {
 	if windows.Text != "0:0\n1:1" {
 		t.Fatalf("prefix c windows = %q", windows.Text)
 	}
+	messages := rt.execute([]string{"show-messages"}, "prefixkeys", 80, 24)
+	if !strings.Contains(messages.Text, "client-1 key c: new-window") {
+		t.Fatalf("prefix key message log = %q", messages.Text)
+	}
 	rt.handleInput(client.ID, []byte{0x02, '%'})
 	panes := rt.execute([]string{"list-panes", "-t", "prefixkeys:1", "-F", "#{pane_index}:#{pane_active}"}, "prefixkeys", 80, 24)
 	if panes.Text != "0:0\n1:1" {

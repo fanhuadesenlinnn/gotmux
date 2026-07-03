@@ -31,7 +31,7 @@ manual verification note.
 | Basic server access command | Implemented for `server-access` metadata, `-l` owner/read-write listing, missing/unknown/owner user errors, and basic non-owner `-a`/`-d`/`-r`/`-w` ACL state when the OS user exists |
 | Basic mode/client entry commands | Implemented for `clock-mode`, `copy-mode`, `choose-buffer`, `choose-client`, `choose-tree`, `customize-mode`, and `find-window` empty CLI success, plus basic attached `display-panes` pane-number status feedback, and `display-panes`, `display-menu`, `display-popup`, `confirm-before`, `command-prompt`, and `suspend-client` no-current-client errors in the detached CLI subset |
 | Basic prompt history commands | Implemented for empty `show-prompt-history`/`showphist` output, `-T` filtering, and stateless `clear-prompt-history`/`clearphist`; the probe covers empty histories and invalid type errors |
-| Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata, empty `-J`/`-T` jobs/terminal output, and basic timestamped command message log output with `message-limit` trimming |
+| Basic message inspection commands | Implemented for `show-messages`/`showmsgs` command metadata, empty `-J`/`-T` jobs/terminal output, basic timestamped command/key message log output, and `message-limit` trimming |
 | `source-file` | Implemented for simple command files and line continuations |
 | Explicit `-f` startup config | Implemented for server startup |
 | Default `.tmux.conf` discovery | Implemented for `$HOME/.tmux.conf` when starting a new server |
@@ -69,7 +69,7 @@ manual verification note.
 | Full pane process lifecycle | Basic process exit cleanup and default empty-server shutdown exist, but `remain-on-exit`, pane-died hooks, `exit-empty` option semantics, and all edge-case notifications remain incomplete. |
 | Full hooks and jobs | Basic hook storage/display is implemented, but hook firing, hook context formats, after-hook ordering, and complete hook side effects remain incomplete; jobs are limited to the basic `run-shell` subset. |
 | Full `pipe-pane` semantics | Basic output piping is implemented, but complete bidirectional lifecycle edge cases, offset replay, format expansion, pane destruction integration, and all failure modes remain incomplete. |
-| Full message log | Basic timestamped command messages are stored, but complete client/key text, format fields, target-client filtering, status-message integration, and all message sources are incomplete. |
+| Full message log | Basic timestamped command/key messages are stored, but complete command formatting, target-client filtering, status-message integration, and all message sources are incomplete. |
 | Control mode | Not implemented. |
 | Full `refresh-client` semantics | Basic attached-client success exists, but client panning, control-mode subscriptions, reports, size updates, and flag updates remain incomplete. |
 | Full `switch-client` semantics | Basic attached-client session switching exists, but key-table switching, read-only toggles, sorted session order, environment updates, pane-target active pane selection, and zoom handling remain incomplete. |
