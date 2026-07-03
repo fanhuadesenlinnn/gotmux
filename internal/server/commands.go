@@ -218,7 +218,12 @@ func (rt *Runtime) executeWithClient(argv []string, currentSession string, width
 			return ok("")
 		}
 		return rt.cmdChooseTree(args, currentSession)
-	case "clock-mode", "copy-mode", "choose-buffer", "choose-client", "customize-mode", "find-window":
+	case "choose-buffer":
+		if clientID == 0 {
+			return ok("")
+		}
+		return rt.cmdChooseBuffer()
+	case "clock-mode", "copy-mode", "choose-client", "customize-mode", "find-window":
 		return ok("")
 	case "command-prompt", "confirm-before", "display-menu", "display-popup", "suspend-client":
 		if clientID == 0 {
@@ -1336,6 +1341,18 @@ func (rt *Runtime) cmdChooseTree(args []string, currentSession string) protocol.
 		return status("choose-tree: empty")
 	}
 	return status("choose-tree: " + strings.Join(parts, " "))
+}
+
+func (rt *Runtime) cmdChooseBuffer() protocol.Message {
+	buffers := rt.state.ListBuffers()
+	if len(buffers) == 0 {
+		return status("choose-buffer: empty")
+	}
+	parts := make([]string, 0, len(buffers))
+	for _, buffer := range buffers {
+		parts = append(parts, fmt.Sprintf("%s:%d:%s", buffer.Name, len(buffer.Data), quoteBufferSample(buffer.Data)))
+	}
+	return status("choose-buffer: " + strings.Join(parts, " "))
 }
 
 func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol.Message {

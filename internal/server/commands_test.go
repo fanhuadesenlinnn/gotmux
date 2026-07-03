@@ -1847,6 +1847,28 @@ func TestChooseTreeAttachedStatus(t *testing.T) {
 	_ = rt.execute([]string{"kill-session", "-t", "choosetree"}, "choosetree", 80, 24)
 }
 
+func TestChooseBufferAttachedStatus(t *testing.T) {
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	if _, _, _, err := rt.state.NewSession("choosebuffer", "", "first", []string{"/bin/sh"}); err != nil {
+		t.Fatalf("new-session failed: %s", err)
+	}
+	msg := rt.execute([]string{"choose-buffer"}, "choosebuffer", 80, 24)
+	if !msg.OK || msg.Text != "" || msg.StatusText != "" {
+		t.Fatalf("detached choose-buffer = %#v", msg)
+	}
+	msg = rt.executeWithClient([]string{"choose-buffer"}, "choosebuffer", 80, 24, 1)
+	if !msg.OK || msg.StatusText != "choose-buffer: empty" {
+		t.Fatalf("attached empty choose-buffer = %#v", msg)
+	}
+	rt.state.SetBuffer("one", "alpha", false)
+	rt.state.SetBuffer("two", "beta", false)
+	msg = rt.executeWithClient([]string{"choose-buffer"}, "choosebuffer", 80, 24, 1)
+	if !msg.OK || msg.StatusText != "choose-buffer: two:4:\"beta\" one:5:\"alpha\"" {
+		t.Fatalf("attached choose-buffer = %#v", msg)
+	}
+	_ = rt.execute([]string{"kill-session", "-t", "choosebuffer"}, "choosebuffer", 80, 24)
+}
+
 func TestStatusOffSuppressesStatusLine(t *testing.T) {
 	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), clients: make(map[int64]*attachedClient)}
 	if _, _, _, err := rt.state.NewSession("statusoff", "", "first", []string{"/bin/sh"}); err != nil {
