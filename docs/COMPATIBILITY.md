@@ -48,6 +48,7 @@ manual verification note.
 | Basic paste buffers | Implemented for `set-buffer`, `set-buffer -n`, `show-buffer`, `list-buffers`, basic `list-buffers -f` truthy filters and `-O name`/`-O size`, `delete-buffer`, `paste-buffer`, `load-buffer`, `save-buffer`, and `capture-pane -b`; the probe covers set/show/list/filter/order/rename/delete, file load/save, and capture-to-buffer |
 | tmux/gotmux automated behavior probe | Implemented for the first CLI, format, option, binding, environment, source-file, default-config, command-sequence, pane-geometry, `capture-pane`, and buffer subsets; independent test groups restart their isolated servers so the full probe remains repeatable under macOS PTY limits |
 | macOS/Linux static Go builds | Implemented |
+| Internal source organization | Phase 0 complete: server commands, model ownership, and command tests are split by command/domain family; every Go source file remains below 1000 lines, with no behavioral changes |
 
 ## Not Yet Compatible With tmux
 
@@ -91,4 +92,6 @@ The first architecture pass follows tmux's main separation of concerns:
 - `key-bindings.c`: default prefix key behavior.
 - `tty.c`, `input.c`, `screen*.c`, `status.c`: terminal I/O and rendering.
 
-gotmux mirrors that shape with Go packages under `internal/`.
+gotmux mirrors that shape with Go packages under `internal/`. Command handlers
+and model ownership are split into focused files matching these tmux source
+families so later compatibility work can stay scoped.
