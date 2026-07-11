@@ -152,6 +152,56 @@ func TestScreenCaptureRowsMarksAutoWrappedLines(t *testing.T) {
 	})
 }
 
+func TestScreenTracksSGRStyles(t *testing.T) {
+	screen := NewScreen(24, 2)
+	screen.Write([]byte("\x1b[31mR\x1b[38;5;202mP\x1b[48;2;1;2;3mT\x1b[1;2;3;4;5;7;8;9mA\x1b[22;23;24;25;27;28;29mO"))
+
+	rows := screen.StyledRows()
+	if len(rows) != 2 || len(rows[0].Cells) != 24 {
+		t.Fatalf("styled rows shape = %#v", rows)
+	}
+	want := []StyledCell{
+		{Rune: 'R', Used: true, Style: Style{Fg: Color{Mode: ColorANSI, Value: 1}}},
+		{Rune: 'P', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}}},
+		{Rune: 'T', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
+		{Rune: 'A', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}, Attrs: AttrBold | AttrDim | AttrItalic | AttrUnderline | AttrBlink | AttrReverse | AttrHidden | AttrStrikethrough}},
+		{Rune: 'O', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
+	}
+	for i := range want {
+		if rows[0].Cells[i] != want[i] {
+			t.Fatalf("cell %d = %#v, want %#v", i, rows[0].Cells[i], want[i])
+		}
+	}
+}
+
+func TestScreenEraseUsesCurrentBackground(t *testing.T) {
+	screen := NewScreen(8, 1)
+	screen.Write([]byte("\x1b[41mabc\x1b[K"))
+
+	row := screen.StyledRows()[0]
+	for i := 3; i < 8; i++ {
+		want := StyledCell{Rune: ' ', Style: Style{Bg: Color{Mode: ColorANSI, Value: 1}}}
+		if row.Cells[i] != want {
+			t.Fatalf("erased cell %d = %#v, want %#v", i, row.Cells[i], want)
+		}
+	}
+}
+
+func TestScreenCaptureRowsWithSGRSequencesMatchesTmux(t *testing.T) {
+	screen := NewScreen(32, 3)
+	screen.Write([]byte("\x1b[31mred\x1b[0m plain \x1b[1;44mboldblue\x1b[0m\r\n" +
+		"\x1b[38;5;202m256\x1b[39m \x1b[48;2;1;2;3mRGBBG\x1b[0m\r\n" +
+		"\x1b[1;2;3;4;5;7;8;9mall\x1b[22;23;24;25;27;28;29moff\x1b[0m"))
+
+	rows := screen.CaptureRowsWithSequences(false, true)
+	want := []CaptureRow{
+		{Text: "\x1b[31mred\x1b[39m plain \x1b[1m\x1b[44mboldblue"},
+		{Text: "\x1b[0m\x1b[38;5;202m256\x1b[39m \x1b[48;2;1;2;3mRGBBG"},
+		{Text: "\x1b[1;2;3;4;5;7;8;9m\x1b[49mall\x1b[0moff"},
+	}
+	assertCaptureRows(t, rows, want)
+}
+
 func assertLines(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

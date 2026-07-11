@@ -7,6 +7,7 @@ import (
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
 	"github.com/fanhuadesenlinnn/gotmux/internal/protocol"
+	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func (rt *Runtime) cmdSplitWindow(args []string, currentSession string, width, height int) protocol.Message {
@@ -291,7 +292,7 @@ func (rt *Runtime) cmdCapturePane(args []string, currentSession string) protocol
 	joinLines := hasAny(args, "-J")
 	includeEmptyCells := !joinLines && !hasAny(args, "-T")
 	trimTrailing := !joinLines && !hasAny(args, "-N")
-	rows := rt.capturePaneRows(pane, includeEmptyCells, trimTrailing)
+	rows := rt.capturePaneRows(pane, includeEmptyCells, trimTrailing, hasAny(args, "-e"))
 	rows = sliceCaptureRows(rows, optionValue(args, "-S", ""), optionValue(args, "-E", ""))
 	text := formatCaptureRows(rows, hasAny(args, "-L"), hasAny(args, "-F"), joinLines, hasAny(args, "-C"))
 	if !hasAny(args, "-p") {
@@ -556,7 +557,7 @@ func (rt *Runtime) adjacentPane(paneID int, delta int) *model.Pane {
 }
 
 func (rt *Runtime) capturePaneLines(pane *model.Pane, trimTrailing bool) []string {
-	rows := rt.capturePaneRows(pane, true, trimTrailing)
+	rows := rt.capturePaneRows(pane, true, trimTrailing, false)
 	lines := make([]string, len(rows))
 	for i, row := range rows {
 		lines[i] = row.Text
@@ -570,13 +571,18 @@ type capturePaneRow struct {
 	Number  int
 }
 
-func (rt *Runtime) capturePaneRows(pane *model.Pane, includeEmptyCells bool, trimTrailing bool) []capturePaneRow {
+func (rt *Runtime) capturePaneRows(pane *model.Pane, includeEmptyCells bool, trimTrailing bool, withSequences bool) []capturePaneRow {
 	var rows []capturePaneRow
 	rt.screensMu.RLock()
 	screen := rt.screens[pane.ID]
 	rt.screensMu.RUnlock()
 	if screen != nil {
-		screenRows := screen.CaptureRowsWithOptions(includeEmptyCells, trimTrailing)
+		var screenRows []terminal.CaptureRow
+		if withSequences {
+			screenRows = screen.CaptureRowsWithSequences(includeEmptyCells, trimTrailing)
+		} else {
+			screenRows = screen.CaptureRowsWithOptions(includeEmptyCells, trimTrailing)
+		}
 		rows = make([]capturePaneRow, len(screenRows))
 		for i, row := range screenRows {
 			rows[i] = capturePaneRow{Text: row.Text, Wrapped: row.Wrapped, Number: i}

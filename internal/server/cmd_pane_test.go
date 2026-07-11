@@ -402,6 +402,14 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 		t.Fatalf("capture-pane -C = %q", msg.Text)
 	}
 
+	screen = terminal.NewScreen(24, 1)
+	screen.Write([]byte("\x1b[31mred\x1b[0m plain \x1b[1;44mbold\x1b[0m"))
+	rt.screens[pane.ID] = screen
+	msg = rt.execute([]string{"capture-pane", "-e", "-p", "-T", "-S", "0", "-E", "0", "-t", "cap"}, session.Name, 80, 24)
+	if msg.Text != "\x1b[31mred\x1b[39m plain \x1b[1m\x1b[44mbold" {
+		t.Fatalf("capture-pane -e = %q", msg.Text)
+	}
+
 	screen = terminal.NewScreen(8, 2)
 	screen.Write([]byte("one  \r\ntwo"))
 	rt.screens[pane.ID] = screen

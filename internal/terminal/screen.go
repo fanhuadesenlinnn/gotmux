@@ -32,10 +32,11 @@ type Screen struct {
 	mainSavedX  int
 	mainSavedY  int
 
-	cursorX int
-	cursorY int
-	savedX  int
-	savedY  int
+	cursorX  int
+	cursorY  int
+	savedX   int
+	savedY   int
+	curStyle Style
 
 	state   int
 	csi     []byte
@@ -43,8 +44,9 @@ type Screen struct {
 }
 
 type cell struct {
-	r    rune
-	used bool
+	r     rune
+	used  bool
+	style Style
 }
 
 func NewScreen(width, height int) *Screen {
@@ -95,6 +97,25 @@ func (s *Screen) Lines() []string {
 	return lines
 }
 
+func (s *Screen) StyledRows() []StyledRow {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rows := make([]StyledRow, s.height)
+	for y := 0; y < s.height; y++ {
+		cells := make([]StyledCell, s.width)
+		for x := 0; x < s.width; x++ {
+			current := s.cells[y][x]
+			r := current.r
+			if r == 0 {
+				r = ' '
+			}
+			cells[x] = StyledCell{Rune: r, Used: current.used, Style: current.style}
+		}
+		rows[y] = StyledRow{Cells: cells, Wrapped: y < len(s.wraps) && s.wraps[y]}
+	}
+	return rows
+}
+
 func (s *Screen) CaptureLines(preserveTrailing bool) []string {
 	rows := s.CaptureRows(preserveTrailing)
 	lines := make([]string, len(rows))
@@ -137,6 +158,33 @@ func (s *Screen) CaptureRowsWithOptions(includeEmptyCells bool, trimTrailing boo
 			line = strings.TrimRight(line, " ")
 		}
 		rows[y] = CaptureRow{Text: line, Wrapped: y < len(s.wraps) && s.wraps[y]}
+	}
+	return rows
+}
+
+func (s *Screen) CaptureRowsWithSequences(includeEmptyCells bool, trimTrailing bool) []CaptureRow {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rows := make([]CaptureRow, s.height)
+	lastStyle := Style{}
+	for y := 0; y < s.height; y++ {
+		end := captureLineEnd(s.cells[y], s.width, includeEmptyCells)
+		var line strings.Builder
+		for x := 0; x < end; x++ {
+			current := s.cells[y][x]
+			line.WriteString(styleTransition(lastStyle, current.style))
+			lastStyle = current.style
+			r := current.r
+			if r == 0 {
+				r = ' '
+			}
+			line.WriteRune(r)
+		}
+		text := line.String()
+		if trimTrailing {
+			text = strings.TrimRight(text, " ")
+		}
+		rows[y] = CaptureRow{Text: text, Wrapped: y < len(s.wraps) && s.wraps[y]}
 	}
 	return rows
 }
@@ -307,9 +355,93 @@ func (s *Screen) applyCSILocked(seq string) {
 	case 'u':
 		s.cursorX = clampInt(s.savedX, 0, s.width)
 		s.cursorY = clampInt(s.savedY, 0, s.height-1)
-	case 'm', 'h', 'l', 'r':
+	case 'm':
+		s.applySGRLocked(params)
+	case 'h', 'l', 'r':
 		return
 	}
+}
+
+func (s *Screen) applySGRLocked(params []int) {
+	if len(params) == 0 {
+		s.curStyle = Style{}
+		return
+	}
+	for i := 0; i < len(params); i++ {
+		n := params[i]
+		if n == 38 || n == 48 {
+			if i+2 < len(params) && params[i+1] == 5 && validColorComponent(params[i+2]) {
+				color := Color{Mode: Color256, Value: uint8(params[i+2])}
+				if n == 38 {
+					s.curStyle.Fg = color
+				} else {
+					s.curStyle.Bg = color
+				}
+				i += 2
+				continue
+			}
+			if i+4 < len(params) && params[i+1] == 2 && validColorComponent(params[i+2]) && validColorComponent(params[i+3]) && validColorComponent(params[i+4]) {
+				color := Color{Mode: ColorRGB, R: uint8(params[i+2]), G: uint8(params[i+3]), B: uint8(params[i+4])}
+				if n == 38 {
+					s.curStyle.Fg = color
+				} else {
+					s.curStyle.Bg = color
+				}
+				i += 4
+			}
+			continue
+		}
+		switch n {
+		case 0:
+			s.curStyle = Style{}
+		case 1:
+			s.curStyle.Attrs |= AttrBold
+		case 2:
+			s.curStyle.Attrs |= AttrDim
+		case 3:
+			s.curStyle.Attrs |= AttrItalic
+		case 4:
+			s.curStyle.Attrs |= AttrUnderline
+		case 5, 6:
+			s.curStyle.Attrs |= AttrBlink
+		case 7:
+			s.curStyle.Attrs |= AttrReverse
+		case 8:
+			s.curStyle.Attrs |= AttrHidden
+		case 9:
+			s.curStyle.Attrs |= AttrStrikethrough
+		case 21, 24:
+			s.curStyle.Attrs &^= AttrUnderline
+		case 22:
+			s.curStyle.Attrs &^= AttrBold | AttrDim
+		case 23:
+			s.curStyle.Attrs &^= AttrItalic
+		case 25:
+			s.curStyle.Attrs &^= AttrBlink
+		case 27:
+			s.curStyle.Attrs &^= AttrReverse
+		case 28:
+			s.curStyle.Attrs &^= AttrHidden
+		case 29:
+			s.curStyle.Attrs &^= AttrStrikethrough
+		case 30, 31, 32, 33, 34, 35, 36, 37:
+			s.curStyle.Fg = Color{Mode: ColorANSI, Value: uint8(n - 30)}
+		case 39:
+			s.curStyle.Fg = Color{}
+		case 40, 41, 42, 43, 44, 45, 46, 47:
+			s.curStyle.Bg = Color{Mode: ColorANSI, Value: uint8(n - 40)}
+		case 49:
+			s.curStyle.Bg = Color{}
+		case 90, 91, 92, 93, 94, 95, 96, 97:
+			s.curStyle.Fg = Color{Mode: ColorANSI, Value: uint8(n - 90 + 8)}
+		case 100, 101, 102, 103, 104, 105, 106, 107:
+			s.curStyle.Bg = Color{Mode: ColorANSI, Value: uint8(n - 100 + 8)}
+		}
+	}
+}
+
+func validColorComponent(value int) bool {
+	return value >= 0 && value <= 255
 }
 
 func (s *Screen) applyPrivateModeLocked(params []int, enable bool) {
@@ -422,6 +554,7 @@ func (s *Screen) resetLocked() {
 	s.mainSavedX, s.mainSavedY = 0, 0
 	s.cursorX, s.cursorY = 0, 0
 	s.savedX, s.savedY = 0, 0
+	s.curStyle = Style{}
 	s.state = screenNormal
 	s.csi = s.csi[:0]
 	s.utf8Buf = nil
@@ -440,7 +573,7 @@ func (s *Screen) putRuneLocked(r rune) {
 	if r < 0x20 {
 		return
 	}
-	s.cells[s.cursorY][s.cursorX] = cell{r: r, used: true}
+	s.cells[s.cursorY][s.cursorX] = cell{r: r, used: true, style: s.curStyle}
 	s.cursorX++
 }
 
@@ -523,7 +656,7 @@ func (s *Screen) deleteCharsLocked(count int) {
 	}
 	copy(row[x:], row[minInt(x+count, s.width):])
 	for i := maxInt(s.width-count, x); i < s.width; i++ {
-		row[i] = blankCell()
+		row[i] = blankCellWithBackground(s.curStyle.Bg)
 	}
 }
 
@@ -539,7 +672,7 @@ func (s *Screen) insertBlankCharsLocked(count int) {
 	count = minInt(count, s.width-x)
 	copy(row[x+count:], row[x:s.width-count])
 	for i := x; i < x+count; i++ {
-		row[i] = blankCell()
+		row[i] = blankCellWithBackground(s.curStyle.Bg)
 	}
 }
 
@@ -620,7 +753,7 @@ func (s *Screen) fillLineLocked(y, start, end int, r rune, used bool) {
 	start = clampInt(start, 0, s.width)
 	end = clampInt(end, 0, s.width)
 	for x := start; x < end; x++ {
-		s.cells[y][x] = cell{r: r, used: used}
+		s.cells[y][x] = cell{r: r, used: used, style: Style{Bg: s.curStyle.Bg}}
 	}
 }
 
@@ -697,8 +830,32 @@ func lastUsedCell(cells []cell) int {
 	return -1
 }
 
+func captureLineEnd(cells []cell, width int, includeEmptyCells bool) int {
+	last := lastUsedCell(cells)
+	if includeEmptyCells {
+		for i := len(cells) - 1; i >= 0; i-- {
+			if cells[i].used || cells[i].style != (Style{}) {
+				last = i
+				break
+			}
+		}
+		if last >= 0 {
+			return expandedLineSize(width, last+1)
+		}
+		return 0
+	}
+	if last >= 0 {
+		return last + 1
+	}
+	return 0
+}
+
 func blankCell() cell {
 	return cell{r: ' '}
+}
+
+func blankCellWithBackground(background Color) cell {
+	return cell{r: ' ', style: Style{Bg: background}}
 }
 
 func clampInt(v, low, high int) int {

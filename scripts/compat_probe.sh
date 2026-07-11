@@ -370,6 +370,12 @@ compare "capture-pane used trailing cells" capture-pane -p -N -T -t cap -S 0 -E 
 "${gotmux_cmd[@]}" capture-pane -b capbuf -t cap -S 0 -E 2 >/dev/null
 compare "capture-pane buffer" list-buffers -F "#{buffer_name}:#{buffer_size}:#{buffer_sample}"
 
+"${tmux_cmd[@]}" new-session -d -s capsgr -x 32 -y 5 /bin/sh -c "printf '\033[31mred\033[0m plain \033[1\07344mboldblue\033[0m\r\n\033[38\0735\073202m256\033[39m \033[48\0732\0731\0732\0733mRGBBG\033[0m\r\n\033[1\0732\0733\0734\0735\0737\0738\0739mall\033[22\07323\07324\07325\07327\07328\07329moff\033[0m' && exec cat"
+"${gotmux_cmd[@]}" new-session -d -s capsgr -x 32 -y 5 /bin/sh -c "printf '\033[31mred\033[0m plain \033[1\07344mboldblue\033[0m\r\n\033[38\0735\073202m256\033[39m \033[48\0732\0731\0732\0733mRGBBG\033[0m\r\n\033[1\0732\0733\0734\0735\0737\0738\0739mall\033[22\07323\07324\07325\07327\07328\07329moff\033[0m' && exec cat" >/dev/null
+sleep 0.2
+compare "capture-pane SGR sequences" capture-pane -e -p -T -t capsgr -S 0 -E 2
+compare "capture-pane SGR empty cells" capture-pane -e -p -t capsgr -S 0 -E 2
+
 "${tmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh >/dev/null
 "${tmux_cmd[@]}" send-keys -t capj "printf '\\033[H\\033[2Jabcdefgh\\nxy\\n'" Enter

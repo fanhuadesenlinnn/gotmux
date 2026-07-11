@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fanhuadesenlinnn/gotmux/internal/model"
+	"github.com/fanhuadesenlinnn/gotmux/internal/terminal"
 )
 
 func TestRenderPaneCanvasDrawsSplitBorderAndContent(t *testing.T) {
@@ -50,5 +51,23 @@ func TestVisibleTextLinesStripsANSIEscapes(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("line %d = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func TestRenderPanesIncludesScreenStyles(t *testing.T) {
+	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 2, Height: 1, History: model.NewRing(1024)}
+	rows := map[int][]terminal.StyledRow{
+		pane.ID: {
+			{Cells: []terminal.StyledCell{
+				{Rune: 'A', Used: true, Style: terminal.Style{Fg: terminal.Color{Mode: terminal.ColorANSI, Value: 1}}},
+				{Rune: 'B', Used: true},
+			}},
+		},
+	}
+
+	got := string(renderPanes(2, 1, []*model.Pane{pane}, rows))
+	want := "\x1b[?25l\x1b[2J\x1b[1;1H\x1b[0m\x1b[31mA\x1b[39mB\x1b[?25h"
+	if got != want {
+		t.Fatalf("rendered panes = %q, want %q", got, want)
 	}
 }

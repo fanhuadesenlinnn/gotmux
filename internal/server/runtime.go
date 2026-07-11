@@ -718,7 +718,7 @@ func (rt *Runtime) resizePanes(panes []*model.Pane) {
 }
 
 func (rt *Runtime) renderPanes(width, height int, panes []*model.Pane) []byte {
-	return renderPanes(width, height, panes, rt.paneScreenLines(panes))
+	return renderPanes(width, height, panes, rt.paneScreenRows(panes))
 }
 
 func (rt *Runtime) ensurePaneScreen(pane *model.Pane, width, height int) *terminal.Screen {
@@ -746,13 +746,13 @@ func (rt *Runtime) ensurePaneScreen(pane *model.Pane, width, height int) *termin
 	return screen
 }
 
-func (rt *Runtime) paneScreenLines(panes []*model.Pane) map[int][]string {
+func (rt *Runtime) paneScreenRows(panes []*model.Pane) map[int][]terminal.StyledRow {
 	rt.screensMu.RLock()
 	defer rt.screensMu.RUnlock()
 	if len(rt.screens) == 0 {
 		return nil
 	}
-	lines := make(map[int][]string, len(panes))
+	rows := make(map[int][]terminal.StyledRow, len(panes))
 	for _, pane := range panes {
 		if pane == nil {
 			continue
@@ -761,9 +761,9 @@ func (rt *Runtime) paneScreenLines(panes []*model.Pane) map[int][]string {
 		if screen == nil {
 			continue
 		}
-		lines[pane.ID] = screen.Lines()
+		rows[pane.ID] = screen.StyledRows()
 	}
-	return lines
+	return rows
 }
 
 func (rt *Runtime) clientWidth(id int64) int {
