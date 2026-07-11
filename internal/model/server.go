@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	HistoryBytes       = 2 << 20
 	DefaultStatusLeft  = "[#{session_name}] "
 	DefaultStatusRight = "#{?window_bigger,[#{window_offset_x}#,#{window_offset_y}] ,}\"#{=21:pane_title}\" %H:%M %d-%b-%y"
 )

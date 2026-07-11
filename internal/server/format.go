@@ -249,6 +249,16 @@ func formatValueLookup(key string, ctx formatContext) (string, bool) {
 			return strconv.Itoa(ctx.pane.Index), true
 		}
 		return "", true
+	case "history_size":
+		if ctx.pane != nil {
+			return strconv.Itoa(ctx.pane.HistorySize), true
+		}
+		return "", true
+	case "history_limit":
+		if ctx.pane != nil {
+			return strconv.Itoa(ctx.pane.HistoryLimit), true
+		}
+		return "", true
 	case "pane_left":
 		if ctx.pane != nil {
 			return strconv.Itoa(ctx.pane.Left), true

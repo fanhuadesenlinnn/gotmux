@@ -202,6 +202,49 @@ func TestScreenCaptureRowsWithSGRSequencesMatchesTmux(t *testing.T) {
 	assertCaptureRows(t, rows, want)
 }
 
+func TestScreenStoresHistoryRowsWithinLimit(t *testing.T) {
+	screen := NewScreenWithHistory(5, 2, 3)
+	screen.Write([]byte("one\r\ntwo\r\nthree\r\nfour\r\nfive"))
+
+	if got := screen.HistoryLen(); got != 3 {
+		t.Fatalf("history length = %d, want 3", got)
+	}
+	assertCaptureRows(t, screen.HistoryRows(false, true), []CaptureRow{
+		{Text: "one"},
+		{Text: "two"},
+		{Text: "three"},
+	})
+	assertCaptureRows(t, screen.CaptureAllRowsWithOptions(false, true, false), []CaptureRow{
+		{Text: "one"},
+		{Text: "two"},
+		{Text: "three"},
+		{Text: "four"},
+		{Text: "five"},
+	})
+}
+
+func TestScreenAlternateScreenDoesNotAddHistory(t *testing.T) {
+	screen := NewScreenWithHistory(5, 2, 10)
+	screen.Write([]byte("main\r\nview"))
+	screen.Write([]byte("\x1b[?1049halt1\r\nalt2\r\nalt3\x1b[?1049l"))
+
+	if got := screen.HistoryLen(); got != 0 {
+		t.Fatalf("alternate screen history length = %d, want 0", got)
+	}
+}
+
+func TestScreenClearHistory(t *testing.T) {
+	screen := NewScreenWithHistory(5, 2, 10)
+	screen.Write([]byte("one\r\ntwo\r\nthree"))
+	if got := screen.HistoryLen(); got != 1 {
+		t.Fatalf("history length before clear = %d, want 1", got)
+	}
+	screen.ClearHistory()
+	if got := screen.HistoryLen(); got != 0 {
+		t.Fatalf("history length after clear = %d, want 0", got)
+	}
+}
+
 func assertLines(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {

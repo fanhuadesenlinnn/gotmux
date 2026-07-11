@@ -18,11 +18,14 @@ const (
 // VT sequences used by shells and full-screen programs without inventing tmux
 // behavior above the terminal layer.
 type Screen struct {
-	mu     sync.RWMutex
-	width  int
-	height int
-	cells  [][]cell
-	wraps  []bool
+	mu           sync.RWMutex
+	width        int
+	height       int
+	cells        [][]cell
+	wraps        []bool
+	history      [][]cell
+	historyWraps []bool
+	historyLimit int
 
 	altScreen   bool
 	mainCells   [][]cell
@@ -50,13 +53,20 @@ type cell struct {
 }
 
 func NewScreen(width, height int) *Screen {
+	return NewScreenWithHistory(width, height, 2000)
+}
+
+func NewScreenWithHistory(width, height, historyLimit int) *Screen {
 	if width <= 0 {
 		width = 80
 	}
 	if height <= 0 {
 		height = 24
 	}
-	screen := &Screen{}
+	if historyLimit < 0 {
+		historyLimit = 0
+	}
+	screen := &Screen{historyLimit: historyLimit}
 	screen.resizeLocked(width, height)
 	return screen
 }
@@ -612,6 +622,9 @@ func (s *Screen) clearScreenLocked(mode int) {
 			s.fillLineLocked(y, start, end, ' ', false)
 		}
 	case 2, 3:
+		if mode == 2 && !s.altScreen {
+			s.appendUsedScreenToHistoryLocked()
+		}
 		for y := 0; y < s.height; y++ {
 			s.fillLineLocked(y, 0, s.width, ' ', false)
 			s.setWrappedLocked(y, false)
@@ -711,6 +724,9 @@ func (s *Screen) scrollUpLocked(count int) {
 		return
 	}
 	count = minInt(count, s.height)
+	if !s.altScreen {
+		s.appendHistoryLocked(count)
+	}
 	for y := 0; y < s.height-count; y++ {
 		copy(s.cells[y], s.cells[y+count])
 		s.setWrappedLocked(y, s.isWrappedLocked(y+count))

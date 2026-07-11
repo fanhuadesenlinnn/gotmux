@@ -310,9 +310,13 @@ func (rt *Runtime) cmdClearHistory(args []string, currentSession string) protoco
 	if pane == nil {
 		return fail("can't find pane")
 	}
-	if pane.History != nil {
-		pane.History.Reset()
+	rt.screensMu.RLock()
+	screen := rt.screens[pane.ID]
+	rt.screensMu.RUnlock()
+	if screen != nil {
+		screen.ClearHistory()
 	}
+	rt.state.SetPaneHistorySize(pane.ID, 0)
 	return ok("")
 }
 
@@ -578,20 +582,14 @@ func (rt *Runtime) capturePaneRows(pane *model.Pane, includeEmptyCells bool, tri
 	rt.screensMu.RUnlock()
 	if screen != nil {
 		var screenRows []terminal.CaptureRow
-		if withSequences {
-			screenRows = screen.CaptureRowsWithSequences(includeEmptyCells, trimTrailing)
-		} else {
-			screenRows = screen.CaptureRowsWithOptions(includeEmptyCells, trimTrailing)
-		}
+		screenRows = screen.CaptureAllRowsWithOptions(includeEmptyCells, trimTrailing, withSequences)
+		historyLen := screen.HistoryLen()
 		rows = make([]capturePaneRow, len(screenRows))
 		for i, row := range screenRows {
-			rows[i] = capturePaneRow{Text: row.Text, Wrapped: row.Wrapped, Number: i}
+			rows[i] = capturePaneRow{Text: row.Text, Wrapped: row.Wrapped, Number: i - historyLen}
 		}
 	} else {
-		lines := visibleTextLines(pane.History.Bytes(), pane.Height)
-		if pane.Height > 0 && len(lines) < pane.Height {
-			lines = append(lines, make([]string, pane.Height-len(lines))...)
-		}
+		lines := make([]string, max(0, pane.Height))
 		rows = make([]capturePaneRow, len(lines))
 		for i, line := range lines {
 			if includeEmptyCells && pane.Width > 0 && len(line) < pane.Width {
@@ -635,24 +633,43 @@ func sliceCaptureRows(rows []capturePaneRow, startValue string, endValue string)
 	if len(rows) == 0 {
 		return nil
 	}
+	minimum := rows[0].Number
+	maximum := rows[len(rows)-1].Number
 	start := 0
-	end := len(rows) - 1
+	end := maximum
 	if startValue != "" {
-		start = parseCaptureLineIndex(startValue, len(rows), 0)
+		if startValue == "-" {
+			start = minimum
+		} else if parsed, err := strconv.Atoi(startValue); err == nil {
+			start = parsed
+		}
 	}
 	if endValue != "" {
-		end = parseCaptureLineIndex(endValue, len(rows), end)
+		if endValue == "-" {
+			end = maximum
+		} else if parsed, err := strconv.Atoi(endValue); err == nil {
+			end = parsed
+		}
 	}
-	if start < 0 {
-		start = 0
+	if start < minimum {
+		start = minimum
 	}
-	if end >= len(rows) {
-		end = len(rows) - 1
+	if end > maximum {
+		end = maximum
+	}
+	if end < minimum {
+		end = minimum
 	}
 	if end < start {
 		return nil
 	}
-	return rows[start : end+1]
+	selected := make([]capturePaneRow, 0, end-start+1)
+	for _, row := range rows {
+		if row.Number >= start && row.Number <= end {
+			selected = append(selected, row)
+		}
+	}
+	return selected
 }
 
 func formatCaptureRows(rows []capturePaneRow, numberLines bool, showFlags bool, joinLines bool, escapeSequences bool) string {

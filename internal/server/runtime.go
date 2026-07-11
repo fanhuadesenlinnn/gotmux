@@ -346,9 +346,9 @@ func (rt *Runtime) readPane(pane *model.Pane, file *os.File, generation int) {
 		}
 		if n > 0 {
 			data := append([]byte(nil), buf[:n]...)
-			pane.History.Write(data)
 			if screen := rt.ensurePaneScreen(pane, pane.Width, pane.Height); screen != nil {
 				screen.Write(data)
+				rt.state.SetPaneHistorySize(pane.ID, screen.HistoryLen())
 			}
 			rt.writePanePipe(pane.ID, data)
 			pane.Activity = time.Now()
@@ -513,11 +513,10 @@ func (rt *Runtime) redrawClient(clientID int64) {
 		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: terminal.ClearScreen()})
 	} else if len(panes) == 1 {
 		pane := panes[0]
-		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: terminal.ClearScreen()})
 		if err := rt.startPane(pane, rt.clientWidth(clientID), rt.clientContentHeight(clientID)); err != nil {
 			_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: []byte(err.Error() + "\r\n")})
 		}
-		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: pane.History.Bytes()})
+		_ = client.conn.Write(protocol.Message{Type: protocol.TypeOutput, Data: rt.renderPanes(rt.clientWidth(clientID), rt.clientContentHeight(clientID), panes)})
 	} else {
 		rt.renderClientContent(clientID, client, panes)
 	}
@@ -738,7 +737,7 @@ func (rt *Runtime) ensurePaneScreen(pane *model.Pane, width, height int) *termin
 	}
 	screen := rt.screens[pane.ID]
 	if screen == nil {
-		screen = terminal.NewScreen(width, height)
+		screen = terminal.NewScreenWithHistory(width, height, pane.HistoryLimit)
 		rt.screens[pane.ID] = screen
 		return screen
 	}

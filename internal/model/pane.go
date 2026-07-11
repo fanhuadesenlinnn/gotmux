@@ -4,36 +4,31 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 )
 
 type Pane struct {
-	ID         int
-	Index      int
-	Command    []string
-	Env        []string
-	CWD        string
-	Left       int
-	Top        int
-	Width      int
-	Height     int
-	Floating   bool
-	CreatedAt  time.Time
-	Activity   time.Time
-	PTY        *os.File
-	Process    *exec.Cmd
-	History    *Ring
-	Hooks      map[string][]string
-	Exited     bool
-	ExitState  string
-	Generation int
-}
-
-type PaneExitResult struct {
-	Removed       bool
-	SessionName   string
-	SessionClosed bool
-	ClientIDs     []int64
+	ID           int
+	Index        int
+	Command      []string
+	Env          []string
+	CWD          string
+	Left         int
+	Top          int
+	Width        int
+	Height       int
+	Floating     bool
+	CreatedAt    time.Time
+	Activity     time.Time
+	PTY          *os.File
+	Process      *exec.Cmd
+	HistoryLimit int
+	HistorySize  int
+	Hooks        map[string][]string
+	Exited       bool
+	ExitState    string
+	Generation   int
 }
 
 func (s *Server) SplitPane(sessionName, cwd string, command []string) (*Pane, error) {
@@ -972,15 +967,23 @@ func clampPosition(value, maxPosition, fallback int) int {
 }
 
 func (s *Server) newPaneLocked(session *Session, window *Window, cwd string, command []string) *Pane {
+	historyLimit := 2000
+	value := window.Options["history-limit"]
+	if value == "" {
+		value = s.GlobalWindowOptions["history-limit"]
+	}
+	if parsed, err := strconv.Atoi(value); err == nil && parsed >= 0 {
+		historyLimit = parsed
+	}
 	pane := &Pane{
-		ID:        s.NextPaneID,
-		Index:     len(window.Panes),
-		Command:   NormalizeCommand(command),
-		Env:       s.environmentLocked(session),
-		CWD:       cwd,
-		CreatedAt: time.Now(),
-		Activity:  time.Now(),
-		History:   NewRing(HistoryBytes),
+		ID:           s.NextPaneID,
+		Index:        len(window.Panes),
+		Command:      NormalizeCommand(command),
+		Env:          s.environmentLocked(session),
+		CWD:          cwd,
+		CreatedAt:    time.Now(),
+		Activity:     time.Now(),
+		HistoryLimit: historyLimit,
 	}
 	s.NextPaneID++
 	window.Panes = append(window.Panes, pane)

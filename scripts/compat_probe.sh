@@ -394,6 +394,28 @@ compare "capture-pane joined flags and numbers" capture-pane -p -L -F -J -t capj
 sleep 0.4
 compare "capture-pane escaped backslash" capture-pane -p -C -t capc -S 0 -E 0
 
+"${tmux_cmd[@]}" new-session -d -s caphist -x 20 -y 10 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s caphist -x 20 -y 10 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t caphist "printf '\033[H\033[2J' && seq 1 100" Enter
+"${gotmux_cmd[@]}" send-keys -t caphist "printf '\033[H\033[2J' && seq 1 100" Enter >/dev/null
+sleep 0.4
+compare "capture-pane history range" capture-pane -p -t caphist -S -50
+compare "capture-pane full history range" capture-pane -p -t caphist -S - -E -95
+compare "history formats before clear" display-message -p -t caphist -F "#{history_size}:#{history_limit}"
+compare "clear screen history" clear-history -t caphist
+compare "history formats after clear" display-message -p -t caphist -F "#{history_size}:#{history_limit}"
+
+"${tmux_cmd[@]}" set -g history-limit 3
+"${gotmux_cmd[@]}" set -g history-limit 3 >/dev/null
+"${tmux_cmd[@]}" new-session -d -s histlimit -x 20 -y 5 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s histlimit -x 20 -y 5 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t histlimit "seq 1 20" Enter
+"${gotmux_cmd[@]}" send-keys -t histlimit "seq 1 20" Enter >/dev/null
+sleep 0.3
+compare "history limit trims new pane" display-message -p -t histlimit -F "#{history_size}:#{history_limit}"
+"${tmux_cmd[@]}" set -g history-limit 2000
+"${gotmux_cmd[@]}" set -g history-limit 2000 >/dev/null
+
 compare "clear history command" clear-history -t cap
 compare "clear history alias" clearhist -t cap
 

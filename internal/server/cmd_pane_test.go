@@ -425,28 +425,30 @@ func TestCapturePaneUsesScreenSnapshot(t *testing.T) {
 }
 
 func TestClearHistoryClearsPaneHistory(t *testing.T) {
-	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock")}
+	rt := &Runtime{state: model.NewServer("/tmp/gotmux-test.sock"), screens: make(map[int]*terminal.Screen)}
 	session, _, pane, err := rt.state.NewSession("clear", "", "first", []string{"/bin/sh"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	pane.History.Write([]byte("old\nhistory\n"))
+	screen := terminal.NewScreenWithHistory(8, 2, 10)
+	screen.Write([]byte("old\r\nhistory\r\nvisible"))
+	rt.screens[pane.ID] = screen
 
 	msg := rt.execute([]string{"clear-history", "-t", "clear"}, session.Name, 80, 24)
 	if !msg.OK {
 		t.Fatalf("clear-history failed: %s", msg.Text)
 	}
-	if got := string(pane.History.Bytes()); got != "" {
-		t.Fatalf("history after clear-history = %q", got)
+	if got := screen.HistoryLen(); got != 0 {
+		t.Fatalf("history size after clear-history = %d", got)
 	}
 
-	pane.History.Write([]byte("again\n"))
+	screen.Write([]byte("\r\nagain\r\nmore"))
 	msg = rt.execute([]string{"clearhist", "-t", "clear"}, session.Name, 80, 24)
 	if !msg.OK {
 		t.Fatalf("clearhist failed: %s", msg.Text)
 	}
-	if got := string(pane.History.Bytes()); got != "" {
-		t.Fatalf("history after clearhist = %q", got)
+	if got := screen.HistoryLen(); got != 0 {
+		t.Fatalf("history size after clearhist = %d", got)
 	}
 	_ = rt.execute([]string{"kill-session", "-t", "clear"}, "clear", 80, 24)
 }

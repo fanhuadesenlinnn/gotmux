@@ -8,12 +8,13 @@ import (
 )
 
 func TestRenderPaneCanvasDrawsSplitBorderAndContent(t *testing.T) {
-	left := &model.Pane{Left: 0, Top: 0, Width: 4, Height: 3, History: model.NewRing(1024)}
-	right := &model.Pane{Left: 5, Top: 0, Width: 4, Height: 3, History: model.NewRing(1024)}
-	left.History.Write([]byte("left\n"))
-	right.History.Write([]byte("right\n"))
+	left := &model.Pane{ID: 1, Left: 0, Top: 0, Width: 4, Height: 3}
+	right := &model.Pane{ID: 2, Left: 5, Top: 0, Width: 4, Height: 3}
 
-	got := renderPaneCanvas(9, 3, []*model.Pane{left, right})
+	got := renderPaneCanvas(9, 3, []*model.Pane{left, right}, map[int][]string{
+		1: {"    ", "    ", "left"},
+		2: {"    ", "    ", "right"},
+	})
 	want := []string{
 		"    |    ",
 		"    |    ",
@@ -27,8 +28,7 @@ func TestRenderPaneCanvasDrawsSplitBorderAndContent(t *testing.T) {
 }
 
 func TestRenderPaneCanvasUsesScreenLinesFromTop(t *testing.T) {
-	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 6, Height: 2, History: model.NewRing(1024)}
-	pane.History.Write([]byte("old\nhistory\n"))
+	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 6, Height: 2}
 
 	got := renderPaneCanvas(6, 2, []*model.Pane{pane}, map[int][]string{
 		pane.ID: {"top   ", "next  "},
@@ -55,7 +55,7 @@ func TestVisibleTextLinesStripsANSIEscapes(t *testing.T) {
 }
 
 func TestRenderPanesIncludesScreenStyles(t *testing.T) {
-	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 2, Height: 1, History: model.NewRing(1024)}
+	pane := &model.Pane{ID: 7, Left: 0, Top: 0, Width: 2, Height: 1}
 	rows := map[int][]terminal.StyledRow{
 		pane.ID: {
 			{Cells: []terminal.StyledCell{

@@ -330,6 +330,9 @@ func optionStorageScope(scope, name string) string {
 		if _, ok := defaultServerOptions()[name]; ok {
 			return "server"
 		}
+		if _, ok := defaultWindowOptions()[name]; ok {
+			return "global-window"
+		}
 	}
 	return scope
 }

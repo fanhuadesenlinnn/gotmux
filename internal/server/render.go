@@ -89,19 +89,6 @@ func drawStyledPane(canvas [][]renderCell, covered [][]bool, pane *model.Pane, s
 		}
 		return
 	}
-	textLines := visibleTextLines(pane.History.Bytes(), bottom-top)
-	startY := bottom - len(textLines)
-	for i, line := range textLines {
-		y := startY + i
-		x := left
-		for _, r := range line {
-			if x >= right {
-				break
-			}
-			canvas[y][x].r = r
-			x++
-		}
-	}
 }
 
 func drawStyledBorders(canvas [][]renderCell, covered [][]bool) {
@@ -181,8 +168,6 @@ func drawPane(canvas [][]rune, covered [][]bool, pane *model.Pane, screenLines m
 		drawTextLines(canvas, left, top, right, bottom, lines, true)
 		return
 	}
-	textLines := visibleTextLines(pane.History.Bytes(), bottom-top)
-	drawTextLines(canvas, left, top, right, bottom, textLines, false)
 }
 
 func drawTextLines(canvas [][]rune, left, top, right, bottom int, textLines []string, fromTop bool) {

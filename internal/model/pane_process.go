@@ -2,6 +2,22 @@ package model
 
 import "time"
 
+type PaneExitResult struct {
+	Removed       bool
+	SessionName   string
+	SessionClosed bool
+	ClientIDs     []int64
+}
+
+func (s *Server) SetPaneHistorySize(paneID int, size int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	location, ok := s.paneLocationLocked(paneID)
+	if ok {
+		location.pane.HistorySize = size
+	}
+}
+
 func (s *Server) environmentLocked(session *Session) []string {
 	env := make(map[string]string, len(s.GlobalEnvironment)+len(session.Environment))
 	for key, value := range s.GlobalEnvironment {
@@ -42,7 +58,7 @@ func respawnPaneLocked(session *Session, window *Window, pane *Pane, cwd string,
 	}
 	pane.PTY = nil
 	pane.Process = nil
-	pane.History = NewRing(HistoryBytes)
+	pane.HistorySize = 0
 	pane.Exited = false
 	pane.ExitState = ""
 	pane.Activity = time.Now()
