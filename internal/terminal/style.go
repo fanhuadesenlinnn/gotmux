@@ -40,6 +40,7 @@ type Style struct {
 type StyledCell struct {
 	Rune  rune
 	Used  bool
+	Width int
 	Style Style
 }
 

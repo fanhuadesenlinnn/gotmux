@@ -59,8 +59,8 @@ func TestRenderPanesIncludesScreenStyles(t *testing.T) {
 	rows := map[int][]terminal.StyledRow{
 		pane.ID: {
 			{Cells: []terminal.StyledCell{
-				{Rune: 'A', Used: true, Style: terminal.Style{Fg: terminal.Color{Mode: terminal.ColorANSI, Value: 1}}},
-				{Rune: 'B', Used: true},
+				{Rune: 'A', Used: true, Width: 1, Style: terminal.Style{Fg: terminal.Color{Mode: terminal.ColorANSI, Value: 1}}},
+				{Rune: 'B', Used: true, Width: 1},
 			}},
 		},
 	}
@@ -69,5 +69,24 @@ func TestRenderPanesIncludesScreenStyles(t *testing.T) {
 	want := "\x1b[?25l\x1b[2J\x1b[1;1H\x1b[0m\x1b[31mA\x1b[39mB\x1b[?25h"
 	if got != want {
 		t.Fatalf("rendered panes = %q, want %q", got, want)
+	}
+}
+
+func TestRenderPanesSkipsWideCharacterPlaceholder(t *testing.T) {
+	pane := &model.Pane{ID: 8, Left: 0, Top: 0, Width: 3, Height: 1}
+	rows := map[int][]terminal.StyledRow{
+		pane.ID: {
+			{Cells: []terminal.StyledCell{
+				{Rune: '中', Used: true, Width: 2},
+				{Rune: ' ', Width: 0},
+				{Rune: 'A', Used: true, Width: 1},
+			}},
+		},
+	}
+
+	got := string(renderPanes(3, 1, []*model.Pane{pane}, rows))
+	want := "\x1b[?25l\x1b[2J\x1b[1;1H\x1b[0m中A\x1b[?25h"
+	if got != want {
+		t.Fatalf("rendered wide pane = %q, want %q", got, want)
 	}
 }

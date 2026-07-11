@@ -12,6 +12,7 @@ import (
 
 type renderCell struct {
 	r     rune
+	width int
 	style terminal.Style
 }
 
@@ -26,6 +27,9 @@ func renderPanes(width, height int, panes []*model.Pane, screenRows map[int][]te
 		out.WriteString(fmt.Sprintf("\x1b[%d;1H\x1b[0m", y+1))
 		lastStyle := terminal.Style{}
 		for _, cell := range row {
+			if cell.width == 0 {
+				continue
+			}
 			out.WriteString(terminal.StyleSequence(lastStyle, cell.style))
 			lastStyle = cell.style
 			out.WriteRune(cell.r)
@@ -42,7 +46,7 @@ func renderStyledPaneCanvas(width, height int, panes []*model.Pane, screenRows m
 		canvas[y] = make([]renderCell, width)
 		covered[y] = make([]bool, width)
 		for x := range canvas[y] {
-			canvas[y][x].r = ' '
+			canvas[y][x] = renderCell{r: ' ', width: 1}
 		}
 	}
 	for _, pane := range panes {
@@ -84,7 +88,7 @@ func drawStyledPane(canvas [][]renderCell, covered [][]bool, pane *model.Pane, s
 				if r == 0 {
 					r = ' '
 				}
-				canvas[y][x] = renderCell{r: r, style: cell.Style}
+				canvas[y][x] = renderCell{r: r, width: cell.Width, style: cell.Style}
 			}
 		}
 		return

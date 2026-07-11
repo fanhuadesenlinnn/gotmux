@@ -87,6 +87,9 @@ func captureGridRows(cells [][]cell, wraps []bool, width int, includeEmptyCells 
 		var line strings.Builder
 		for x := 0; x < end; x++ {
 			current := row[x]
+			if current.width == 0 {
+				continue
+			}
 			if withSequences {
 				line.WriteString(styleTransition(*lastStyle, current.style))
 				*lastStyle = current.style

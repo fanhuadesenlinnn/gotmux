@@ -376,6 +376,13 @@ sleep 0.2
 compare "capture-pane SGR sequences" capture-pane -e -p -T -t capsgr -S 0 -E 2
 compare "capture-pane SGR empty cells" capture-pane -e -p -t capsgr -S 0 -E 2
 
+"${tmux_cmd[@]}" new-session -d -s capwide -x 20 -y 4 /bin/sh
+"${gotmux_cmd[@]}" new-session -d -s capwide -x 20 -y 4 /bin/sh >/dev/null
+"${tmux_cmd[@]}" send-keys -t capwide "printf '\033[H\033[2J中文abc漢字\n'" Enter
+"${gotmux_cmd[@]}" send-keys -t capwide "printf '\033[H\033[2J中文abc漢字\n'" Enter >/dev/null
+sleep 0.3
+compare "capture-pane wide characters" capture-pane -p -T -t capwide -S 0 -E 0
+
 "${tmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s capj -x 5 -y 5 /bin/sh >/dev/null
 "${tmux_cmd[@]}" send-keys -t capj "printf '\\033[H\\033[2Jabcdefgh\\nxy\\n'" Enter

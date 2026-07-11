@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 )
 
 const (
@@ -49,6 +51,7 @@ type Screen struct {
 type cell struct {
 	r     rune
 	used  bool
+	width int
 	style Style
 }
 
@@ -119,7 +122,7 @@ func (s *Screen) StyledRows() []StyledRow {
 			if r == 0 {
 				r = ' '
 			}
-			cells[x] = StyledCell{Rune: r, Used: current.used, Style: current.style}
+			cells[x] = StyledCell{Rune: r, Used: current.used, Width: current.width, Style: current.style}
 		}
 		rows[y] = StyledRow{Cells: cells, Wrapped: y < len(s.wraps) && s.wraps[y]}
 	}
@@ -182,6 +185,9 @@ func (s *Screen) CaptureRowsWithSequences(includeEmptyCells bool, trimTrailing b
 		var line strings.Builder
 		for x := 0; x < end; x++ {
 			current := s.cells[y][x]
+			if current.width == 0 {
+				continue
+			}
 			line.WriteString(styleTransition(lastStyle, current.style))
 			lastStyle = current.style
 			r := current.r
@@ -574,7 +580,11 @@ func (s *Screen) putRuneLocked(r rune) {
 	if s.width <= 0 || s.height <= 0 {
 		return
 	}
-	if s.cursorX >= s.width {
+	runeWidth := runewidth.RuneWidth(r)
+	if runeWidth <= 0 {
+		return
+	}
+	if s.cursorX >= s.width || (runeWidth == 2 && s.cursorX == s.width-1) {
 		s.autoWrapLocked()
 	}
 	if s.cursorY < 0 || s.cursorY >= s.height {
@@ -583,8 +593,28 @@ func (s *Screen) putRuneLocked(r rune) {
 	if r < 0x20 {
 		return
 	}
-	s.cells[s.cursorY][s.cursorX] = cell{r: r, used: true, style: s.curStyle}
-	s.cursorX++
+	s.clearWideCellLocked(s.cursorY, s.cursorX)
+	s.cells[s.cursorY][s.cursorX] = cell{r: r, used: true, width: runeWidth, style: s.curStyle}
+	if runeWidth == 2 {
+		s.clearWideCellLocked(s.cursorY, s.cursorX+1)
+		s.cells[s.cursorY][s.cursorX+1] = cell{r: ' ', width: 0, style: s.curStyle}
+	}
+	s.cursorX += runeWidth
+}
+
+func (s *Screen) clearWideCellLocked(y, x int) {
+	if y < 0 || y >= s.height || x < 0 || x >= s.width {
+		return
+	}
+	row := s.cells[y]
+	background := s.curStyle.Bg
+	if row[x].width == 0 && x > 0 && row[x-1].width == 2 {
+		row[x-1] = blankCellWithBackground(background)
+	}
+	if row[x].width == 2 && x+1 < len(row) && row[x+1].width == 0 {
+		row[x+1] = blankCellWithBackground(background)
+	}
+	row[x] = blankCellWithBackground(background)
 }
 
 func (s *Screen) lineFeedLocked() {
@@ -671,6 +701,7 @@ func (s *Screen) deleteCharsLocked(count int) {
 	for i := maxInt(s.width-count, x); i < s.width; i++ {
 		row[i] = blankCellWithBackground(s.curStyle.Bg)
 	}
+	normalizeWideCells(row)
 }
 
 func (s *Screen) insertBlankCharsLocked(count int) {
@@ -687,6 +718,7 @@ func (s *Screen) insertBlankCharsLocked(count int) {
 	for i := x; i < x+count; i++ {
 		row[i] = blankCellWithBackground(s.curStyle.Bg)
 	}
+	normalizeWideCells(row)
 }
 
 func (s *Screen) insertLinesLocked(count int) {
@@ -768,8 +800,14 @@ func (s *Screen) fillLineLocked(y, start, end int, r rune, used bool) {
 	}
 	start = clampInt(start, 0, s.width)
 	end = clampInt(end, 0, s.width)
+	if start > 0 && start < s.width && s.cells[y][start].width == 0 {
+		start--
+	}
+	if end < s.width && s.cells[y][end].width == 0 {
+		end++
+	}
 	for x := start; x < end; x++ {
-		s.cells[y][x] = cell{r: r, used: used, style: Style{Bg: s.curStyle.Bg}}
+		s.cells[y][x] = cell{r: r, used: used, width: 1, style: Style{Bg: s.curStyle.Bg}}
 	}
 }
 
@@ -826,13 +864,16 @@ func cellsString(cells []cell, width int) string {
 	if width > len(cells) {
 		width = len(cells)
 	}
-	runes := make([]rune, width)
+	runes := make([]rune, 0, width)
 	for i := 0; i < width; i++ {
+		if cells[i].width == 0 {
+			continue
+		}
 		r := cells[i].r
 		if r == 0 {
 			r = ' '
 		}
-		runes[i] = r
+		runes = append(runes, r)
 	}
 	return string(runes)
 }
@@ -867,11 +908,26 @@ func captureLineEnd(cells []cell, width int, includeEmptyCells bool) int {
 }
 
 func blankCell() cell {
-	return cell{r: ' '}
+	return cell{r: ' ', width: 1}
 }
 
 func blankCellWithBackground(background Color) cell {
-	return cell{r: ' ', style: Style{Bg: background}}
+	return cell{r: ' ', width: 1, style: Style{Bg: background}}
+}
+
+func normalizeWideCells(row []cell) {
+	for i := range row {
+		switch row[i].width {
+		case 0:
+			if i == 0 || row[i-1].width != 2 {
+				row[i] = blankCell()
+			}
+		case 2:
+			if i+1 >= len(row) || row[i+1].width != 0 {
+				row[i] = blankCell()
+			}
+		}
+	}
 }
 
 func clampInt(v, low, high int) int {

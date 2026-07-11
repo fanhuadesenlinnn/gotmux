@@ -161,11 +161,11 @@ func TestScreenTracksSGRStyles(t *testing.T) {
 		t.Fatalf("styled rows shape = %#v", rows)
 	}
 	want := []StyledCell{
-		{Rune: 'R', Used: true, Style: Style{Fg: Color{Mode: ColorANSI, Value: 1}}},
-		{Rune: 'P', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}}},
-		{Rune: 'T', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
-		{Rune: 'A', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}, Attrs: AttrBold | AttrDim | AttrItalic | AttrUnderline | AttrBlink | AttrReverse | AttrHidden | AttrStrikethrough}},
-		{Rune: 'O', Used: true, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
+		{Rune: 'R', Used: true, Width: 1, Style: Style{Fg: Color{Mode: ColorANSI, Value: 1}}},
+		{Rune: 'P', Used: true, Width: 1, Style: Style{Fg: Color{Mode: Color256, Value: 202}}},
+		{Rune: 'T', Used: true, Width: 1, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
+		{Rune: 'A', Used: true, Width: 1, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}, Attrs: AttrBold | AttrDim | AttrItalic | AttrUnderline | AttrBlink | AttrReverse | AttrHidden | AttrStrikethrough}},
+		{Rune: 'O', Used: true, Width: 1, Style: Style{Fg: Color{Mode: Color256, Value: 202}, Bg: Color{Mode: ColorRGB, R: 1, G: 2, B: 3}}},
 	}
 	for i := range want {
 		if rows[0].Cells[i] != want[i] {
@@ -180,7 +180,7 @@ func TestScreenEraseUsesCurrentBackground(t *testing.T) {
 
 	row := screen.StyledRows()[0]
 	for i := 3; i < 8; i++ {
-		want := StyledCell{Rune: ' ', Style: Style{Bg: Color{Mode: ColorANSI, Value: 1}}}
+		want := StyledCell{Rune: ' ', Width: 1, Style: Style{Bg: Color{Mode: ColorANSI, Value: 1}}}
 		if row.Cells[i] != want {
 			t.Fatalf("erased cell %d = %#v, want %#v", i, row.Cells[i], want)
 		}
@@ -242,6 +242,49 @@ func TestScreenClearHistory(t *testing.T) {
 	screen.ClearHistory()
 	if got := screen.HistoryLen(); got != 0 {
 		t.Fatalf("history length after clear = %d, want 0", got)
+	}
+}
+
+func TestScreenWideRuneWrapsBeforeLastColumn(t *testing.T) {
+	screen := NewScreen(4, 2)
+	screen.Write([]byte("abc中"))
+
+	rows := screen.StyledRows()
+	if !rows[0].Wrapped {
+		t.Fatal("line before wide rune was not marked wrapped")
+	}
+	if rows[1].Cells[0].Rune != '中' || rows[1].Cells[0].Width != 2 || rows[1].Cells[1].Width != 0 {
+		t.Fatalf("wide rune cells = %#v", rows[1].Cells[:2])
+	}
+}
+
+func TestScreenOverwritingWideRuneHalfClearsOtherHalf(t *testing.T) {
+	screen := NewScreen(6, 1)
+	screen.Write([]byte("中文"))
+	screen.Write([]byte("\x1b[1;2HX"))
+
+	cells := screen.StyledRows()[0].Cells
+	if cells[0].Rune != ' ' || cells[0].Width != 1 || cells[1].Rune != 'X' || cells[1].Width != 1 {
+		t.Fatalf("overwritten wide cells = %#v", cells[:2])
+	}
+	if cells[2].Rune != '文' || cells[2].Width != 2 || cells[3].Width != 0 {
+		t.Fatalf("following wide cells = %#v", cells[2:4])
+	}
+}
+
+func TestScreenInsertDeleteLeaveNoOrphanWideCells(t *testing.T) {
+	screen := NewScreen(8, 1)
+	screen.Write([]byte("A中文B"))
+	screen.Write([]byte("\x1b[1;2H\x1b[P\x1b[2@"))
+
+	cells := screen.StyledRows()[0].Cells
+	for i, current := range cells {
+		if current.Width == 0 && (i == 0 || cells[i-1].Width != 2) {
+			t.Fatalf("orphan wide placeholder at %d: %#v", i, cells)
+		}
+		if current.Width == 2 && (i+1 >= len(cells) || cells[i+1].Width != 0) {
+			t.Fatalf("wide main cell without placeholder at %d: %#v", i, cells)
+		}
 	}
 }
 
