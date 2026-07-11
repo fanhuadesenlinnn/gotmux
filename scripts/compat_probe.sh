@@ -146,6 +146,43 @@ wait_file_contains() {
   return 1
 }
 
+restart_probe_servers() {
+  local i started
+
+  "${tmux_cmd[@]}" kill-server
+  "${gotmux_cmd[@]}" kill-server >/dev/null
+
+  started=false
+  for i in {1..40}; do
+    if "${tmux_cmd[@]}" new-session -d -s compat -n first -x 80 -y 24 /bin/sh 2>/dev/null; then
+      started=true
+      break
+    fi
+    sleep 0.05
+  done
+  if [[ "${started}" != true ]]; then
+    echo "compat probe failed: tmux server restart" >&2
+    return 1
+  fi
+  "${tmux_cmd[@]}" new-window -t compat -n second /bin/sh
+  "${tmux_cmd[@]}" split-window -t compat -h /bin/sh
+
+  started=false
+  for i in {1..40}; do
+    if "${gotmux_cmd[@]}" new-session -d -s compat -n first /bin/sh >/dev/null 2>&1; then
+      started=true
+      break
+    fi
+    sleep 0.05
+  done
+  if [[ "${started}" != true ]]; then
+    echo "compat probe failed: gotmux server restart" >&2
+    return 1
+  fi
+  "${gotmux_cmd[@]}" new-window -t compat -n second /bin/sh >/dev/null
+  "${gotmux_cmd[@]}" split-window -t compat -h /bin/sh >/dev/null
+}
+
 tmux_shell_opts_file="$(mktemp)"
 gotmux_shell_opts_file="$(mktemp)"
 "${tmux_cmd[@]}" new-session -d -s shellopts -x 80 -y 24 /bin/sh -c "printf 'new-session\n' >> '${tmux_shell_opts_file}' && exec cat"
@@ -726,6 +763,9 @@ compare "new-pane print command" new-pane -P -F "#{pane_index}:#{pane_left}:#{pa
 compare "new-pane panes" list-panes -t newp -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
 compare "new-pane detached command" newp -d -x 20 -y 5 -X 3 -Y 4 -t newp /bin/sh
 compare "new-pane detached panes" list-panes -t newp -F "#{pane_index}:#{pane_left}:#{pane_top}:#{pane_width}:#{pane_height}:#{pane_active}"
+
+# Split independent groups to keep the long probe below macOS's PTY limit.
+restart_probe_servers
 
 "${tmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh
 "${gotmux_cmd[@]}" new-session -d -s respawn -x 80 -y 24 -n first /bin/sh >/dev/null
